@@ -35,6 +35,25 @@ static void uuid_simple_from_ids(uint16_t bustype, uint16_t vendor, uint16_t pro
   bytes_to_hex32(b, out33);
 }
 
+// Match gilrs-core macOS UUID layout:
+// bytes = [bustype(u32 le=0x03), vendor(u16 le), 0,0, product(u16 le), 0,0, version(u16 le), 0,0]
+static void uuid_simple_macos(uint16_t vendor, uint16_t product, uint16_t version, char out33[33]) {
+  uint8_t b[16];
+  memset(b, 0, sizeof(b));
+  if (vendor == 0 && product == 0 && version == 0) {
+    bytes_to_hex32(b, out33);
+    return;
+  }
+  b[0] = 0x03; // bustype (USB), little-endian u32
+  b[4] = (uint8_t)(vendor & 0xFF);
+  b[5] = (uint8_t)((vendor >> 8) & 0xFF);
+  b[8] = (uint8_t)(product & 0xFF);
+  b[9] = (uint8_t)((product >> 8) & 0xFF);
+  b[12] = (uint8_t)(version & 0xFF);
+  b[13] = (uint8_t)((version >> 8) & 0xFF);
+  bytes_to_hex32(b, out33);
+}
+
 static moonbit_string_t moonbit_string_from_utf8_lossy(const char *s) {
   if (s == NULL) {
     return moonbit_make_string_raw(0);
@@ -362,28 +381,32 @@ static uint32_t map_hid_button_usage(uint32_t usage) {
     return CODE_BTN_SOUTH;
   case 2:
     return CODE_BTN_EAST;
-  case 3:
-    return CODE_BTN_WEST;
   case 4:
-    return CODE_BTN_NORTH;
+    return CODE_BTN_WEST;
   case 5:
-    return CODE_BTN_LT;
-  case 6:
-    return CODE_BTN_RT;
+    return CODE_BTN_NORTH;
   case 7:
-    return CODE_BTN_LT2;
+    return CODE_BTN_LT;
   case 8:
-    return CODE_BTN_RT2;
+    return CODE_BTN_RT;
   case 9:
-    return CODE_BTN_SELECT;
+    return CODE_BTN_LT2;
   case 10:
-    return CODE_BTN_START;
+    return CODE_BTN_RT2;
   case 11:
-    return CODE_BTN_MODE;
+    return CODE_BTN_SELECT;
   case 12:
-    return CODE_BTN_LTHUMB;
+    return CODE_BTN_START;
   case 13:
+    return CODE_BTN_MODE;
+  case 14:
+    return CODE_BTN_LTHUMB;
+  case 15:
     return CODE_BTN_RTHUMB;
+  case 20:
+    return CODE_BTN_C;
+  case 21:
+    return CODE_BTN_Z;
   default:
     return UINT32_MAX;
   }
@@ -398,12 +421,12 @@ static uint32_t map_hid_gd_usage_to_axis(uint32_t usage) {
   case 0x31:
     return CODE_AXIS_LSTICKY;
   case 0x32:
-    return CODE_AXIS_LEFTZ;
-  case 0x33:
     return CODE_AXIS_RSTICKX;
-  case 0x34:
-    return CODE_AXIS_RSTICKY;
   case 0x35:
+    return CODE_AXIS_RSTICKY;
+  case 0x33:
+    return CODE_AXIS_LEFTZ;
+  case 0x34:
     return CODE_AXIS_RIGHTZ;
   default:
     return UINT32_MAX;
@@ -426,6 +449,23 @@ static double norm_i32(int32_t v, int32_t minv, int32_t maxv) {
     t = 1.0;
   }
   return t * 2.0 - 1.0;
+}
+
+static double norm_btn_01_i32(int32_t v, int32_t minv, int32_t maxv) {
+  if (maxv == minv) {
+    return 0.0;
+  }
+  double dv = (double)v;
+  double dmin = (double)minv;
+  double dmax = (double)maxv;
+  double t = (dv - dmin) / (dmax - dmin);
+  if (t < 0.0) {
+    t = 0.0;
+  }
+  if (t > 1.0) {
+    t = 1.0;
+  }
+  return t;
 }
 
 static double clamp_f64(double v, double lo, double hi) {
@@ -496,17 +536,21 @@ static void mac_fill_device_info(moon_gamepad_backend_t *b, uint32_t idx, IOHIDD
       b->products[idx] = p;
     }
   }
+  int32_t ver = 0;
+  CFTypeRef verref = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDVersionNumberKey));
+  if (verref != NULL && CFGetTypeID(verref) == CFNumberGetTypeID()) {
+    (void)CFNumberGetValue((CFNumberRef)verref, kCFNumberSInt32Type, &ver);
+  }
   CFTypeRef nref = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductKey));
   if (nref != NULL && CFGetTypeID(nref) == CFStringGetTypeID()) {
     CFStringRef s = (CFStringRef)nref;
     (void)CFStringGetCString(s, b->names[idx], (CFIndex)sizeof(b->names[idx]), kCFStringEncodingUTF8);
   }
 
-  uint16_t bustype = 0x03; // USB (best-effort).
-  uint16_t vendor = (b->vendors[idx] >= 0) ? (uint16_t)b->vendors[idx] : 0;
-  uint16_t product = (b->products[idx] >= 0) ? (uint16_t)b->products[idx] : 0;
-  uint16_t version = 0;
-  uuid_simple_from_ids(bustype, vendor, product, version, b->uuids[idx]);
+  uint16_t vendor = (b->vendors[idx] > 0) ? (uint16_t)b->vendors[idx] : 0;
+  uint16_t product = (b->products[idx] > 0) ? (uint16_t)b->products[idx] : 0;
+  uint16_t version = (ver > 0) ? (uint16_t)ver : 0;
+  uuid_simple_macos(vendor, product, version, b->uuids[idx]);
 }
 
 static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDeviceRef device) {
@@ -681,6 +725,26 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
     moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, nv, t};
     queue_push(&b->q, ev);
     return;
+  }
+
+  // Simulation page 0x02: analog triggers on some controllers.
+  if (page == 0x02) {
+    // kHIDUsage_Sim_Accelerator (0xC4), kHIDUsage_Sim_Brake (0xC5)
+    uint32_t code = UINT32_MAX;
+    if (usage == 0xC4) {
+      code = CODE_BTN_RT2;
+    } else if (usage == 0xC5) {
+      code = CODE_BTN_LT2;
+    }
+    if (code != UINT32_MAX) {
+      int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
+      int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
+      int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
+      double nv = norm_btn_01_i32(v, minv, maxv);
+      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_CHANGED, id, code, 0, nv, t};
+      queue_push(&b->q, ev);
+      return;
+    }
   }
 }
 
