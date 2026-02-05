@@ -392,6 +392,30 @@ static uint32_t device_id_of(moon_gamepad_backend_t *b, IOHIDDeviceRef dev) {
   return b->device_ids[(uint32_t)idx];
 }
 
+static int mac_idx_by_entry_id(moon_gamepad_backend_t *b, uint64_t entry_id) {
+  if (b == NULL) {
+    return -1;
+  }
+  for (uint32_t i = 0; i < b->devices_len; i++) {
+    if (b->entry_ids[i] == entry_id) {
+      return (int)i;
+    }
+  }
+  return -1;
+}
+
+static int mac_idx_by_location_id(moon_gamepad_backend_t *b, uint32_t location_id) {
+  if (b == NULL) {
+    return -1;
+  }
+  for (uint32_t i = 0; i < b->devices_len; i++) {
+    if (b->location_ids[i] == location_id) {
+      return (int)i;
+    }
+  }
+  return -1;
+}
+
 static uint32_t map_hid_button_usage(uint32_t usage) {
   // Best-effort, common HID gamepad layouts.
   switch (usage) {
@@ -919,7 +943,12 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
   if (b == NULL || device == NULL) {
     return;
   }
-  int idx = find_device_idx(b, device);
+  int32_t location_id_i32 = 0;
+  if (!mac_get_i32_prop(device, CFSTR(kIOHIDLocationIDKey), &location_id_i32) || location_id_i32 <= 0) {
+    return;
+  }
+  uint32_t location_id = (uint32_t)location_id_i32;
+  int idx = mac_idx_by_location_id(b, location_id);
   if (idx < 0) {
     return;
   }
@@ -977,7 +1006,15 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
     return;
   }
   IOHIDDeviceRef dev = (IOHIDDeviceRef)sender;
-  int dev_idx = find_device_idx(b, dev);
+  if (dev == NULL) {
+    return;
+  }
+  io_service_t svc = IOHIDDeviceGetService(dev);
+  uint64_t entry_id = 0;
+  if (svc == IO_OBJECT_NULL || IORegistryEntryGetRegistryEntryID(svc, &entry_id) != KERN_SUCCESS) {
+    return;
+  }
+  int dev_idx = mac_idx_by_entry_id(b, entry_id);
   if (dev_idx < 0) {
     return;
   }
