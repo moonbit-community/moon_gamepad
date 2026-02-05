@@ -276,15 +276,17 @@ typedef struct moon_gamepad_backend_t {
   IOHIDManagerRef mgr;
   CFRunLoopRef rl;
   pthread_t thread;
-  // Simple device list.
+  // Device slots: keep stable ids across reconnect.
   IOHIDDeviceRef devices[32];
   uint32_t device_ids[32];
   uint64_t entry_ids[32];
   uint32_t location_ids[32];
+  uint8_t connected[32];
   int32_t vendors[32];
   int32_t products[32];
   char uuids[32][33];
   char names[32][256];
+  // Number of allocated slots (may include disconnected ones).
   uint32_t devices_len;
   uint32_t next_id;
   // DPad hat state per device index.
@@ -397,7 +399,7 @@ static int mac_idx_by_entry_id(moon_gamepad_backend_t *b, uint64_t entry_id) {
     return -1;
   }
   for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->entry_ids[i] == entry_id) {
+    if (b->connected[i] && b->entry_ids[i] == entry_id) {
       return (int)i;
     }
   }
@@ -409,11 +411,24 @@ static int mac_idx_by_location_id(moon_gamepad_backend_t *b, uint32_t location_i
     return -1;
   }
   for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->location_ids[i] == location_id) {
+    if (b->connected[i] && b->location_ids[i] == location_id) {
       return (int)i;
     }
   }
   return -1;
+}
+
+static int mac_connected_count(moon_gamepad_backend_t *b) {
+  if (b == NULL) {
+    return 0;
+  }
+  int n = 0;
+  for (uint32_t i = 0; i < b->devices_len; i++) {
+    if (b->connected[i]) {
+      n++;
+    }
+  }
+  return n;
 }
 
 static uint32_t map_hid_button_usage(uint32_t usage) {
@@ -872,9 +887,6 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
   if (b == NULL || device == NULL) {
     return;
   }
-  if (b->devices_len >= 32) {
-    return;
-  }
   if (find_device_idx(b, device) >= 0) {
     return;
   }
@@ -912,27 +924,41 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
   }
 
   // Dedupe by entry/location in case the callback is invoked multiple times.
+  uint32_t idx = UINT32_MAX;
   for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->location_ids[i] == location_id && b->entry_ids[i] == entry_id) {
+    if (b->entry_ids[i] != entry_id) {
+      continue;
+    }
+    if (b->connected[i]) {
       return;
     }
+    // Reuse disconnected slot (stable id across reconnect).
+    idx = i;
+    break;
+  }
+  if (idx == UINT32_MAX) {
+    if (b->devices_len >= 32) {
+      return;
+    }
+    idx = b->devices_len++;
+    b->device_ids[idx] = b->next_id++;
+    b->entry_ids[idx] = entry_id;
   }
 
   // Retain device while stored.
   CFRetain(device);
-  uint32_t id = b->next_id++;
-  uint32_t idx = b->devices_len;
+  if (b->devices[idx] != NULL) {
+    CFRelease(b->devices[idx]);
+  }
   b->devices[idx] = device;
-  b->device_ids[idx] = id;
-  b->entry_ids[idx] = entry_id;
   b->location_ids[idx] = location_id;
+  b->connected[idx] = 1;
   mac_collect_device_caps(b, idx, device);
   mac_fill_device_info(b, idx, device);
   b->dpad_x[idx] = 0;
   b->dpad_y[idx] = 0;
-  b->devices_len = b->devices_len + 1;
-  b->gamepad_count = (int32_t)b->devices_len;
-  moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, id, 0, 0, 0.0, now_ms()};
+  b->gamepad_count = (int32_t)mac_connected_count(b);
+  moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, b->device_ids[idx], 0, 0, 0.0, now_ms()};
   queue_push(&b->q, ev);
 }
 
@@ -953,48 +979,14 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
     return;
   }
   uint32_t id = b->device_ids[(uint32_t)idx];
-  // Remove by swap-with-last.
-  uint32_t last = b->devices_len - 1;
-  IOHIDDeviceRef d = b->devices[(uint32_t)idx];
-  if (d != NULL) {
-    CFRelease(d);
+  if (b->devices[(uint32_t)idx] != NULL) {
+    CFRelease(b->devices[(uint32_t)idx]);
+    b->devices[(uint32_t)idx] = NULL;
   }
-  if ((uint32_t)idx != last) {
-    b->devices[(uint32_t)idx] = b->devices[last];
-    b->device_ids[(uint32_t)idx] = b->device_ids[last];
-    b->entry_ids[(uint32_t)idx] = b->entry_ids[last];
-    b->location_ids[(uint32_t)idx] = b->location_ids[last];
-    b->vendors[(uint32_t)idx] = b->vendors[last];
-    b->products[(uint32_t)idx] = b->products[last];
-    memcpy(b->uuids[(uint32_t)idx], b->uuids[last], sizeof(b->uuids[(uint32_t)idx]));
-    memcpy(b->names[(uint32_t)idx], b->names[last], sizeof(b->names[(uint32_t)idx]));
-    b->axes_len[(uint32_t)idx] = b->axes_len[last];
-    b->buttons_len[(uint32_t)idx] = b->buttons_len[last];
-    b->axis_info_len[(uint32_t)idx] = b->axis_info_len[last];
-    memcpy(b->axes_codes[(uint32_t)idx], b->axes_codes[last], sizeof(b->axes_codes[(uint32_t)idx]));
-    memcpy(b->axes_key[(uint32_t)idx], b->axes_key[last], sizeof(b->axes_key[(uint32_t)idx]));
-    memcpy(b->buttons_codes[(uint32_t)idx], b->buttons_codes[last], sizeof(b->buttons_codes[(uint32_t)idx]));
-    memcpy(b->buttons_key[(uint32_t)idx], b->buttons_key[last], sizeof(b->buttons_key[(uint32_t)idx]));
-    memcpy(b->axis_info_codes[(uint32_t)idx], b->axis_info_codes[last],
-           sizeof(b->axis_info_codes[(uint32_t)idx]));
-    memcpy(b->axis_info_min[(uint32_t)idx], b->axis_info_min[last], sizeof(b->axis_info_min[(uint32_t)idx]));
-    memcpy(b->axis_info_max[(uint32_t)idx], b->axis_info_max[last], sizeof(b->axis_info_max[(uint32_t)idx]));
-    b->dpad_x[(uint32_t)idx] = b->dpad_x[last];
-    b->dpad_y[(uint32_t)idx] = b->dpad_y[last];
-  }
-  b->devices[last] = NULL;
-  b->device_ids[last] = 0;
-  b->entry_ids[last] = 0;
-  b->location_ids[last] = 0;
-  b->vendors[last] = -1;
-  b->products[last] = -1;
-  memset(b->uuids[last], 0, sizeof(b->uuids[last]));
-  memset(b->names[last], 0, sizeof(b->names[last]));
-  mac_caps_clear(b, last);
-  b->dpad_x[last] = 0;
-  b->dpad_y[last] = 0;
-  b->devices_len--;
-  b->gamepad_count = (int32_t)b->devices_len;
+  b->connected[(uint32_t)idx] = 0;
+  b->dpad_x[(uint32_t)idx] = 0;
+  b->dpad_y[(uint32_t)idx] = 0;
+  b->gamepad_count = (int32_t)mac_connected_count(b);
   moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
   queue_push(&b->q, ev);
 }
@@ -1169,8 +1161,12 @@ static void mac_backend_init(moon_gamepad_backend_t *b) {
   b->rl = NULL;
   b->devices_len = 0;
   b->next_id = 0;
+  b->gamepad_count = 0;
   memset(b->devices, 0, sizeof(b->devices));
   memset(b->device_ids, 0, sizeof(b->device_ids));
+  memset(b->entry_ids, 0, sizeof(b->entry_ids));
+  memset(b->location_ids, 0, sizeof(b->location_ids));
+  memset(b->connected, 0, sizeof(b->connected));
   for (int i = 0; i < 32; i++) {
     b->vendors[i] = -1;
     b->products[i] = -1;
@@ -1213,6 +1209,7 @@ static void mac_backend_shutdown(moon_gamepad_backend_t *b) {
     }
   }
   b->devices_len = 0;
+  b->gamepad_count = 0;
 }
 
 #endif // __APPLE__
