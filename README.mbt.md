@@ -8,17 +8,31 @@ MoonBit port of core `gilrs` concepts (mappings, events, state, and filters), wi
 - SDL mapping parser + mapping utilities
 - Filters: `jitter`, `deadzone`, `axis_dpad_to_button`, `Repeat`
 - Mockable core: `Gilrs::new_mock`, `GilrsBuilder` (mock), `Gamepad` handle
+- Blocking event wait: `Gilrs::next_event_blocking(timeout_ms)`
 
-- Native backend (best-effort):
-  - macOS: IOHIDManager (events + hotplug)
-  - Linux: evdev `/dev/input/event*` (capability-based filtering + polling)
-  - Windows: XInput (polling)
+## Platform Support (Checklist)
 
-Limitations (compared to upstream `gilrs`):
+This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may have behavioral gaps.
 
-- No force feedback implementation yet (API exists but is stubbed).
-- No vendor/product/UUID/power-info discovery in the native backend yet.
-- SDL mapping support is available (parser + utilities), but native events currently use a built-in logical layout.
+- macOS (native / IOHIDManager)
+  - [x] Enumeration + hotplug events
+  - [x] Buttons + axes events
+  - [x] Device identity (`name`, `uuid`, `vendor_id`, `product_id`)
+  - [x] SDL mapping DB lookup on connect (name + hats_mapped overlay)
+  - [ ] Force feedback (upstream gilrs-core macOS reports unsupported)
+  - [ ] Power info (currently always `Unknown`)
+- Linux (native / evdev) *(planned to harden later)*
+  - [x] Enumeration + hotplug events (best-effort)
+  - [x] Basic rumble (`FF_RUMBLE`) when device can be opened read-write
+  - [ ] Permissions/udev guidance + broader device coverage
+- Windows (native / XInput) *(planned to harden later)*
+  - [x] Basic input + rumble (via `XInputSetState` when available)
+  - [ ] CI coverage and device identity parity
+
+## Notes / Limitations (vs upstream `gilrs`)
+
+- Native backends currently use a built-in logical layout; full per-device remapping requires deeper native evcode coverage.
+- `PowerInfo` is exposed but currently defaults to `Unknown` on native backends.
 
 ## Quickstart (native)
 

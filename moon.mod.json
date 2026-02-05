@@ -1,6 +1,6 @@
 {
   "name": "Milky2018/gamepad",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "readme": "README.mbt.md",
   "repository": "https://github.com/moonbit-community/moon_gamepad.git",
   "preferred-target": "native",

@@ -428,57 +428,47 @@ static double norm_i32(int32_t v, int32_t minv, int32_t maxv) {
   return t * 2.0 - 1.0;
 }
 
-static void push_dpad_buttons(moon_gamepad_backend_t *b, uint32_t idx, int8_t x, int8_t y,
-                              int64_t t) {
-  if (b == NULL || idx >= 32) {
-    return;
+static double clamp_f64(double v, double lo, double hi) {
+  if (v < lo) {
+    return lo;
   }
-  uint32_t id = b->device_ids[idx];
-  int8_t ox = b->dpad_x[idx];
-  int8_t oy = b->dpad_y[idx];
-  b->dpad_x[idx] = x;
-  b->dpad_y[idx] = y;
+  if (v > hi) {
+    return hi;
+  }
+  return v;
+}
 
-  // Left/right
-  if (ox != x) {
-    if (ox < 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_RELEASED, id, CODE_BTN_DPAD_LEFT, 0, 0.0,
-                                 t};
-      queue_push(&b->q, ev);
-    } else if (ox > 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_RELEASED, id, CODE_BTN_DPAD_RIGHT, 0, 0.0,
-                                 t};
-      queue_push(&b->q, ev);
-    }
-    if (x < 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_PRESSED, id, CODE_BTN_DPAD_LEFT, 0, 0.0,
-                                 t};
-      queue_push(&b->q, ev);
-    } else if (x > 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_PRESSED, id, CODE_BTN_DPAD_RIGHT, 0, 0.0,
-                                 t};
-      queue_push(&b->q, ev);
+static double axis_value_like_gilrs(int32_t v, int32_t minv, int32_t maxv, int invert_y) {
+  if (maxv == minv) {
+    return 0.0;
+  }
+  int64_t range_i64 = (int64_t)maxv - (int64_t)minv;
+  int64_t val_i64 = (int64_t)v - (int64_t)minv;
+  double range = (double)range_i64;
+  double val = (double)val_i64;
+
+  // Mirror the odd-range centering adjustment in MoonBit axis_value().
+  const int64_t INT_MAX_I64 = 2147483647LL;
+  if (range_i64 <= INT_MAX_I64 && range_i64 >= 0) {
+    if ((range_i64 % 2) == 1) {
+      range += 1.0;
+      val += 1.0;
     }
   }
 
-  // Up/down
-  if (oy != y) {
-    if (oy < 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_RELEASED, id, CODE_BTN_DPAD_UP, 0, 0.0, t};
-      queue_push(&b->q, ev);
-    } else if (oy > 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_RELEASED, id, CODE_BTN_DPAD_DOWN, 0, 0.0,
-                                 t};
-      queue_push(&b->q, ev);
-    }
-    if (y < 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_PRESSED, id, CODE_BTN_DPAD_UP, 0, 0.0, t};
-      queue_push(&b->q, ev);
-    } else if (y > 0) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_PRESSED, id, CODE_BTN_DPAD_DOWN, 0, 0.0, t};
-      queue_push(&b->q, ev);
-    }
+  if (range == 0.0) {
+    return 0.0;
   }
+
+  double out = val / range * 2.0 - 1.0;
+  if (invert_y && out != 0.0) {
+    out = -out;
+  }
+  return clamp_f64(out, -1.0, 1.0);
+}
+
+static int is_y_axis_code(uint32_t code) {
+  return (code == CODE_AXIS_LSTICKY) || (code == CODE_AXIS_RSTICKY) || (code == CODE_AXIS_DPADY);
 }
 
 static void mac_fill_device_info(moon_gamepad_backend_t *b, uint32_t idx, IOHIDDeviceRef device) {
@@ -631,49 +621,49 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
   // Generic Desktop page 0x01
   if (page == 0x01) {
     if (usage == 0x39) {
-      // Hat switch: 0..7 directions, 8 == neutral.
-      int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
-      int8_t x = 0;
-      int8_t y = 0;
-      // map: 0 up, 1 up-right, 2 right, 3 down-right, 4 down, 5 down-left, 6 left, 7 up-left.
-      switch (v) {
-      case 0:
-        y = -1;
-        break;
-      case 1:
-        y = -1;
-        x = 1;
-        break;
-      case 2:
-        x = 1;
-        break;
-      case 3:
-        y = 1;
-        x = 1;
-        break;
-      case 4:
-        y = 1;
-        break;
-      case 5:
-        y = 1;
-        x = -1;
-        break;
-      case 6:
-        x = -1;
-        break;
-      case 7:
-        y = -1;
-        x = -1;
-        break;
-      default:
-        x = 0;
-        y = 0;
-        break;
+      // Hat switch: normalize using reported logical min/max and emit axes only, matching gilrs-core.
+      int32_t hat_v = (int32_t)IOHIDValueGetIntegerValue(value);
+      int32_t hat_min = (int32_t)IOHIDElementGetLogicalMin(el);
+      int32_t hat_max = (int32_t)IOHIDElementGetLogicalMax(el);
+      int32_t range = hat_max - hat_min + 1;
+      int32_t shifted = hat_v - hat_min;
+      int32_t dpad_value;
+      if (range == 4) {
+        dpad_value = shifted * 2;
+      } else if (range == 8) {
+        dpad_value = shifted;
+      } else {
+        dpad_value = -1; // treat as centered/unknown
       }
-      push_dpad_buttons(b, (uint32_t)dev_idx, x, y, t);
-      // Also expose axes for filters/consumers.
-      moon_gamepad_event_t ex = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADX, 0, (double)x, t};
-      moon_gamepad_event_t ey = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADY, 0, (double)y, t};
+
+      int32_t x_raw;
+      if (dpad_value >= 5 && dpad_value <= 7) {
+        x_raw = -1;
+      } else if (dpad_value >= 1 && dpad_value <= 3) {
+        x_raw = 1;
+      } else {
+        x_raw = 0;
+      }
+
+      // gilrs-core emits an inverted macOS axis here (down positive, up negative) and lets the Y
+      // inversion stage fix it; we emit the post-inversion value directly (up positive).
+      int32_t y_raw;
+      if (dpad_value >= 3 && dpad_value <= 5) {
+        y_raw = 1; // down (pre-inversion)
+      } else if (dpad_value == 0 || dpad_value == 1 || dpad_value == 7) {
+        y_raw = -1; // up (pre-inversion)
+      } else {
+        y_raw = 0;
+      }
+
+      double x = (double)x_raw;
+      double y = (double)y_raw;
+      if (y != 0.0) {
+        y = -y; // post-inversion
+      }
+
+      moon_gamepad_event_t ex = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADX, 0, x, t};
+      moon_gamepad_event_t ey = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADY, 0, y, t};
       queue_push(&b->q, ex);
       queue_push(&b->q, ey);
       return;
@@ -686,7 +676,8 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
     int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
     int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
     int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
-    double nv = norm_i32(v, minv, maxv);
+    // Match gilrs' axis_value-like normalization and Y-axis inversion for macOS.
+    double nv = axis_value_like_gilrs(v, minv, maxv, is_y_axis_code(code));
     moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, nv, t};
     queue_push(&b->q, ev);
     return;
