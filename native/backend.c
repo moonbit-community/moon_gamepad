@@ -19,8 +19,10 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/input.h>
 #include <poll.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -165,6 +167,7 @@ typedef struct moon_gamepad_backend_t {
 #if defined(__linux__)
   int fds[64];
   uint32_t fd_ids[64];
+  char paths[64][256];
   uint32_t fds_len;
   uint32_t next_id;
 #endif
@@ -620,67 +623,28 @@ static void mac_backend_shutdown(moon_gamepad_backend_t *b) {
 #endif // __APPLE__
 
 #if defined(__linux__)
+#define BITS_PER_LONG (sizeof(unsigned long) * 8)
+#define NBITS(x) ((((x) + 1) + BITS_PER_LONG - 1) / BITS_PER_LONG)
+#define BIT_WORD(nr) ((nr) / BITS_PER_LONG)
+#define BIT_MASK(nr) (1UL << ((nr) % BITS_PER_LONG))
 
-typedef struct input_event {
-  struct timeval time;
-  uint16_t type;
-  uint16_t code;
-  int32_t value;
-} input_event;
-
-enum {
-  EV_KEY = 0x01,
-  EV_ABS = 0x03,
-};
-
-// Linux absolute axis codes (subset).
-enum {
-  ABS_X = 0x00,
-  ABS_Y = 0x01,
-  ABS_Z = 0x02,
-  ABS_RX = 0x03,
-  ABS_RY = 0x04,
-  ABS_RZ = 0x05,
-  ABS_HAT0X = 0x10,
-  ABS_HAT0Y = 0x11,
-};
-
-// Linux button codes (subset). Values match linux/input-event-codes.h but we only need mapping.
-enum {
-  BTN_SOUTH_LX = 0x130,
-  BTN_EAST_LX = 0x131,
-  BTN_C_LX = 0x132,
-  BTN_NORTH_LX = 0x133,
-  BTN_WEST_LX = 0x134,
-  BTN_Z_LX = 0x135,
-  BTN_TL = 0x136,
-  BTN_TR = 0x137,
-  BTN_TL2 = 0x138,
-  BTN_TR2 = 0x139,
-  BTN_SELECT_LX = 0x13a,
-  BTN_START_LX = 0x13b,
-  BTN_MODE_LX = 0x13c,
-  BTN_THUMBL = 0x13d,
-  BTN_THUMBR = 0x13e,
-  BTN_DPAD_UP_LX = 0x220,
-  BTN_DPAD_DOWN_LX = 0x221,
-  BTN_DPAD_LEFT_LX = 0x222,
-  BTN_DPAD_RIGHT_LX = 0x223,
-};
+static int test_bit(int nr, const unsigned long *addr) {
+  return (addr[BIT_WORD(nr)] & BIT_MASK(nr)) != 0;
+}
 
 static uint32_t map_linux_btn(uint16_t code) {
   switch (code) {
-  case BTN_SOUTH_LX:
+  case BTN_SOUTH:
     return CODE_BTN_SOUTH;
-  case BTN_EAST_LX:
+  case BTN_EAST:
     return CODE_BTN_EAST;
-  case BTN_C_LX:
+  case BTN_C:
     return CODE_BTN_C;
-  case BTN_NORTH_LX:
+  case BTN_NORTH:
     return CODE_BTN_NORTH;
-  case BTN_WEST_LX:
+  case BTN_WEST:
     return CODE_BTN_WEST;
-  case BTN_Z_LX:
+  case BTN_Z:
     return CODE_BTN_Z;
   case BTN_TL:
     return CODE_BTN_LT;
@@ -690,23 +654,23 @@ static uint32_t map_linux_btn(uint16_t code) {
     return CODE_BTN_LT2;
   case BTN_TR2:
     return CODE_BTN_RT2;
-  case BTN_SELECT_LX:
+  case BTN_SELECT:
     return CODE_BTN_SELECT;
-  case BTN_START_LX:
+  case BTN_START:
     return CODE_BTN_START;
-  case BTN_MODE_LX:
+  case BTN_MODE:
     return CODE_BTN_MODE;
   case BTN_THUMBL:
     return CODE_BTN_LTHUMB;
   case BTN_THUMBR:
     return CODE_BTN_RTHUMB;
-  case BTN_DPAD_UP_LX:
+  case BTN_DPAD_UP:
     return CODE_BTN_DPAD_UP;
-  case BTN_DPAD_DOWN_LX:
+  case BTN_DPAD_DOWN:
     return CODE_BTN_DPAD_DOWN;
-  case BTN_DPAD_LEFT_LX:
+  case BTN_DPAD_LEFT:
     return CODE_BTN_DPAD_LEFT;
-  case BTN_DPAD_RIGHT_LX:
+  case BTN_DPAD_RIGHT:
     return CODE_BTN_DPAD_RIGHT;
   default:
     return UINT32_MAX;
@@ -756,6 +720,85 @@ static double norm_linux_abs(int32_t v, uint16_t code) {
   return dv / denom;
 }
 
+static int linux_is_gamepad_fd(int fd) {
+  unsigned long evbit[NBITS(EV_MAX)];
+  unsigned long keybit[NBITS(KEY_MAX)];
+  unsigned long absbit[NBITS(ABS_MAX)];
+
+  memset(evbit, 0, sizeof(evbit));
+  memset(keybit, 0, sizeof(keybit));
+  memset(absbit, 0, sizeof(absbit));
+
+  if (ioctl(fd, EVIOCGBIT(0, sizeof(evbit)), evbit) < 0) {
+    return 0;
+  }
+
+  int has_key = test_bit(EV_KEY, evbit);
+  int has_abs = test_bit(EV_ABS, evbit);
+
+  if (!has_key && !has_abs) {
+    return 0;
+  }
+
+  if (has_key) {
+    (void)ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybit)), keybit);
+  }
+  if (has_abs) {
+    (void)ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(absbit)), absbit);
+  }
+
+  int has_gamepad_key =
+      test_bit(BTN_GAMEPAD, keybit) || test_bit(BTN_JOYSTICK, keybit) || test_bit(BTN_SOUTH, keybit) ||
+      test_bit(BTN_EAST, keybit) || test_bit(BTN_NORTH, keybit) || test_bit(BTN_WEST, keybit) ||
+      test_bit(BTN_TL, keybit) || test_bit(BTN_TR, keybit) || test_bit(BTN_START, keybit) ||
+      test_bit(BTN_SELECT, keybit) || test_bit(BTN_MODE, keybit) || test_bit(BTN_DPAD_UP, keybit) ||
+      test_bit(BTN_DPAD_DOWN, keybit) || test_bit(BTN_DPAD_LEFT, keybit) || test_bit(BTN_DPAD_RIGHT, keybit);
+
+  int has_sticks = test_bit(ABS_X, absbit) && test_bit(ABS_Y, absbit);
+  int has_hat = test_bit(ABS_HAT0X, absbit) || test_bit(ABS_HAT0Y, absbit);
+
+  if (!has_gamepad_key) {
+    return 0;
+  }
+  if (!has_sticks && !has_hat) {
+    return 0;
+  }
+
+  return 1;
+}
+
+static int linux_has_path(moon_gamepad_backend_t *b, const char *path) {
+  if (b == NULL || path == NULL) {
+    return 0;
+  }
+  for (uint32_t i = 0; i < b->fds_len; i++) {
+    if (strncmp(b->paths[i], path, sizeof(b->paths[i])) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static void linux_compact(moon_gamepad_backend_t *b) {
+  if (b == NULL) {
+    return;
+  }
+  uint32_t out = 0;
+  for (uint32_t i = 0; i < b->fds_len; i++) {
+    if (b->fds[i] < 0) {
+      continue;
+    }
+    if (out != i) {
+      b->fds[out] = b->fds[i];
+      b->fd_ids[out] = b->fd_ids[i];
+      memcpy(b->paths[out], b->paths[i], sizeof(b->paths[out]));
+    }
+    out++;
+  }
+  b->fds_len = out;
+  b->gamepad_count = (int32_t)b->fds_len;
+}
+
 static void linux_backend_scan(moon_gamepad_backend_t *b) {
   DIR *dir = opendir("/dev/input");
   if (dir == NULL) {
@@ -769,17 +812,25 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
     if (b->fds_len >= 64) {
       break;
     }
-    // Avoid opening duplicates (by name).
     char path[256];
     snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
+    if (linux_has_path(b, path)) {
+      continue;
+    }
     int fd = open(path, O_RDONLY | O_NONBLOCK);
     if (fd < 0) {
+      continue;
+    }
+    if (!linux_is_gamepad_fd(fd)) {
+      close(fd);
       continue;
     }
     // Keep.
     uint32_t id = b->next_id++;
     b->fds[b->fds_len] = fd;
     b->fd_ids[b->fds_len] = id;
+    memset(b->paths[b->fds_len], 0, sizeof(b->paths[b->fds_len]));
+    strncpy(b->paths[b->fds_len], path, sizeof(b->paths[b->fds_len]) - 1);
     b->fds_len++;
     b->gamepad_count = (int32_t)b->fds_len;
     moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, id, 0, 0, 0.0, now_ms()};
@@ -793,6 +844,7 @@ static void linux_backend_init(moon_gamepad_backend_t *b) {
   b->next_id = 0;
   memset(b->fds, -1, sizeof(b->fds));
   memset(b->fd_ids, 0, sizeof(b->fd_ids));
+  memset(b->paths, 0, sizeof(b->paths));
   linux_backend_scan(b);
 }
 
@@ -806,6 +858,7 @@ static void linux_backend_shutdown(moon_gamepad_backend_t *b) {
       b->fds[i] = -1;
     }
   }
+  memset(b->paths, 0, sizeof(b->paths));
   b->fds_len = 0;
 }
 
@@ -815,13 +868,14 @@ static void linux_backend_poll(moon_gamepad_backend_t *b) {
   }
   // Best-effort rescan for hotplug.
   linux_backend_scan(b);
+  linux_compact(b);
   if (b->fds_len == 0) {
     return;
   }
   struct pollfd pfds[64];
   for (uint32_t i = 0; i < b->fds_len; i++) {
     pfds[i].fd = b->fds[i];
-    pfds[i].events = POLLIN;
+    pfds[i].events = POLLIN | POLLERR | POLLHUP | POLLNVAL;
     pfds[i].revents = 0;
   }
   int n = poll(pfds, (nfds_t)b->fds_len, 0);
@@ -829,16 +883,25 @@ static void linux_backend_poll(moon_gamepad_backend_t *b) {
     return;
   }
   for (uint32_t i = 0; i < b->fds_len; i++) {
+    if ((pfds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+      uint32_t id = b->fd_ids[i];
+      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
+      queue_push(&b->q, ev);
+      close(b->fds[i]);
+      b->fds[i] = -1;
+      memset(b->paths[i], 0, sizeof(b->paths[i]));
+      continue;
+    }
     if ((pfds[i].revents & POLLIN) == 0) {
       continue;
     }
-    input_event ev;
+    struct input_event ev;
     ssize_t r;
     while ((r = read(pfds[i].fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
       uint32_t id = b->fd_ids[i];
       int64_t t = now_ms();
       if (ev.type == EV_KEY) {
-        uint32_t code = map_linux_btn(ev.code);
+        uint32_t code = map_linux_btn((uint16_t)ev.code);
         if (code == UINT32_MAX) {
           continue;
         }
@@ -851,16 +914,26 @@ static void linux_backend_poll(moon_gamepad_backend_t *b) {
         out.time_ms = t;
         queue_push(&b->q, out);
       } else if (ev.type == EV_ABS) {
-        uint32_t code = map_linux_abs(ev.code);
+        uint32_t code = map_linux_abs((uint16_t)ev.code);
         if (code == UINT32_MAX) {
           continue;
         }
-        double nv = norm_linux_abs(ev.value, ev.code);
+        double nv = norm_linux_abs((int32_t)ev.value, (uint16_t)ev.code);
         moon_gamepad_event_t out = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, nv, t};
         queue_push(&b->q, out);
       }
     }
+    if (r == 0 || (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK)) {
+      uint32_t id = b->fd_ids[i];
+      moon_gamepad_event_t dv = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
+      queue_push(&b->q, dv);
+      close(b->fds[i]);
+      b->fds[i] = -1;
+      memset(b->paths[i], 0, sizeof(b->paths[i]));
+      continue;
+    }
   }
+  linux_compact(b);
 }
 
 #endif // __linux__

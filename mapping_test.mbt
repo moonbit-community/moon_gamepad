@@ -199,3 +199,33 @@ test "mapping_db insert/get" {
     ),
   )
 }
+
+///|
+test "parse_sdl_mapping hat unknown direction" {
+  let map_str = "03000000341a00003608000000010000,Test,platform:Linux,dpup:h0.16,"
+  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+    map_str, buttons, axes,
+  )
+  let res2 : Result[Unit, Error] = match res {
+    Ok(_) => Ok(())
+    Err(e) => Err(e)
+  }
+  inspect(
+    res2,
+    content="Err(Milky2018/gamepad.ParseSdlMappingError.UnknownHatDirection)",
+  )
+}
+
+///|
+test "parse_sdl_mapping invalid guid maps to InvalidGuid" {
+  let map_str = "not-a-guid,Test,platform:Linux,a:b0,"
+  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+    map_str, buttons, axes,
+  )
+  let mut is_err = false
+  match res {
+    Ok(_) => is_err = false
+    Err(_) => is_err = true
+  }
+  inspect(is_err, content="true")
+}

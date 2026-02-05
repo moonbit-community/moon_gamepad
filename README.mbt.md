@@ -1,8 +1,6 @@
-# username/gamepad
+# Milky2018/gamepad
 
-MoonBit port of core `gilrs` concepts (mappings, events, state, and filters), with a native-first roadmap.
-
-MoonBit port of core `gilrs` concepts (mappings, events, state, and filters), with a native-first roadmap.
+MoonBit port of core `gilrs` concepts (mappings, events, state, and filters), with a native-first focus.
 
 ## Status
 
@@ -11,7 +9,29 @@ MoonBit port of core `gilrs` concepts (mappings, events, state, and filters), wi
 - Filters: `jitter`, `deadzone`, `axis_dpad_to_button`, `Repeat`
 - Mockable core: `Gilrs::new_mock`, `GilrsBuilder` (mock), `Gamepad` handle
 
-Native backends and force feedback are tracked in `bd` tasks and are not complete yet.
+- Native backend (best-effort):
+  - macOS: IOHIDManager (events + hotplug)
+  - Linux: evdev `/dev/input/event*` (capability-based filtering + polling)
+  - Windows: XInput (polling)
+
+Limitations (compared to upstream `gilrs`):
+
+- No force feedback implementation yet (API exists but is stubbed).
+- No vendor/product/UUID/power-info discovery in the native backend yet.
+- SDL mapping support is available (parser + utilities), but native events currently use a built-in logical layout.
+
+## Quickstart (native)
+
+```moonbit
+let gilrs = Gilrs::new()
+
+while true {
+  match gilrs.next_event() {
+    None => break
+    Some(ev) => println(ev)
+  }
+}
+```
 
 ## Quickstart (mock)
 
