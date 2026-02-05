@@ -1,8 +1,31 @@
 name: CI
 
 on:
-  push:
   pull_request:
+    paths:
+      - "**/*.mbt"
+      - "native/**"
+      - "scripts/**"
+      - "moon.mod.json"
+      - "moon.pkg.json"
+      - "README.mbt.md"
+      - ".github/workflows/ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.mbt"
+      - "native/**"
+      - "scripts/**"
+      - "moon.mod.json"
+      - "moon.pkg.json"
+      - "README.mbt.md"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-macos:
