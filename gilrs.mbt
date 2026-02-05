@@ -29,6 +29,9 @@ pub struct GamepadData {
   mut product_id : Int?
   mut ff_supported : Bool
   mut power_info : PowerInfo
+  mut axes : Array[Code]
+  mut buttons : Array[Code]
+  mut axis_info : Array[(Code, AxisInfo)]
   deadzones : Array[(Code, Double)]
   have_sent_nonzero_for_axis : Array[Bool]
 }
@@ -45,6 +48,9 @@ fn GamepadData::new() -> GamepadData {
     product_id: None,
     ff_supported: false,
     power_info: PowerInfo::Unknown,
+    axes: [],
+    buttons: [],
+    axis_info: [],
     deadzones: [],
     have_sent_nonzero_for_axis: Array::make(6, false),
   }
@@ -55,6 +61,8 @@ pub struct Gilrs {
   mut counter : Int64
   update_state : Bool
   mut default_filters : Bool
+  mut axis_to_btn_pressed : Double
+  mut axis_to_btn_released : Double
   events : Array[Event]
   mut events_head : Int
   gamepads_data : Array[GamepadData]
@@ -77,6 +85,8 @@ pub fn Gilrs::new_mock(
     counter: 0L,
     update_state,
     default_filters,
+    axis_to_btn_pressed: 0.75,
+    axis_to_btn_released: 0.65,
     events: [],
     events_head: 0,
     gamepads_data: data,
@@ -95,6 +105,8 @@ pub fn Gilrs::new_native(
     counter: 0L,
     update_state,
     default_filters,
+    axis_to_btn_pressed: 0.75,
+    axis_to_btn_released: 0.65,
     events: [],
     events_head: 0,
     gamepads_data: [],
@@ -107,6 +119,23 @@ pub fn Gilrs::new_native(
 ///|
 pub fn Gilrs::load_mappings(self : Gilrs, s : String) -> Unit {
   self.mappings.insert(s)
+}
+
+///|
+pub fn Gilrs::set_axis_to_btn(
+  self : Gilrs,
+  pressed : Double,
+  released : Double,
+) -> Unit raise GilrsError {
+  if pressed <= released ||
+    pressed < 0.0 ||
+    pressed > 1.0 ||
+    released < 0.0 ||
+    released > 1.0 {
+    raise GilrsError::InvalidAxisToBtn
+  }
+  self.axis_to_btn_pressed = pressed
+  self.axis_to_btn_released = released
 }
 
 ///|
@@ -165,43 +194,32 @@ fn Gilrs::apply_identity_mapping(self : Gilrs, id : Int) -> Unit {
   if id < 0 || id >= self.gamepads_data.length() {
     return
   }
-  let m = Mapping::new()
-  for
-    code in [
-      BTN_SOUTH,
-      BTN_EAST,
-      BTN_C,
-      BTN_NORTH,
-      BTN_WEST,
-      BTN_Z,
-      BTN_LT,
-      BTN_RT,
-      BTN_LT2,
-      BTN_RT2,
-      BTN_SELECT,
-      BTN_START,
-      BTN_MODE,
-      BTN_LTHUMB,
-      BTN_RTHUMB,
-      BTN_DPAD_UP,
-      BTN_DPAD_DOWN,
-      BTN_DPAD_LEFT,
-      BTN_DPAD_RIGHT,
-      AXIS_LSTICKX,
-      AXIS_LSTICKY,
-      AXIS_LEFTZ,
-      AXIS_RSTICKX,
-      AXIS_RSTICKY,
-      AXIS_RIGHTZ,
-      AXIS_DPADX,
-      AXIS_DPADY,
-    ] {
+  let data = self.gamepads_data[id]
+  let m = Mapping::new_default()
+  for code in data.buttons {
     match axis_or_btn_from_code(code) {
       None => ()
       Some(el) => m.insert(code, el)
     }
   }
-  self.gamepads_data[id].mapping = m
+  for code in data.axes {
+    match axis_or_btn_from_code(code) {
+      None => ()
+      Some(el) => m.insert(code, el)
+    }
+  }
+  data.mapping = m
+}
+
+///|
+fn find_axis_info(infos : Array[(Code, AxisInfo)], code : Code) -> AxisInfo? {
+  for pair in infos {
+    let (c, info) = pair
+    if c == code {
+      return Some(info)
+    }
+  }
+  None
 }
 
 ///|
@@ -224,6 +242,18 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
             self.gamepads_data[id].product_id = b.product_id(id)
             self.gamepads_data[id].ff_supported = b.is_ff_supported(id)
             self.gamepads_data[id].power_info = PowerInfo::Unknown
+            let axes = b.axes(id)
+            let buttons = b.buttons(id)
+            self.gamepads_data[id].axes = axes
+            self.gamepads_data[id].buttons = buttons
+            let infos : Array[(Code, AxisInfo)] = []
+            for c in self.gamepads_data[id].axes {
+              match b.axis_info(id, c) {
+                None => ()
+                Some(info) => infos.push((c, info))
+              }
+            }
+            self.gamepads_data[id].axis_info = infos
           }
       }
       self.apply_identity_mapping(id)
@@ -234,14 +264,11 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
           Some(line) => {
             let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
               line,
-              [],
-              [],
+              self.gamepads_data[id].buttons,
+              self.gamepads_data[id].axes,
             )
             match parsed {
-              Ok(m) => {
-                self.gamepads_data[id].mapping.name = m.name()
-                self.gamepads_data[id].mapping.set_hats_mapped(m.hats_mapped())
-              }
+              Ok(m) => self.gamepads_data[id].mapping = m
               Err(_) => ()
             }
           }
@@ -253,46 +280,160 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
       self.set_connected(id, false)
       self.insert_event(Event::at(gid, EventType::Disconnected, ne.time_ms))
     }
-    NativeEventTag::AxisChanged =>
-      match axis_from_code(ne.code) {
-        None => ()
-        Some(axis) =>
+    NativeEventTag::ButtonPressed => {
+      let code = ne.code
+      match self.axis_or_btn_name(gid, code) {
+        Some(AxisOrBtn::Btn(btn)) => {
+          self.insert_event(
+            Event::at(gid, EventType::ButtonPressed(btn, code), ne.time_ms),
+          )
+          self.insert_event(
+            Event::at(gid, EventType::ButtonChanged(btn, 1.0, code), ne.time_ms),
+          )
+        }
+        Some(AxisOrBtn::Axis(axis)) =>
+          self.insert_event(
+            Event::at(gid, EventType::AxisChanged(axis, 1.0, code), ne.time_ms),
+          )
+        None => {
           self.insert_event(
             Event::at(
               gid,
-              EventType::AxisChanged(axis, ne.value, ne.code),
+              EventType::ButtonPressed(Button::Unknown, code),
               ne.time_ms,
             ),
           )
-      }
-    NativeEventTag::ButtonPressed =>
-      match button_from_code(ne.code) {
-        None => ()
-        Some(btn) =>
-          self.insert_event(
-            Event::at(gid, EventType::ButtonPressed(btn, ne.code), ne.time_ms),
-          )
-      }
-    NativeEventTag::ButtonReleased =>
-      match button_from_code(ne.code) {
-        None => ()
-        Some(btn) =>
-          self.insert_event(
-            Event::at(gid, EventType::ButtonReleased(btn, ne.code), ne.time_ms),
-          )
-      }
-    NativeEventTag::ButtonChanged =>
-      match button_from_code(ne.code) {
-        None => ()
-        Some(btn) =>
           self.insert_event(
             Event::at(
               gid,
-              EventType::ButtonChanged(btn, ne.value, ne.code),
+              EventType::ButtonChanged(Button::Unknown, 1.0, code),
               ne.time_ms,
             ),
           )
+        }
       }
+    }
+    NativeEventTag::ButtonReleased => {
+      let code = ne.code
+      match self.axis_or_btn_name(gid, code) {
+        Some(AxisOrBtn::Btn(btn)) => {
+          self.insert_event(
+            Event::at(gid, EventType::ButtonReleased(btn, code), ne.time_ms),
+          )
+          self.insert_event(
+            Event::at(gid, EventType::ButtonChanged(btn, 0.0, code), ne.time_ms),
+          )
+        }
+        Some(AxisOrBtn::Axis(axis)) =>
+          self.insert_event(
+            Event::at(gid, EventType::AxisChanged(axis, 0.0, code), ne.time_ms),
+          )
+        None => {
+          self.insert_event(
+            Event::at(
+              gid,
+              EventType::ButtonReleased(Button::Unknown, code),
+              ne.time_ms,
+            ),
+          )
+          self.insert_event(
+            Event::at(
+              gid,
+              EventType::ButtonChanged(Button::Unknown, 0.0, code),
+              ne.time_ms,
+            ),
+          )
+        }
+      }
+    }
+    NativeEventTag::AxisChanged => {
+      if id < 0 || id >= self.gamepads_data.length() {
+        return
+      }
+      let code = ne.code
+      let info = match find_axis_info(self.gamepads_data[id].axis_info, code) {
+        None => AxisInfo::new(0, 1, None)
+        Some(i) => i
+      }
+      let raw_val = ne.value.to_int()
+      match self.axis_or_btn_name(gid, code) {
+        Some(AxisOrBtn::Btn(btn)) => {
+          let val = btn_value(info, raw_val)
+          if val >= self.axis_to_btn_pressed &&
+            !self.gamepads_data[id].state.is_pressed(code) {
+            self.insert_event(
+              Event::at(gid, EventType::ButtonPressed(btn, code), ne.time_ms),
+            )
+            self.insert_event(
+              Event::at(
+                gid,
+                EventType::ButtonChanged(btn, val, code),
+                ne.time_ms,
+              ),
+            )
+          } else if val <= self.axis_to_btn_released &&
+            self.gamepads_data[id].state.is_pressed(code) {
+            self.insert_event(
+              Event::at(gid, EventType::ButtonReleased(btn, code), ne.time_ms),
+            )
+            self.insert_event(
+              Event::at(
+                gid,
+                EventType::ButtonChanged(btn, val, code),
+                ne.time_ms,
+              ),
+            )
+          } else {
+            self.insert_event(
+              Event::at(
+                gid,
+                EventType::ButtonChanged(btn, val, code),
+                ne.time_ms,
+              ),
+            )
+          }
+        }
+        Some(AxisOrBtn::Axis(axis)) => {
+          let val = axis_value(info, raw_val, axis)
+          self.insert_event(
+            Event::at(gid, EventType::AxisChanged(axis, val, code), ne.time_ms),
+          )
+        }
+        None => {
+          let val = axis_value(info, raw_val, Axis::Unknown)
+          self.insert_event(
+            Event::at(
+              gid,
+              EventType::AxisChanged(Axis::Unknown, val, code),
+              ne.time_ms,
+            ),
+          )
+        }
+      }
+    }
+    NativeEventTag::ButtonChanged => {
+      // Legacy tag: treat backend value as already normalized.
+      let code = ne.code
+      match self.axis_or_btn_name(gid, code) {
+        Some(AxisOrBtn::Btn(btn)) =>
+          self.insert_event(
+            Event::at(
+              gid,
+              EventType::ButtonChanged(btn, ne.value, code),
+              ne.time_ms,
+            ),
+          )
+        Some(AxisOrBtn::Axis(axis)) =>
+          self.insert_event(
+            Event::at(
+              gid,
+              EventType::AxisChanged(axis, ne.value, code),
+              ne.time_ms,
+            ),
+          )
+        None => ()
+      }
+    }
   }
 }
 
@@ -302,11 +443,9 @@ pub fn Gilrs::poll(self : Gilrs) -> Unit {
     None => ()
     Some(b) => {
       b.poll()
-      while true {
-        match b.next_event() {
-          None => break
-          Some(ne) => self.push_native_event(ne)
-        }
+      match b.next_event() {
+        None => ()
+        Some(ne) => self.push_native_event(ne)
       }
     }
   }
@@ -370,11 +509,9 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
               }
           }
           b.poll_timeout(t)
-          while true {
-            match b.next_event() {
-              None => break
-              Some(ne) => self.push_native_event(ne)
-            }
+          match b.next_event() {
+            None => ()
+            Some(ne) => self.push_native_event(ne)
           }
         }
       }
@@ -742,6 +879,41 @@ pub fn Gamepad::power_info(self : Gamepad) -> PowerInfo {
   } else {
     self.gilrs.gamepads_data[i].power_info
   }
+}
+
+///|
+pub fn Gamepad::axes(self : Gamepad) -> Array[Code] {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    []
+  } else {
+    self.gilrs.gamepads_data[i].axes.copy()
+  }
+}
+
+///|
+pub fn Gamepad::buttons(self : Gamepad) -> Array[Code] {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    []
+  } else {
+    self.gilrs.gamepads_data[i].buttons.copy()
+  }
+}
+
+///|
+pub fn Gamepad::axis_info(self : Gamepad, code : Code) -> AxisInfo? {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    return None
+  }
+  for pair in self.gilrs.gamepads_data[i].axis_info {
+    let (c, info) = pair
+    if c == code {
+      return Some(info)
+    }
+  }
+  None
 }
 
 ///|

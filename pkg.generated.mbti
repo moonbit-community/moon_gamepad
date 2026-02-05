@@ -248,9 +248,12 @@ pub struct Gamepad {
   gilrs : Gilrs
   id : GamepadId
 }
+pub fn Gamepad::axes(Self) -> Array[Int]
 pub fn Gamepad::axis_code(Self, Axis) -> Int?
+pub fn Gamepad::axis_info(Self, Int) -> AxisInfo?
 pub fn Gamepad::axis_or_btn_name(Self, Int) -> AxisOrBtn?
 pub fn Gamepad::button_code(Self, Button) -> Int?
+pub fn Gamepad::buttons(Self) -> Array[Int]
 pub fn Gamepad::deadzone(Self, Int) -> Double?
 pub fn Gamepad::id(Self) -> GamepadId
 pub fn Gamepad::is_connected(Self) -> Bool
@@ -275,6 +278,9 @@ pub struct GamepadData {
   mut product_id : Int?
   mut ff_supported : Bool
   mut power_info : PowerInfo
+  mut axes : Array[Int]
+  mut buttons : Array[Int]
+  mut axis_info : Array[(Int, AxisInfo)]
   deadzones : Array[(Int, Double)]
   have_sent_nonzero_for_axis : Array[Bool]
 }
@@ -301,6 +307,8 @@ pub struct Gilrs {
   mut counter : Int64
   update_state : Bool
   mut default_filters : Bool
+  mut axis_to_btn_pressed : Double
+  mut axis_to_btn_released : Double
   events : Array[Event]
   mut events_head : Int
   gamepads_data : Array[GamepadData]
@@ -328,6 +336,7 @@ pub fn Gilrs::next_event(Self) -> Event?
 pub fn Gilrs::next_event_blocking(Self, Int64?) -> Event?
 pub fn Gilrs::poll(Self) -> Unit
 pub fn Gilrs::reset_counter(Self) -> Unit
+pub fn Gilrs::set_axis_to_btn(Self, Double, Double) -> Unit raise GilrsError
 pub fn Gilrs::set_deadzone(Self, GamepadId, Int, Double) -> Unit
 pub fn Gilrs::set_mapping(Self, GamepadId, Mapping) -> Unit
 pub fn Gilrs::set_time(Self, Int64) -> Unit
@@ -371,6 +380,7 @@ pub fn Mapping::map(Self, Int) -> AxisOrBtn?
 pub fn Mapping::map_rev(Self, AxisOrBtn) -> Int?
 pub fn Mapping::name(Self) -> String
 pub fn Mapping::new() -> Self
+pub fn Mapping::new_default() -> Self
 pub fn Mapping::parse_sdl_mapping(String, Array[Int], Array[Int]) -> Self raise ParseSdlMappingError
 pub fn Mapping::set_hats_mapped(Self, Int) -> Unit
 
@@ -397,6 +407,9 @@ pub fn MappingDb::new() -> Self
 pub struct NativeBackend {
   owner : BackendOwner
 }
+pub fn NativeBackend::axes(Self, Int) -> Array[Int]
+pub fn NativeBackend::axis_info(Self, Int, Int) -> AxisInfo?
+pub fn NativeBackend::buttons(Self, Int) -> Array[Int]
 pub fn NativeBackend::gamepad_count(Self) -> Int
 pub fn NativeBackend::is_ff_supported(Self, Int) -> Bool
 pub fn NativeBackend::name(Self, Int) -> String

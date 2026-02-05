@@ -43,6 +43,11 @@ pub fn Mapping::new() -> Mapping {
 }
 
 ///|
+pub fn Mapping::new_default() -> Mapping {
+  { mappings: [], name: "", default: true, hats_mapped: 0 }
+}
+
+///|
 fn axis_same(a : Axis, b : Axis) -> Bool {
   a.to_index() == b.to_index()
 }

@@ -59,6 +59,22 @@ extern "C" fn backend_is_ff_supported(owner : BackendOwner, id : Int) -> Int = "
 
 ///|
 #borrow(owner)
+extern "C" fn backend_axes_bin(owner : BackendOwner, id : Int) -> Bytes = "moon_gamepad_backend_axes_bin"
+
+///|
+#borrow(owner)
+extern "C" fn backend_buttons_bin(owner : BackendOwner, id : Int) -> Bytes = "moon_gamepad_backend_buttons_bin"
+
+///|
+#borrow(owner)
+extern "C" fn backend_axis_info_bin(
+  owner : BackendOwner,
+  id : Int,
+  code : Int,
+) -> Bytes = "moon_gamepad_backend_axis_info_bin"
+
+///|
+#borrow(owner)
 extern "C" fn backend_set_rumble(
   owner : BackendOwner,
   id : Int,
@@ -134,6 +150,57 @@ pub fn NativeBackend::product_id(self : NativeBackend, id : Int) -> Int? {
 ///|
 pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
   backend_is_ff_supported(self.owner, id) != 0
+}
+
+///|
+fn read_i32_le(b : Bytes, off : Int) -> Int {
+  let b0 = b[off + 0].to_int()
+  let b1 = b[off + 1].to_int()
+  let b2 = b[off + 2].to_int()
+  let b3 = b[off + 3].to_int()
+  b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)
+}
+
+///|
+fn decode_i32s(b : Bytes) -> Array[Int] {
+  let out : Array[Int] = []
+  if b.length() == 0 {
+    return out
+  }
+  let n = b.length() / 4
+  for i in 0..<n {
+    out.push(read_i32_le(b, i * 4))
+  }
+  out
+}
+
+///|
+pub fn NativeBackend::axes(self : NativeBackend, id : Int) -> Array[Int] {
+  decode_i32s(backend_axes_bin(self.owner, id))
+}
+
+///|
+pub fn NativeBackend::buttons(self : NativeBackend, id : Int) -> Array[Int] {
+  decode_i32s(backend_buttons_bin(self.owner, id))
+}
+
+///|
+pub fn NativeBackend::axis_info(
+  self : NativeBackend,
+  id : Int,
+  code : Int,
+) -> AxisInfo? {
+  let b = backend_axis_info_bin(self.owner, id, code)
+  if b.length() < 12 {
+    return None
+  }
+  let present = read_i32_le(b, 0)
+  if present == 0 {
+    return None
+  }
+  let minv = read_i32_le(b, 4)
+  let maxv = read_i32_le(b, 8)
+  Some(AxisInfo::new(minv, maxv, None))
 }
 
 ///|

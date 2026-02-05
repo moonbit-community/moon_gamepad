@@ -287,6 +287,17 @@ typedef struct moon_gamepad_backend_t {
   // DPad hat state per device index.
   int8_t dpad_x[32];
   int8_t dpad_y[32];
+	  // Device capabilities (best-effort).
+	  int32_t axes_codes[32][32];
+	  uint32_t axes_key[32][32];
+	  uint8_t axes_len[32];
+	  int32_t buttons_codes[32][64];
+	  uint32_t buttons_key[32][64];
+	  uint8_t buttons_len[32];
+	  int32_t axis_info_codes[32][32];
+	  int32_t axis_info_min[32][32];
+	  int32_t axis_info_max[32][32];
+	  uint8_t axis_info_len[32];
 #endif
 
 #if defined(__linux__)
@@ -345,12 +356,16 @@ enum {
   CODE_AXIS_LSTICKX = 100,
   CODE_AXIS_LSTICKY = 101,
   CODE_AXIS_LEFTZ = 102,
-  CODE_AXIS_RSTICKX = 103,
-  CODE_AXIS_RSTICKY = 104,
-  CODE_AXIS_RIGHTZ = 105,
-  CODE_AXIS_DPADX = 106,
-  CODE_AXIS_DPADY = 107,
-};
+	  CODE_AXIS_RSTICKX = 103,
+	  CODE_AXIS_RSTICKY = 104,
+	  CODE_AXIS_RIGHTZ = 105,
+	  CODE_AXIS_DPADX = 106,
+	  CODE_AXIS_DPADY = 107,
+	  CODE_AXIS_RT = 108,
+	  CODE_AXIS_LT = 109,
+	  CODE_AXIS_RT2 = 110,
+	  CODE_AXIS_LT2 = 111,
+	};
 
 #if defined(__APPLE__)
 
@@ -511,6 +526,207 @@ static int is_y_axis_code(uint32_t code) {
   return (code == CODE_AXIS_LSTICKY) || (code == CODE_AXIS_RSTICKY) || (code == CODE_AXIS_DPADY);
 }
 
+static void mac_caps_clear(moon_gamepad_backend_t *b, uint32_t idx) {
+  if (b == NULL || idx >= 32) {
+    return;
+  }
+  b->axes_len[idx] = 0;
+  b->buttons_len[idx] = 0;
+  b->axis_info_len[idx] = 0;
+  memset(b->axes_codes[idx], 0, sizeof(b->axes_codes[idx]));
+  memset(b->axes_key[idx], 0, sizeof(b->axes_key[idx]));
+  memset(b->buttons_codes[idx], 0, sizeof(b->buttons_codes[idx]));
+  memset(b->buttons_key[idx], 0, sizeof(b->buttons_key[idx]));
+  memset(b->axis_info_codes[idx], 0, sizeof(b->axis_info_codes[idx]));
+  memset(b->axis_info_min[idx], 0, sizeof(b->axis_info_min[idx]));
+  memset(b->axis_info_max[idx], 0, sizeof(b->axis_info_max[idx]));
+}
+
+static int mac_codes_contains(const int32_t *xs, uint8_t len, int32_t code) {
+  for (uint8_t i = 0; i < len; i++) {
+    if (xs[i] == code) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static void mac_insert_sorted(int32_t *codes, uint32_t *keys, uint8_t *len, uint8_t cap, int32_t code,
+                              uint32_t key) {
+  if (codes == NULL || keys == NULL || len == NULL) {
+    return;
+  }
+  uint8_t n = *len;
+  if (n >= cap) {
+    return;
+  }
+  // Stable insert by key.
+  uint8_t pos = n;
+  for (uint8_t i = 0; i < n; i++) {
+    if (keys[i] > key) {
+      pos = i;
+      break;
+    }
+  }
+  for (uint8_t j = n; j > pos; j--) {
+    codes[j] = codes[j - 1];
+    keys[j] = keys[j - 1];
+  }
+  codes[pos] = code;
+  keys[pos] = key;
+  *len = (uint8_t)(n + 1);
+}
+
+static void mac_push_code(int32_t *codes, uint32_t *keys, uint8_t *len, uint8_t cap, int32_t code, uint32_t key) {
+  if (codes == NULL || keys == NULL || len == NULL) {
+    return;
+  }
+  uint8_t n = *len;
+  if (n >= cap) {
+    return;
+  }
+  codes[n] = code;
+  keys[n] = key;
+  *len = (uint8_t)(n + 1);
+}
+
+static void mac_add_axis_code(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, uint32_t sort_key, int32_t minv,
+                              int32_t maxv) {
+  if (b == NULL || idx >= 32) {
+    return;
+  }
+  if (!mac_codes_contains(b->axes_codes[idx], b->axes_len[idx], code)) {
+    mac_insert_sorted(b->axes_codes[idx], b->axes_key[idx], &b->axes_len[idx], 32, code, sort_key);
+  }
+  // Update axis_info (keep first occurrence; values may differ but best-effort).
+  for (uint8_t i = 0; i < b->axis_info_len[idx]; i++) {
+    if (b->axis_info_codes[idx][i] == code) {
+      return;
+    }
+  }
+  if (b->axis_info_len[idx] < 32) {
+    uint8_t j = b->axis_info_len[idx]++;
+    b->axis_info_codes[idx][j] = code;
+    b->axis_info_min[idx][j] = minv;
+    b->axis_info_max[idx][j] = maxv;
+  }
+}
+
+static void mac_add_axis_code_append(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, uint32_t sort_key,
+                                     int32_t minv, int32_t maxv) {
+  if (b == NULL || idx >= 32) {
+    return;
+  }
+  if (!mac_codes_contains(b->axes_codes[idx], b->axes_len[idx], code)) {
+    mac_push_code(b->axes_codes[idx], b->axes_key[idx], &b->axes_len[idx], 32, code, sort_key);
+  }
+  for (uint8_t i = 0; i < b->axis_info_len[idx]; i++) {
+    if (b->axis_info_codes[idx][i] == code) {
+      return;
+    }
+  }
+  if (b->axis_info_len[idx] < 32) {
+    uint8_t j = b->axis_info_len[idx]++;
+    b->axis_info_codes[idx][j] = code;
+    b->axis_info_min[idx][j] = minv;
+    b->axis_info_max[idx][j] = maxv;
+  }
+}
+
+static void mac_add_button_code(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, uint32_t sort_key) {
+  if (b == NULL || idx >= 32) {
+    return;
+  }
+  if (!mac_codes_contains(b->buttons_codes[idx], b->buttons_len[idx], code)) {
+    mac_insert_sorted(b->buttons_codes[idx], b->buttons_key[idx], &b->buttons_len[idx], 64, code, sort_key);
+  }
+}
+
+static void mac_collect_elements(moon_gamepad_backend_t *b, uint32_t idx, CFArrayRef elements, int *saw_hat) {
+  if (b == NULL || elements == NULL || idx >= 32) {
+    return;
+  }
+  CFIndex n = CFArrayGetCount(elements);
+  for (CFIndex i = 0; i < n; i++) {
+    IOHIDElementRef el = (IOHIDElementRef)CFArrayGetValueAtIndex(elements, i);
+    if (el == NULL) {
+      continue;
+    }
+    IOHIDElementType type = IOHIDElementGetType(el);
+    if (type == kIOHIDElementTypeCollection) {
+      CFArrayRef children = IOHIDElementGetChildren(el);
+      if (children != NULL) {
+        mac_collect_elements(b, idx, children, saw_hat);
+      }
+      continue;
+    }
+    uint32_t page = IOHIDElementGetUsagePage(el);
+    uint32_t usage = IOHIDElementGetUsage(el);
+
+    if (page == 0x09) {
+      uint32_t code = map_hid_button_usage(usage);
+      if (code != UINT32_MAX) {
+        uint32_t key = (page << 16) | usage;
+        mac_add_button_code(b, idx, (int32_t)code, key);
+      }
+      continue;
+    }
+
+    if (page == 0x01) {
+      if (usage == 0x39) {
+        // Hat -> two axes (append after other axes to match SDL ordering).
+        if (saw_hat != NULL) {
+          *saw_hat = 1;
+        }
+        continue;
+      }
+      uint32_t code = map_hid_gd_usage_to_axis(usage);
+      if (code != UINT32_MAX) {
+        int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
+        int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
+        uint32_t key = (page << 16) | usage;
+        mac_add_axis_code(b, idx, (int32_t)code, key, minv, maxv);
+        continue;
+      }
+    }
+
+    if (page == 0x02) {
+      // Simulation triggers: treat as axes (mapped to buttons via Mapping).
+      if (usage == 0xC4) {
+        int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
+        int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
+        uint32_t key = (page << 16) | usage;
+        mac_add_axis_code(b, idx, (int32_t)CODE_AXIS_RT2, key, minv, maxv);
+      } else if (usage == 0xC5) {
+        int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
+        int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
+        uint32_t key = (page << 16) | usage;
+        mac_add_axis_code(b, idx, (int32_t)CODE_AXIS_LT2, key, minv, maxv);
+      }
+      continue;
+    }
+  }
+}
+
+static void mac_collect_device_caps(moon_gamepad_backend_t *b, uint32_t idx, IOHIDDeviceRef device) {
+  if (b == NULL || device == NULL || idx >= 32) {
+    return;
+  }
+  mac_caps_clear(b, idx);
+  int saw_hat = 0;
+  CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
+  if (elements == NULL) {
+    return;
+  }
+  mac_collect_elements(b, idx, elements, &saw_hat);
+  CFRelease(elements);
+  if (saw_hat) {
+    uint32_t key = (0x01u << 16) | 0x39u;
+    mac_add_axis_code_append(b, idx, (int32_t)CODE_AXIS_DPADX, key, -1, 1);
+    mac_add_axis_code_append(b, idx, (int32_t)CODE_AXIS_DPADY, key, -1, 1);
+  }
+}
+
 static void mac_fill_device_info(moon_gamepad_backend_t *b, uint32_t idx, IOHIDDeviceRef device) {
   if (b == NULL || device == NULL || idx >= 32) {
     return;
@@ -569,6 +785,7 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
   uint32_t idx = b->devices_len;
   b->devices[idx] = device;
   b->device_ids[idx] = id;
+  mac_collect_device_caps(b, idx, device);
   mac_fill_device_info(b, idx, device);
   b->dpad_x[idx] = 0;
   b->dpad_y[idx] = 0;
@@ -603,6 +820,17 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
     b->products[(uint32_t)idx] = b->products[last];
     memcpy(b->uuids[(uint32_t)idx], b->uuids[last], sizeof(b->uuids[(uint32_t)idx]));
     memcpy(b->names[(uint32_t)idx], b->names[last], sizeof(b->names[(uint32_t)idx]));
+    b->axes_len[(uint32_t)idx] = b->axes_len[last];
+    b->buttons_len[(uint32_t)idx] = b->buttons_len[last];
+    b->axis_info_len[(uint32_t)idx] = b->axis_info_len[last];
+    memcpy(b->axes_codes[(uint32_t)idx], b->axes_codes[last], sizeof(b->axes_codes[(uint32_t)idx]));
+    memcpy(b->axes_key[(uint32_t)idx], b->axes_key[last], sizeof(b->axes_key[(uint32_t)idx]));
+    memcpy(b->buttons_codes[(uint32_t)idx], b->buttons_codes[last], sizeof(b->buttons_codes[(uint32_t)idx]));
+    memcpy(b->buttons_key[(uint32_t)idx], b->buttons_key[last], sizeof(b->buttons_key[(uint32_t)idx]));
+    memcpy(b->axis_info_codes[(uint32_t)idx], b->axis_info_codes[last],
+           sizeof(b->axis_info_codes[(uint32_t)idx]));
+    memcpy(b->axis_info_min[(uint32_t)idx], b->axis_info_min[last], sizeof(b->axis_info_min[(uint32_t)idx]));
+    memcpy(b->axis_info_max[(uint32_t)idx], b->axis_info_max[last], sizeof(b->axis_info_max[(uint32_t)idx]));
     b->dpad_x[(uint32_t)idx] = b->dpad_x[last];
     b->dpad_y[(uint32_t)idx] = b->dpad_y[last];
   }
@@ -612,6 +840,7 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
   b->products[last] = -1;
   memset(b->uuids[last], 0, sizeof(b->uuids[last]));
   memset(b->names[last], 0, sizeof(b->names[last]));
+  mac_caps_clear(b, last);
   b->dpad_x[last] = 0;
   b->dpad_y[last] = 0;
   b->devices_len--;
@@ -689,63 +918,55 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
         x_raw = 0;
       }
 
-      // gilrs-core emits an inverted macOS axis here (down positive, up negative) and lets the Y
-      // inversion stage fix it; we emit the post-inversion value directly (up positive).
-      int32_t y_raw;
-      if (dpad_value >= 3 && dpad_value <= 5) {
-        y_raw = 1; // down (pre-inversion)
-      } else if (dpad_value == 0 || dpad_value == 1 || dpad_value == 7) {
-        y_raw = -1; // up (pre-inversion)
+	      // gilrs-core emits an inverted macOS axis here (down positive, up negative) and lets the Y
+	      // inversion stage fix it.
+	      int32_t y_raw;
+	      if (dpad_value >= 3 && dpad_value <= 5) {
+	        y_raw = 1; // down (pre-inversion)
+	      } else if (dpad_value == 0 || dpad_value == 1 || dpad_value == 7) {
+	        y_raw = -1; // up (pre-inversion)
       } else {
         y_raw = 0;
-      }
+	      }
 
-      double x = (double)x_raw;
-      double y = (double)y_raw;
-      if (y != 0.0) {
-        y = -y; // post-inversion
-      }
+	      double x = (double)x_raw;
+	      double y = (double)y_raw;
 
-      moon_gamepad_event_t ex = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADX, 0, x, t};
-      moon_gamepad_event_t ey = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADY, 0, y, t};
-      queue_push(&b->q, ex);
+	      moon_gamepad_event_t ex = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADX, 0, x, t};
+	      moon_gamepad_event_t ey = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADY, 0, y, t};
+	      queue_push(&b->q, ex);
       queue_push(&b->q, ey);
       return;
     }
 
     uint32_t code = map_hid_gd_usage_to_axis(usage);
-    if (code == UINT32_MAX) {
-      return;
-    }
-    int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
-    int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
-    int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
-    // Match gilrs' axis_value-like normalization and Y-axis inversion for macOS.
-    double nv = axis_value_like_gilrs(v, minv, maxv, is_y_axis_code(code));
-    moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, nv, t};
-    queue_push(&b->q, ev);
-    return;
-  }
+	    if (code == UINT32_MAX) {
+	      return;
+	    }
+	    int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
+	    // Emit raw value; mapping/normalization happens in MoonBit.
+	    moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, (double)v, t};
+	    queue_push(&b->q, ev);
+	    return;
+	  }
 
   // Simulation page 0x02: analog triggers on some controllers.
   if (page == 0x02) {
-    // kHIDUsage_Sim_Accelerator (0xC4), kHIDUsage_Sim_Brake (0xC5)
-    uint32_t code = UINT32_MAX;
-    if (usage == 0xC4) {
-      code = CODE_BTN_RT2;
-    } else if (usage == 0xC5) {
-      code = CODE_BTN_LT2;
-    }
-    if (code != UINT32_MAX) {
-      int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
-      int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
-      int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
-      double nv = norm_btn_01_i32(v, minv, maxv);
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_CHANGED, id, code, 0, nv, t};
-      queue_push(&b->q, ev);
-      return;
-    }
-  }
+	    // kHIDUsage_Sim_Accelerator (0xC4), kHIDUsage_Sim_Brake (0xC5)
+	    uint32_t code = UINT32_MAX;
+	    if (usage == 0xC4) {
+	      code = CODE_AXIS_RT2;
+	    } else if (usage == 0xC5) {
+	      code = CODE_AXIS_LT2;
+	    }
+	    if (code != UINT32_MAX) {
+	      int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
+	      // Emit raw value; mapping/normalization happens in MoonBit.
+	      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, (double)v, t};
+	      queue_push(&b->q, ev);
+	      return;
+	    }
+	  }
 }
 
 static CFDictionaryRef make_matching_dict(uint32_t page, uint32_t usage) {
@@ -826,8 +1047,18 @@ static void mac_backend_init(moon_gamepad_backend_t *b) {
     memset(b->uuids[i], 0, sizeof(b->uuids[i]));
     memset(b->names[i], 0, sizeof(b->names[i]));
   }
-  memset(b->dpad_x, 0, sizeof(b->dpad_x));
-  memset(b->dpad_y, 0, sizeof(b->dpad_y));
+	  memset(b->dpad_x, 0, sizeof(b->dpad_x));
+	  memset(b->dpad_y, 0, sizeof(b->dpad_y));
+	  memset(b->axes_codes, 0, sizeof(b->axes_codes));
+	  memset(b->axes_key, 0, sizeof(b->axes_key));
+	  memset(b->axes_len, 0, sizeof(b->axes_len));
+	  memset(b->buttons_codes, 0, sizeof(b->buttons_codes));
+	  memset(b->buttons_key, 0, sizeof(b->buttons_key));
+	  memset(b->buttons_len, 0, sizeof(b->buttons_len));
+	  memset(b->axis_info_codes, 0, sizeof(b->axis_info_codes));
+	  memset(b->axis_info_min, 0, sizeof(b->axis_info_min));
+	  memset(b->axis_info_max, 0, sizeof(b->axis_info_max));
+  memset(b->axis_info_len, 0, sizeof(b->axis_info_len));
   pthread_create(&b->thread, NULL, mac_thread_main, b);
 }
 
@@ -1953,6 +2184,98 @@ int32_t moon_gamepad_backend_is_ff_supported(void *owner, int32_t id) {
   (void)b;
   (void)id;
   return 0;
+#endif
+}
+
+moonbit_bytes_t moon_gamepad_backend_axes_bin(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+  uint8_t len = b->axes_len[(uint32_t)idx];
+  moonbit_bytes_t out = moonbit_make_bytes_raw((int32_t)len * 4);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  for (uint8_t i = 0; i < len; i++) {
+    int32_t v = b->axes_codes[(uint32_t)idx][i];
+    memcpy(out + (int32_t)i * 4, &v, 4);
+  }
+  return out;
+#else
+  (void)b;
+  (void)id;
+  return moonbit_make_bytes_raw(0);
+#endif
+}
+
+moonbit_bytes_t moon_gamepad_backend_buttons_bin(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+  uint8_t len = b->buttons_len[(uint32_t)idx];
+  moonbit_bytes_t out = moonbit_make_bytes_raw((int32_t)len * 4);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  for (uint8_t i = 0; i < len; i++) {
+    int32_t v = b->buttons_codes[(uint32_t)idx][i];
+    memcpy(out + (int32_t)i * 4, &v, 4);
+  }
+  return out;
+#else
+  (void)b;
+  (void)id;
+  return moonbit_make_bytes_raw(0);
+#endif
+}
+
+moonbit_bytes_t moon_gamepad_backend_axis_info_bin(void *owner, int32_t id, int32_t code) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+  int32_t present = 0;
+  int32_t minv = 0;
+  int32_t maxv = 0;
+  uint8_t len = b->axis_info_len[(uint32_t)idx];
+  for (uint8_t i = 0; i < len; i++) {
+    if (b->axis_info_codes[(uint32_t)idx][i] == code) {
+      present = 1;
+      minv = b->axis_info_min[(uint32_t)idx][i];
+      maxv = b->axis_info_max[(uint32_t)idx][i];
+      break;
+    }
+  }
+  moonbit_bytes_t out = moonbit_make_bytes_raw(12);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  memcpy(out + 0, &present, 4);
+  memcpy(out + 4, &minv, 4);
+  memcpy(out + 8, &maxv, 4);
+  return out;
+#else
+  (void)b;
+  (void)id;
+  (void)code;
+  return moonbit_make_bytes_raw(0);
 #endif
 }
 

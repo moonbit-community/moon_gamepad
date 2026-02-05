@@ -150,6 +150,13 @@ pub fn button_from_code(code : Code) -> Button? {
 
 ///|
 pub fn axis_or_btn_from_code(code : Code) -> AxisOrBtn? {
+  match code {
+    AXIS_LT => return Some(AxisOrBtn::Btn(Button::LeftTrigger))
+    AXIS_RT => return Some(AxisOrBtn::Btn(Button::RightTrigger))
+    AXIS_LT2 => return Some(AxisOrBtn::Btn(Button::LeftTrigger2))
+    AXIS_RT2 => return Some(AxisOrBtn::Btn(Button::RightTrigger2))
+    _ => ()
+  }
   match axis_from_code(code) {
     Some(a) => Some(AxisOrBtn::Axis(a))
     None =>

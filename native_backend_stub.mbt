@@ -86,6 +86,32 @@ pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
 }
 
 ///|
+pub fn NativeBackend::axes(self : NativeBackend, id : Int) -> Array[Int] {
+  let _ = self
+  let _ = id
+  []
+}
+
+///|
+pub fn NativeBackend::buttons(self : NativeBackend, id : Int) -> Array[Int] {
+  let _ = self
+  let _ = id
+  []
+}
+
+///|
+pub fn NativeBackend::axis_info(
+  self : NativeBackend,
+  id : Int,
+  code : Int,
+) -> AxisInfo? {
+  let _ = self
+  let _ = id
+  let _ = code
+  None
+}
+
+///|
 pub fn NativeBackend::set_rumble(
   self : NativeBackend,
   id : Int,
