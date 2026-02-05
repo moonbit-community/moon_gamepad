@@ -301,6 +301,7 @@ pub fn Gilrs::new() -> Self
 pub fn Gilrs::new_mock(Int, update_state? : Bool, default_filters? : Bool) -> Self
 pub fn Gilrs::new_native(update_state? : Bool, default_filters? : Bool) -> Self
 pub fn Gilrs::next_event(Self) -> Event?
+pub fn Gilrs::next_event_blocking(Self, Int64?) -> Event?
 pub fn Gilrs::poll(Self) -> Unit
 pub fn Gilrs::reset_counter(Self) -> Unit
 pub fn Gilrs::set_deadzone(Self, GamepadId, Int, Double) -> Unit
@@ -376,6 +377,7 @@ pub fn NativeBackend::gamepad_count(Self) -> Int
 pub fn NativeBackend::new() -> Self
 pub fn NativeBackend::next_event(Self) -> NativeEvent?
 pub fn NativeBackend::poll(Self) -> Unit
+pub fn NativeBackend::poll_timeout(Self, Int) -> Unit
 
 pub struct NativeEvent {
   tag : NativeEventTag

@@ -24,6 +24,13 @@ extern "C" fn backend_poll(owner : BackendOwner) -> Unit = "moon_gamepad_backend
 
 ///|
 #borrow(owner)
+extern "C" fn backend_poll_timeout(
+  owner : BackendOwner,
+  timeout_ms : Int,
+) -> Unit = "moon_gamepad_backend_poll_timeout"
+
+///|
+#borrow(owner)
 extern "C" fn backend_gamepad_count(owner : BackendOwner) -> Int = "moon_gamepad_backend_gamepad_count"
 
 ///|
@@ -43,6 +50,14 @@ pub fn NativeBackend::new() -> NativeBackend {
 ///|
 pub fn NativeBackend::poll(self : NativeBackend) -> Unit {
   backend_poll(self.owner)
+}
+
+///|
+pub fn NativeBackend::poll_timeout(
+  self : NativeBackend,
+  timeout_ms : Int,
+) -> Unit {
+  backend_poll_timeout(self.owner, timeout_ms)
 }
 
 ///|

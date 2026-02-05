@@ -296,6 +296,70 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
 }
 
 ///|
+pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
+  let jitter_filter = Jitter::new()
+  let mut timeout2 = timeout_ms
+  while true {
+    if self.events_head >= self.events.length() {
+      match self.backend {
+        None => ()
+        Some(b) => {
+          let t : Int = match timeout2 {
+            None => -1
+            Some(ms) =>
+              if ms <= 0L {
+                0
+              } else if ms >= 0x7FFF_FFFFL {
+                0x7FFF_FFFF
+              } else {
+                ms.to_int()
+              }
+          }
+          b.poll_timeout(t)
+          while true {
+            match b.next_event() {
+              None => break
+              Some(ne) => self.push_native_event(ne)
+            }
+          }
+        }
+      }
+      timeout2 = match timeout2 {
+        None => None
+        Some(_) => Some(0L)
+      }
+    }
+    let raw = if self.events_head >= self.events.length() {
+      None
+    } else {
+      let ev = self.events[self.events_head]
+      self.events_head = self.events_head + 1
+      Some(ev)
+    }
+    let mut ev = raw
+    if self.default_filters {
+      ev = filter_ev(ev, axis_dpad_to_button, self)
+      ev = filter_ev(ev, fn(ev, g) { jitter_filter.filter(ev, g) }, self)
+      ev = filter_ev(ev, deadzone, self)
+    }
+    match ev {
+      Some(e) =>
+        if e.is_dropped() {
+          continue
+        } else {
+          if self.update_state {
+            self.update(e)
+          }
+          return Some(e)
+        }
+      None => return None
+    }
+  } else {
+    None
+  }
+}
+
+///|
 pub fn Gilrs::update(self : Gilrs, event : Event) -> Unit {
   let id = event.id().value()
   if id < 0 || id >= self.gamepads_data.length() {
@@ -551,6 +615,9 @@ pub fn Gilrs::gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
 pub fn Gilrs::gamepads(self : Gilrs) -> Array[(GamepadId, Gamepad)] {
   let out : Array[(GamepadId, Gamepad)] = []
   for i in 0..<self.gamepads_data.length() {
+    if !self.gamepads_data[i].connected {
+      continue
+    }
     let id = GamepadId::new(i)
     out.push((id, { gilrs: self, id }))
   }

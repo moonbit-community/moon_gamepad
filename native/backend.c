@@ -8,6 +8,7 @@
 
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
+#include <errno.h>
 #include <IOKit/hid/IOHIDLib.h>
 #include <IOKit/hid/IOHIDKeys.h>
 #include <IOKit/hid/IOHIDManager.h>
@@ -47,6 +48,7 @@ typedef struct moon_gamepad_queue_t {
   uint32_t len;
 #if defined(__APPLE__)
   pthread_mutex_t mu;
+  pthread_cond_t cv;
 #endif
 } moon_gamepad_queue_t;
 
@@ -58,6 +60,7 @@ static void queue_init(moon_gamepad_queue_t *q, uint32_t cap) {
   q->len = 0;
 #if defined(__APPLE__)
   pthread_mutex_init(&q->mu, NULL);
+  pthread_cond_init(&q->cv, NULL);
 #endif
 }
 
@@ -67,10 +70,25 @@ static void queue_free(moon_gamepad_queue_t *q) {
     q->buf = NULL;
   }
 #if defined(__APPLE__)
+  pthread_cond_destroy(&q->cv);
   pthread_mutex_destroy(&q->mu);
 #endif
   q->cap = 0;
   q->head = q->tail = q->len = 0;
+}
+
+static uint32_t queue_len(moon_gamepad_queue_t *q) {
+  if (q == NULL) {
+    return 0;
+  }
+#if defined(__APPLE__)
+  pthread_mutex_lock(&q->mu);
+  uint32_t out = q->len;
+  pthread_mutex_unlock(&q->mu);
+  return out;
+#else
+  return q->len;
+#endif
 }
 
 static int64_t now_ms(void) {
@@ -117,6 +135,7 @@ static void queue_push(moon_gamepad_queue_t *q, moon_gamepad_event_t ev) {
   q->tail = (q->tail + 1) % q->cap;
   q->len++;
 #if defined(__APPLE__)
+  pthread_cond_signal(&q->cv);
   pthread_mutex_unlock(&q->mu);
 #endif
 }
@@ -142,6 +161,41 @@ static int queue_pop(moon_gamepad_queue_t *q, moon_gamepad_event_t *out) {
 #endif
   return 1;
 }
+
+#if defined(__APPLE__)
+static void queue_wait_nonempty(moon_gamepad_queue_t *q, int32_t timeout_ms) {
+  if (q == NULL) {
+    return;
+  }
+  pthread_mutex_lock(&q->mu);
+  if (q->len != 0 || timeout_ms == 0) {
+    pthread_mutex_unlock(&q->mu);
+    return;
+  }
+
+  if (timeout_ms < 0) {
+    while (q->len == 0) {
+      pthread_cond_wait(&q->cv, &q->mu);
+    }
+    pthread_mutex_unlock(&q->mu);
+    return;
+  }
+
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  int64_t nsec = (int64_t)ts.tv_nsec + (int64_t)(timeout_ms % 1000) * 1000000LL;
+  ts.tv_sec += (time_t)(timeout_ms / 1000) + (time_t)(nsec / 1000000000LL);
+  ts.tv_nsec = (long)(nsec % 1000000000LL);
+
+  while (q->len == 0) {
+    int rc = pthread_cond_timedwait(&q->cv, &q->mu, &ts);
+    if (rc == ETIMEDOUT) {
+      break;
+    }
+  }
+  pthread_mutex_unlock(&q->mu);
+}
+#endif
 
 // -----------------------------------------------------------------------------
 // Backend
@@ -863,7 +917,13 @@ static void linux_backend_shutdown(moon_gamepad_backend_t *b) {
   b->fds_len = 0;
 }
 
+static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeout_ms);
+
 static void linux_backend_poll(moon_gamepad_backend_t *b) {
+  linux_backend_poll_timeout(b, 0);
+}
+
+static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeout_ms) {
   if (b == NULL) {
     return;
   }
@@ -879,7 +939,7 @@ static void linux_backend_poll(moon_gamepad_backend_t *b) {
     pfds[i].events = POLLIN | POLLERR | POLLHUP | POLLNVAL;
     pfds[i].revents = 0;
   }
-  int n = poll(pfds, (nfds_t)b->fds_len, 0);
+  int n = poll(pfds, (nfds_t)b->fds_len, timeout_ms);
   if (n <= 0) {
     return;
   }
@@ -1169,6 +1229,34 @@ static void windows_backend_poll(moon_gamepad_backend_t *b) {
   b->gamepad_count = connected_count;
 }
 
+static void windows_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeout_ms) {
+  if (b == NULL) {
+    return;
+  }
+  if (timeout_ms == 0) {
+    windows_backend_poll(b);
+    return;
+  }
+  int64_t start = now_ms();
+  while (1) {
+    windows_backend_poll(b);
+    if (queue_len(&b->q) != 0) {
+      return;
+    }
+    if (timeout_ms < 0) {
+      Sleep(8);
+      continue;
+    }
+    int64_t elapsed = now_ms() - start;
+    if (elapsed >= (int64_t)timeout_ms) {
+      return;
+    }
+    int64_t remaining = (int64_t)timeout_ms - elapsed;
+    DWORD sleep_ms = (remaining > 8) ? 8 : (DWORD)remaining;
+    Sleep(sleep_ms);
+  }
+}
+
 #endif // _WIN32
 
 // -----------------------------------------------------------------------------
@@ -1245,6 +1333,23 @@ void moon_gamepad_backend_poll(void *owner) {
   windows_backend_poll(b);
 #else
   (void)b;
+#endif
+}
+
+void moon_gamepad_backend_poll_timeout(void *owner, int32_t timeout_ms) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL) {
+    return;
+  }
+#if defined(__APPLE__)
+  queue_wait_nonempty(&b->q, timeout_ms);
+#elif defined(__linux__)
+  linux_backend_poll_timeout(b, timeout_ms);
+#elif defined(_WIN32)
+  windows_backend_poll_timeout(b, timeout_ms);
+#else
+  (void)b;
+  (void)timeout_ms;
 #endif
 }
 

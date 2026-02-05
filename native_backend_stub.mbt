@@ -29,6 +29,16 @@ pub fn NativeBackend::poll(self : NativeBackend) -> Unit {
 }
 
 ///|
+pub fn NativeBackend::poll_timeout(
+  self : NativeBackend,
+  timeout_ms : Int,
+) -> Unit {
+  let _ = self
+  let _ = timeout_ms
+  ()
+}
+
+///|
 pub fn NativeBackend::next_event(self : NativeBackend) -> NativeEvent? {
   let _ = self
   None

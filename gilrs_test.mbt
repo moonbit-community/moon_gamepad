@@ -147,3 +147,20 @@ test "gilrs next_event runs axis_dpad_to_button in default pipeline" {
   inspect(g.next_event().map(gilrs_event_sig), content="Some((1, 18, 1, 18))")
   inspect(g.next_event().map(gilrs_event_sig), content="Some((2, 18, 1, 18))")
 }
+
+///|
+test "gilrs next_event_blocking timeout 0 behaves like next_event (mock)" {
+  let g = Gilrs::new_mock(1)
+  inspect(g.next_event_blocking(Some(0L)) is None, content="true")
+  let id = GamepadId::new(0)
+  g.insert_event(Event::at(id, EventType::Connected, 1L))
+  let got = g
+    .next_event_blocking(Some(0L))
+    .map(fn(ev) {
+      match ev.event() {
+        EventType::Connected => 1
+        _ => 0
+      }
+    })
+  inspect(got, content="Some(1)")
+}
