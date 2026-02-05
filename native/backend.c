@@ -576,7 +576,8 @@ static int mac_element_is_hat(IOHIDElementType type, uint32_t page, uint32_t usa
   if (!mac_type_is_input(type)) {
     return 0;
   }
-  return (page == 0x01) && (usage == 0x39);
+  // gilrs-core matches both hatswitch and "hatswitch+1".
+  return (page == 0x01) && (usage == 0x39 || usage == 0x3A);
 }
 
 static double norm_i32(int32_t v, int32_t minv, int32_t maxv) {
