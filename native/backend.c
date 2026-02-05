@@ -6,6 +6,52 @@
 
 #include "backend.h"
 
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+static void bytes_to_hex32(const uint8_t in16[16], char out33[33]) {
+  static const char HEX[16] = "0123456789abcdef";
+  for (int i = 0; i < 16; i++) {
+    uint8_t v = in16[i];
+    out33[i * 2 + 0] = HEX[(v >> 4) & 0xF];
+    out33[i * 2 + 1] = HEX[v & 0xF];
+  }
+  out33[32] = '\0';
+}
+
+static void uuid_simple_from_ids(uint16_t bustype, uint16_t vendor, uint16_t product, uint16_t version,
+                                 char out33[33]) {
+  uint8_t b[16];
+  memset(b, 0, sizeof(b));
+  b[0] = (uint8_t)(bustype & 0xFF);
+  b[1] = (uint8_t)((bustype >> 8) & 0xFF);
+  b[2] = (uint8_t)(vendor & 0xFF);
+  b[3] = (uint8_t)((vendor >> 8) & 0xFF);
+  b[4] = (uint8_t)(product & 0xFF);
+  b[5] = (uint8_t)((product >> 8) & 0xFF);
+  b[6] = (uint8_t)(version & 0xFF);
+  b[7] = (uint8_t)((version >> 8) & 0xFF);
+  bytes_to_hex32(b, out33);
+}
+
+static moonbit_string_t moonbit_string_from_utf8_lossy(const char *s) {
+  if (s == NULL) {
+    return moonbit_make_string_raw(0);
+  }
+  size_t n = strlen(s);
+  moonbit_string_t out = moonbit_make_string_raw((int32_t)n);
+  if (out == NULL) {
+    return moonbit_make_string_raw(0);
+  }
+  // Best-effort: treat bytes as ASCII and replace non-ASCII with '?'.
+  for (size_t i = 0; i < n; i++) {
+    unsigned char c = (unsigned char)s[i];
+    out[i] = (c < 0x80) ? (uint16_t)c : (uint16_t)'?';
+  }
+  return out;
+}
+
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
 #include <errno.h>
@@ -33,6 +79,7 @@
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
+#include <stdio.h>
 #include <windows.h>
 #endif
 
@@ -212,9 +259,13 @@ typedef struct moon_gamepad_backend_t {
   // Simple device list.
   IOHIDDeviceRef devices[32];
   uint32_t device_ids[32];
+  int32_t vendors[32];
+  int32_t products[32];
+  char uuids[32][33];
+  char names[32][256];
   uint32_t devices_len;
   uint32_t next_id;
-  // DPad hat state per id.
+  // DPad hat state per device index.
   int8_t dpad_x[32];
   int8_t dpad_y[32];
 #endif
@@ -223,6 +274,14 @@ typedef struct moon_gamepad_backend_t {
   int fds[64];
   uint32_t fd_ids[64];
   char paths[64][256];
+  int32_t vendors[64];
+  int32_t products[64];
+  char uuids[64][33];
+  char names[64][256];
+  uint8_t ff_supported[64];
+  uint8_t rw[64];
+  int32_t ff_id[64];
+  int64_t ff_until_ms[64];
   uint32_t fds_len;
   uint32_t next_id;
 #endif
@@ -234,6 +293,11 @@ typedef struct moon_gamepad_backend_t {
   uint16_t win_buttons[4];
   int16_t win_lx[4], win_ly[4], win_rx[4], win_ry[4];
   uint8_t win_lt2[4], win_rt2[4];
+  char win_names[4][64];
+  char win_uuids[4][33];
+  uint16_t win_rumble_l[4];
+  uint16_t win_rumble_r[4];
+  int64_t win_rumble_until_ms[4];
 #endif
 } moon_gamepad_backend_t;
 
@@ -364,15 +428,16 @@ static double norm_i32(int32_t v, int32_t minv, int32_t maxv) {
   return t * 2.0 - 1.0;
 }
 
-static void push_dpad_buttons(moon_gamepad_backend_t *b, uint32_t id, int8_t x, int8_t y,
+static void push_dpad_buttons(moon_gamepad_backend_t *b, uint32_t idx, int8_t x, int8_t y,
                               int64_t t) {
-  if (id >= 32) {
+  if (b == NULL || idx >= 32) {
     return;
   }
-  int8_t ox = b->dpad_x[id];
-  int8_t oy = b->dpad_y[id];
-  b->dpad_x[id] = x;
-  b->dpad_y[id] = y;
+  uint32_t id = b->device_ids[idx];
+  int8_t ox = b->dpad_x[idx];
+  int8_t oy = b->dpad_y[idx];
+  b->dpad_x[idx] = x;
+  b->dpad_y[idx] = y;
 
   // Left/right
   if (ox != x) {
@@ -416,6 +481,44 @@ static void push_dpad_buttons(moon_gamepad_backend_t *b, uint32_t id, int8_t x, 
   }
 }
 
+static void mac_fill_device_info(moon_gamepad_backend_t *b, uint32_t idx, IOHIDDeviceRef device) {
+  if (b == NULL || device == NULL || idx >= 32) {
+    return;
+  }
+  b->vendors[idx] = -1;
+  b->products[idx] = -1;
+  memset(b->uuids[idx], 0, sizeof(b->uuids[idx]));
+  memset(b->names[idx], 0, sizeof(b->names[idx]));
+  b->uuids[idx][0] = '\0';
+  b->names[idx][0] = '\0';
+
+  CFTypeRef vref = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDVendorIDKey));
+  if (vref != NULL && CFGetTypeID(vref) == CFNumberGetTypeID()) {
+    int32_t v = -1;
+    if (CFNumberGetValue((CFNumberRef)vref, kCFNumberSInt32Type, &v)) {
+      b->vendors[idx] = v;
+    }
+  }
+  CFTypeRef pref = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductIDKey));
+  if (pref != NULL && CFGetTypeID(pref) == CFNumberGetTypeID()) {
+    int32_t p = -1;
+    if (CFNumberGetValue((CFNumberRef)pref, kCFNumberSInt32Type, &p)) {
+      b->products[idx] = p;
+    }
+  }
+  CFTypeRef nref = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductKey));
+  if (nref != NULL && CFGetTypeID(nref) == CFStringGetTypeID()) {
+    CFStringRef s = (CFStringRef)nref;
+    (void)CFStringGetCString(s, b->names[idx], (CFIndex)sizeof(b->names[idx]), kCFStringEncodingUTF8);
+  }
+
+  uint16_t bustype = 0x03; // USB (best-effort).
+  uint16_t vendor = (b->vendors[idx] >= 0) ? (uint16_t)b->vendors[idx] : 0;
+  uint16_t product = (b->products[idx] >= 0) ? (uint16_t)b->products[idx] : 0;
+  uint16_t version = 0;
+  uuid_simple_from_ids(bustype, vendor, product, version, b->uuids[idx]);
+}
+
 static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDeviceRef device) {
   (void)res;
   (void)sender;
@@ -429,12 +532,14 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
   // Retain device while stored.
   CFRetain(device);
   uint32_t id = b->next_id++;
-  b->devices[b->devices_len] = device;
-  b->device_ids[b->devices_len] = id;
-  b->devices_len++;
+  uint32_t idx = b->devices_len;
+  b->devices[idx] = device;
+  b->device_ids[idx] = id;
+  mac_fill_device_info(b, idx, device);
+  b->dpad_x[idx] = 0;
+  b->dpad_y[idx] = 0;
+  b->devices_len = b->devices_len + 1;
   b->gamepad_count = (int32_t)b->devices_len;
-  b->dpad_x[id] = 0;
-  b->dpad_y[id] = 0;
   moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, id, 0, 0, 0.0, now_ms()};
   queue_push(&b->q, ev);
 }
@@ -460,9 +565,21 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
   if ((uint32_t)idx != last) {
     b->devices[(uint32_t)idx] = b->devices[last];
     b->device_ids[(uint32_t)idx] = b->device_ids[last];
+    b->vendors[(uint32_t)idx] = b->vendors[last];
+    b->products[(uint32_t)idx] = b->products[last];
+    memcpy(b->uuids[(uint32_t)idx], b->uuids[last], sizeof(b->uuids[(uint32_t)idx]));
+    memcpy(b->names[(uint32_t)idx], b->names[last], sizeof(b->names[(uint32_t)idx]));
+    b->dpad_x[(uint32_t)idx] = b->dpad_x[last];
+    b->dpad_y[(uint32_t)idx] = b->dpad_y[last];
   }
   b->devices[last] = NULL;
   b->device_ids[last] = 0;
+  b->vendors[last] = -1;
+  b->products[last] = -1;
+  memset(b->uuids[last], 0, sizeof(b->uuids[last]));
+  memset(b->names[last], 0, sizeof(b->names[last]));
+  b->dpad_x[last] = 0;
+  b->dpad_y[last] = 0;
   b->devices_len--;
   b->gamepad_count = (int32_t)b->devices_len;
   moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
@@ -476,10 +593,11 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
     return;
   }
   IOHIDDeviceRef dev = (IOHIDDeviceRef)sender;
-  uint32_t id = device_id_of(b, dev);
-  if (id == UINT32_MAX) {
+  int dev_idx = find_device_idx(b, dev);
+  if (dev_idx < 0) {
     return;
   }
+  uint32_t id = b->device_ids[(uint32_t)dev_idx];
   IOHIDElementRef el = IOHIDValueGetElement(value);
   if (el == NULL) {
     return;
@@ -552,7 +670,7 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
         y = 0;
         break;
       }
-      push_dpad_buttons(b, id, x, y, t);
+      push_dpad_buttons(b, (uint32_t)dev_idx, x, y, t);
       // Also expose axes for filters/consumers.
       moon_gamepad_event_t ex = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADX, 0, (double)x, t};
       moon_gamepad_event_t ey = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADY, 0, (double)y, t};
@@ -647,6 +765,12 @@ static void mac_backend_init(moon_gamepad_backend_t *b) {
   b->next_id = 0;
   memset(b->devices, 0, sizeof(b->devices));
   memset(b->device_ids, 0, sizeof(b->device_ids));
+  for (int i = 0; i < 32; i++) {
+    b->vendors[i] = -1;
+    b->products[i] = -1;
+    memset(b->uuids[i], 0, sizeof(b->uuids[i]));
+    memset(b->names[i], 0, sizeof(b->names[i]));
+  }
   memset(b->dpad_x, 0, sizeof(b->dpad_x));
   memset(b->dpad_y, 0, sizeof(b->dpad_y));
   pthread_create(&b->thread, NULL, mac_thread_main, b);
@@ -834,6 +958,98 @@ static int linux_has_path(moon_gamepad_backend_t *b, const char *path) {
   return 0;
 }
 
+static void linux_ff_stop_idx(moon_gamepad_backend_t *b, uint32_t idx) {
+  if (b == NULL || idx >= b->fds_len) {
+    return;
+  }
+  if (b->fds[idx] < 0) {
+    return;
+  }
+  if (!b->rw[idx] || !b->ff_supported[idx] || b->ff_id[idx] < 0) {
+    b->ff_until_ms[idx] = 0;
+    return;
+  }
+  struct input_event ie;
+  memset(&ie, 0, sizeof(ie));
+  ie.type = EV_FF;
+  ie.code = (uint16_t)b->ff_id[idx];
+  ie.value = 0;
+  (void)write(b->fds[idx], &ie, sizeof(ie));
+  b->ff_until_ms[idx] = 0;
+}
+
+static void linux_ff_remove_idx(moon_gamepad_backend_t *b, uint32_t idx) {
+  if (b == NULL || idx >= b->fds_len) {
+    return;
+  }
+  if (b->fds[idx] < 0) {
+    b->ff_id[idx] = -1;
+    b->ff_until_ms[idx] = 0;
+    return;
+  }
+  linux_ff_stop_idx(b, idx);
+  if (!b->rw[idx] || !b->ff_supported[idx] || b->ff_id[idx] < 0) {
+    b->ff_id[idx] = -1;
+    return;
+  }
+  (void)ioctl(b->fds[idx], EVIOCRMFF, b->ff_id[idx]);
+  b->ff_id[idx] = -1;
+}
+
+static void linux_ff_tick(moon_gamepad_backend_t *b) {
+  if (b == NULL) {
+    return;
+  }
+  int64_t t = now_ms();
+  for (uint32_t i = 0; i < b->fds_len; i++) {
+    if (b->ff_until_ms[i] != 0 && t >= b->ff_until_ms[i]) {
+      linux_ff_stop_idx(b, i);
+    }
+  }
+}
+
+static int32_t linux_ff_set_rumble_idx(moon_gamepad_backend_t *b, uint32_t idx, uint16_t strong,
+                                      uint16_t weak, int32_t duration_ms) {
+  if (b == NULL || idx >= b->fds_len) {
+    return 0;
+  }
+  if (b->fds[idx] < 0) {
+    return 0;
+  }
+  if (!b->rw[idx] || !b->ff_supported[idx]) {
+    return 0;
+  }
+  if (duration_ms <= 0 || (strong == 0 && weak == 0)) {
+    linux_ff_stop_idx(b, idx);
+    return 1;
+  }
+  if (duration_ms > 0xFFFF) {
+    duration_ms = 0xFFFF;
+  }
+  struct ff_effect effect;
+  memset(&effect, 0, sizeof(effect));
+  effect.type = FF_RUMBLE;
+  effect.id = (b->ff_id[idx] >= 0) ? b->ff_id[idx] : -1;
+  effect.u.rumble.strong_magnitude = strong;
+  effect.u.rumble.weak_magnitude = weak;
+  effect.replay.length = (uint16_t)duration_ms;
+  effect.replay.delay = 0;
+  if (ioctl(b->fds[idx], EVIOCSFF, &effect) < 0) {
+    return 0;
+  }
+  b->ff_id[idx] = effect.id;
+  struct input_event ie;
+  memset(&ie, 0, sizeof(ie));
+  ie.type = EV_FF;
+  ie.code = (uint16_t)effect.id;
+  ie.value = 1;
+  if (write(b->fds[idx], &ie, sizeof(ie)) != (ssize_t)sizeof(ie)) {
+    return 0;
+  }
+  b->ff_until_ms[idx] = now_ms() + (int64_t)duration_ms;
+  return 1;
+}
+
 static void linux_compact(moon_gamepad_backend_t *b) {
   if (b == NULL) {
     return;
@@ -847,6 +1063,14 @@ static void linux_compact(moon_gamepad_backend_t *b) {
       b->fds[out] = b->fds[i];
       b->fd_ids[out] = b->fd_ids[i];
       memcpy(b->paths[out], b->paths[i], sizeof(b->paths[out]));
+      b->vendors[out] = b->vendors[i];
+      b->products[out] = b->products[i];
+      memcpy(b->uuids[out], b->uuids[i], sizeof(b->uuids[out]));
+      memcpy(b->names[out], b->names[i], sizeof(b->names[out]));
+      b->ff_supported[out] = b->ff_supported[i];
+      b->rw[out] = b->rw[i];
+      b->ff_id[out] = b->ff_id[i];
+      b->ff_until_ms[out] = b->ff_until_ms[i];
     }
     out++;
   }
@@ -872,7 +1096,12 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
     if (linux_has_path(b, path)) {
       continue;
     }
-    int fd = open(path, O_RDONLY | O_NONBLOCK);
+    int rw = 1;
+    int fd = open(path, O_RDWR | O_NONBLOCK);
+    if (fd < 0) {
+      rw = 0;
+      fd = open(path, O_RDONLY | O_NONBLOCK);
+    }
     if (fd < 0) {
       continue;
     }
@@ -886,6 +1115,41 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
     b->fd_ids[b->fds_len] = id;
     memset(b->paths[b->fds_len], 0, sizeof(b->paths[b->fds_len]));
     strncpy(b->paths[b->fds_len], path, sizeof(b->paths[b->fds_len]) - 1);
+    b->rw[b->fds_len] = (uint8_t)rw;
+    b->vendors[b->fds_len] = -1;
+    b->products[b->fds_len] = -1;
+    b->ff_supported[b->fds_len] = 0;
+    memset(b->uuids[b->fds_len], 0, sizeof(b->uuids[b->fds_len]));
+    memset(b->names[b->fds_len], 0, sizeof(b->names[b->fds_len]));
+    b->ff_id[b->fds_len] = -1;
+    b->ff_until_ms[b->fds_len] = 0;
+
+    struct input_id iid;
+    memset(&iid, 0, sizeof(iid));
+    if (ioctl(fd, EVIOCGID, &iid) >= 0) {
+      b->vendors[b->fds_len] = (int32_t)iid.vendor;
+      b->products[b->fds_len] = (int32_t)iid.product;
+      uuid_simple_from_ids(iid.bustype, iid.vendor, iid.product, iid.version, b->uuids[b->fds_len]);
+    } else {
+      uuid_simple_from_ids(0, 0, 0, 0, b->uuids[b->fds_len]);
+    }
+
+    char name[256];
+    memset(name, 0, sizeof(name));
+    if (ioctl(fd, EVIOCGNAME((int)sizeof(name)), name) >= 0) {
+      strncpy(b->names[b->fds_len], name, sizeof(b->names[b->fds_len]) - 1);
+    }
+
+    unsigned long ffbit[NBITS(FF_MAX)];
+    memset(ffbit, 0, sizeof(ffbit));
+    if (ioctl(fd, EVIOCGBIT(EV_FF, sizeof(ffbit)), ffbit) >= 0) {
+      if (test_bit(FF_RUMBLE, ffbit)) {
+        b->ff_supported[b->fds_len] = 1;
+      }
+    }
+    if (!rw) {
+      b->ff_supported[b->fds_len] = 0;
+    }
     b->fds_len++;
     b->gamepad_count = (int32_t)b->fds_len;
     moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, id, 0, 0, 0.0, now_ms()};
@@ -900,6 +1164,20 @@ static void linux_backend_init(moon_gamepad_backend_t *b) {
   memset(b->fds, -1, sizeof(b->fds));
   memset(b->fd_ids, 0, sizeof(b->fd_ids));
   memset(b->paths, 0, sizeof(b->paths));
+  memset(b->vendors, 0, sizeof(b->vendors));
+  memset(b->products, 0, sizeof(b->products));
+  memset(b->uuids, 0, sizeof(b->uuids));
+  memset(b->names, 0, sizeof(b->names));
+  memset(b->ff_supported, 0, sizeof(b->ff_supported));
+  memset(b->rw, 0, sizeof(b->rw));
+  for (int i = 0; i < 64; i++) {
+    b->ff_id[i] = -1;
+    b->ff_until_ms[i] = 0;
+  }
+  for (int i = 0; i < 64; i++) {
+    b->vendors[i] = -1;
+    b->products[i] = -1;
+  }
   linux_backend_scan(b);
 }
 
@@ -909,11 +1187,22 @@ static void linux_backend_shutdown(moon_gamepad_backend_t *b) {
   }
   for (uint32_t i = 0; i < b->fds_len; i++) {
     if (b->fds[i] >= 0) {
+      linux_ff_remove_idx(b, i);
       close(b->fds[i]);
       b->fds[i] = -1;
     }
   }
   memset(b->paths, 0, sizeof(b->paths));
+  for (int i = 0; i < 64; i++) {
+    b->vendors[i] = -1;
+    b->products[i] = -1;
+    memset(b->uuids[i], 0, sizeof(b->uuids[i]));
+    memset(b->names[i], 0, sizeof(b->names[i]));
+    b->ff_supported[i] = 0;
+    b->rw[i] = 0;
+    b->ff_id[i] = -1;
+    b->ff_until_ms[i] = 0;
+  }
   b->fds_len = 0;
 }
 
@@ -927,6 +1216,7 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
   if (b == NULL) {
     return;
   }
+  linux_ff_tick(b);
   // Best-effort rescan for hotplug.
   linux_backend_scan(b);
   linux_compact(b);
@@ -940,6 +1230,7 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
     pfds[i].revents = 0;
   }
   int n = poll(pfds, (nfds_t)b->fds_len, timeout_ms);
+  linux_ff_tick(b);
   if (n <= 0) {
     return;
   }
@@ -948,9 +1239,18 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
       uint32_t id = b->fd_ids[i];
       moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
       queue_push(&b->q, ev);
+      linux_ff_remove_idx(b, i);
       close(b->fds[i]);
       b->fds[i] = -1;
       memset(b->paths[i], 0, sizeof(b->paths[i]));
+      b->vendors[i] = -1;
+      b->products[i] = -1;
+      memset(b->uuids[i], 0, sizeof(b->uuids[i]));
+      memset(b->names[i], 0, sizeof(b->names[i]));
+      b->ff_supported[i] = 0;
+      b->rw[i] = 0;
+      b->ff_id[i] = -1;
+      b->ff_until_ms[i] = 0;
       continue;
     }
     if ((pfds[i].revents & POLLIN) == 0) {
@@ -988,9 +1288,18 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
       uint32_t id = b->fd_ids[i];
       moon_gamepad_event_t dv = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
       queue_push(&b->q, dv);
+      linux_ff_remove_idx(b, i);
       close(b->fds[i]);
       b->fds[i] = -1;
       memset(b->paths[i], 0, sizeof(b->paths[i]));
+      b->vendors[i] = -1;
+      b->products[i] = -1;
+      memset(b->uuids[i], 0, sizeof(b->uuids[i]));
+      memset(b->names[i], 0, sizeof(b->names[i]));
+      b->ff_supported[i] = 0;
+      b->rw[i] = 0;
+      b->ff_id[i] = -1;
+      b->ff_until_ms[i] = 0;
       continue;
     }
   }
@@ -1016,6 +1325,11 @@ typedef struct XINPUT_STATE {
   XINPUT_GAMEPAD Gamepad;
 } XINPUT_STATE;
 
+typedef struct XINPUT_VIBRATION {
+  uint16_t wLeftMotorSpeed;
+  uint16_t wRightMotorSpeed;
+} XINPUT_VIBRATION;
+
 enum {
   XINPUT_GAMEPAD_DPAD_UP = 0x0001,
   XINPUT_GAMEPAD_DPAD_DOWN = 0x0002,
@@ -1034,6 +1348,7 @@ enum {
 };
 
 typedef uint32_t(WINAPI *XInputGetStateFn)(uint32_t, XINPUT_STATE *);
+typedef uint32_t(WINAPI *XInputSetStateFn)(uint32_t, XINPUT_VIBRATION *);
 
 static XInputGetStateFn load_xinput_get_state(moon_gamepad_backend_t *b) {
   if (b == NULL) {
@@ -1052,6 +1367,80 @@ static XInputGetStateFn load_xinput_get_state(moon_gamepad_backend_t *b) {
     return NULL;
   }
   return (XInputGetStateFn)GetProcAddress(b->xinput_dll, "XInputGetState");
+}
+
+static XInputSetStateFn load_xinput_set_state(moon_gamepad_backend_t *b) {
+  if (b == NULL) {
+    return NULL;
+  }
+  if (b->xinput_dll == NULL) {
+    (void)load_xinput_get_state(b);
+  }
+  if (b->xinput_dll == NULL) {
+    return NULL;
+  }
+  return (XInputSetStateFn)GetProcAddress(b->xinput_dll, "XInputSetState");
+}
+
+static void windows_rumble_apply(moon_gamepad_backend_t *b, uint32_t idx, uint16_t l, uint16_t r) {
+  if (b == NULL || idx >= 4) {
+    return;
+  }
+  XInputSetStateFn set_state = load_xinput_set_state(b);
+  if (set_state == NULL) {
+    return;
+  }
+  XINPUT_VIBRATION vib;
+  memset(&vib, 0, sizeof(vib));
+  vib.wLeftMotorSpeed = l;
+  vib.wRightMotorSpeed = r;
+  (void)set_state(idx, &vib);
+}
+
+static void windows_rumble_tick(moon_gamepad_backend_t *b) {
+  if (b == NULL) {
+    return;
+  }
+  int64_t t = now_ms();
+  for (uint32_t i = 0; i < 4; i++) {
+    if (!b->win_connected[i]) {
+      continue;
+    }
+    if (b->win_rumble_until_ms[i] != 0 && t >= b->win_rumble_until_ms[i]) {
+      b->win_rumble_l[i] = 0;
+      b->win_rumble_r[i] = 0;
+      b->win_rumble_until_ms[i] = 0;
+      windows_rumble_apply(b, i, 0, 0);
+    }
+  }
+}
+
+static int32_t windows_rumble_set_idx(moon_gamepad_backend_t *b, uint32_t idx, uint16_t l, uint16_t r,
+                                     int32_t duration_ms) {
+  if (b == NULL || idx >= 4) {
+    return 0;
+  }
+  if (load_xinput_set_state(b) == NULL) {
+    return 0;
+  }
+  if (!b->win_connected[idx]) {
+    return 0;
+  }
+  if (duration_ms <= 0 || (l == 0 && r == 0)) {
+    b->win_rumble_l[idx] = 0;
+    b->win_rumble_r[idx] = 0;
+    b->win_rumble_until_ms[idx] = 0;
+    windows_rumble_apply(b, idx, 0, 0);
+    return 1;
+  }
+  if (duration_ms > 600000) {
+    duration_ms = 600000;
+  }
+  b->win_rumble_l[idx] = l;
+  b->win_rumble_r[idx] = r;
+  b->win_rumble_until_ms[idx] = now_ms() + (int64_t)duration_ms;
+  windows_rumble_apply(b, idx, l, r);
+  return 1;
 }
 
 static double norm_i16(int16_t v) {
@@ -1095,6 +1484,13 @@ static void windows_backend_init(moon_gamepad_backend_t *b) {
     b->win_buttons[i] = 0;
     b->win_lx[i] = b->win_ly[i] = b->win_rx[i] = b->win_ry[i] = 0;
     b->win_lt2[i] = b->win_rt2[i] = 0;
+    b->win_rumble_l[i] = 0;
+    b->win_rumble_r[i] = 0;
+    b->win_rumble_until_ms[i] = 0;
+    memset(b->win_names[i], 0, sizeof(b->win_names[i]));
+    memset(b->win_uuids[i], 0, sizeof(b->win_uuids[i]));
+    strncpy(b->win_uuids[i], "xinput", sizeof(b->win_uuids[i]) - 1);
+    snprintf(b->win_names[i], sizeof(b->win_names[i]), "XInput Gamepad %d", i);
   }
   b->gamepad_count = 0;
 }
@@ -1113,6 +1509,7 @@ static void windows_backend_poll(moon_gamepad_backend_t *b) {
   if (b == NULL) {
     return;
   }
+  windows_rumble_tick(b);
   XInputGetStateFn get_state = load_xinput_get_state(b);
   if (get_state == NULL) {
     return;
@@ -1146,6 +1543,10 @@ static void windows_backend_poll(moon_gamepad_backend_t *b) {
 
     if (b->win_connected[idx] && !is_connected) {
       b->win_connected[idx] = 0;
+      b->win_rumble_l[idx] = 0;
+      b->win_rumble_r[idx] = 0;
+      b->win_rumble_until_ms[idx] = 0;
+      windows_rumble_apply(b, idx, 0, 0);
       moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_DISCONNECTED, idx, 0, 0, 0.0, now_ms()};
       queue_push(&b->q, ev);
       continue;
@@ -1227,6 +1628,7 @@ static void windows_backend_poll(moon_gamepad_backend_t *b) {
     }
   }
   b->gamepad_count = connected_count;
+  windows_rumble_tick(b);
 }
 
 static void windows_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeout_ms) {
@@ -1359,6 +1761,187 @@ int32_t moon_gamepad_backend_gamepad_count(void *owner) {
     return 0;
   }
   return b->gamepad_count;
+}
+
+static int idx_by_id_u32(const uint32_t *ids, uint32_t len, uint32_t id) {
+  for (uint32_t i = 0; i < len; i++) {
+    if (ids[i] == id) {
+      return (int)i;
+    }
+  }
+  return -1;
+}
+
+moonbit_string_t moon_gamepad_backend_name(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return moonbit_make_string_raw(0);
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_string_raw(0);
+  }
+  return moonbit_string_from_utf8_lossy(b->names[(uint32_t)idx]);
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_string_raw(0);
+  }
+  return moonbit_string_from_utf8_lossy(b->names[(uint32_t)idx]);
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4) {
+    return moonbit_make_string_raw(0);
+  }
+  return moonbit_string_from_utf8_lossy(b->win_names[(uint32_t)id]);
+#else
+  (void)b;
+  (void)id;
+  return moonbit_make_string_raw(0);
+#endif
+}
+
+moonbit_string_t moon_gamepad_backend_uuid_simple(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return moonbit_make_string_raw(0);
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_string_raw(0);
+  }
+  return moonbit_string_from_utf8_lossy(b->uuids[(uint32_t)idx]);
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_string_raw(0);
+  }
+  return moonbit_string_from_utf8_lossy(b->uuids[(uint32_t)idx]);
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4) {
+    return moonbit_make_string_raw(0);
+  }
+  return moonbit_string_from_utf8_lossy(b->win_uuids[(uint32_t)id]);
+#else
+  (void)b;
+  (void)id;
+  return moonbit_make_string_raw(0);
+#endif
+}
+
+int32_t moon_gamepad_backend_vendor_id(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return -1;
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return -1;
+  }
+  return b->vendors[(uint32_t)idx];
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return -1;
+  }
+  return b->vendors[(uint32_t)idx];
+#else
+  (void)b;
+  (void)id;
+  return -1;
+#endif
+}
+
+int32_t moon_gamepad_backend_product_id(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return -1;
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return -1;
+  }
+  return b->products[(uint32_t)idx];
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return -1;
+  }
+  return b->products[(uint32_t)idx];
+#else
+  (void)b;
+  (void)id;
+  return -1;
+#endif
+}
+
+int32_t moon_gamepad_backend_is_ff_supported(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return 0;
+  }
+#if defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return 0;
+  }
+  return (int32_t)b->ff_supported[(uint32_t)idx];
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4) {
+    return 0;
+  }
+  return load_xinput_set_state(b) != NULL;
+#else
+  (void)b;
+  (void)id;
+  return 0;
+#endif
+}
+
+static uint16_t amp_to_u16(double x) {
+  if (x < 0.0) {
+    x = 0.0;
+  }
+  if (x > 1.0) {
+    x = 1.0;
+  }
+  double v = x * 65535.0;
+  if (v < 0.0) {
+    v = 0.0;
+  }
+  if (v > 65535.0) {
+    v = 65535.0;
+  }
+  return (uint16_t)(v + 0.5);
+}
+
+int32_t moon_gamepad_backend_set_rumble(void *owner, int32_t id, double strong, double weak, int32_t duration_ms) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return 0;
+  }
+  uint16_t s = amp_to_u16(strong);
+  uint16_t w = amp_to_u16(weak);
+#if defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return 0;
+  }
+  return linux_ff_set_rumble_idx(b, (uint32_t)idx, s, w, duration_ms);
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4) {
+    return 0;
+  }
+  return windows_rumble_set_idx(b, (uint32_t)id, s, w, duration_ms);
+#else
+  (void)s;
+  (void)w;
+  (void)duration_ms;
+  return 0;
+#endif
 }
 
 // Returns Bytes. Empty bytes => None.

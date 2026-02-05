@@ -49,3 +49,54 @@ pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
   let _ = self
   0
 }
+
+///|
+pub fn NativeBackend::name(self : NativeBackend, id : Int) -> String {
+  let _ = self
+  let _ = id
+  ""
+}
+
+///|
+pub fn NativeBackend::uuid_simple(self : NativeBackend, id : Int) -> String {
+  let _ = self
+  let _ = id
+  ""
+}
+
+///|
+pub fn NativeBackend::vendor_id(self : NativeBackend, id : Int) -> Int? {
+  let _ = self
+  let _ = id
+  None
+}
+
+///|
+pub fn NativeBackend::product_id(self : NativeBackend, id : Int) -> Int? {
+  let _ = self
+  let _ = id
+  None
+}
+
+///|
+pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
+  let _ = self
+  let _ = id
+  false
+}
+
+///|
+pub fn NativeBackend::set_rumble(
+  self : NativeBackend,
+  id : Int,
+  strong : Double,
+  weak : Double,
+  duration_ms : Int,
+) -> Bool {
+  let _ = self
+  let _ = id
+  let _ = strong
+  let _ = weak
+  let _ = duration_ms
+  false
+}

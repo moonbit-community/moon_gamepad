@@ -13,18 +13,15 @@
 // limitations under the License.
 
 ///|
-test "finish without gamepads returns NoGamepads" {
-  let g = GilrsBuilder::new().with_mock_gamepad_count(1).build()
-  let res : Result[Effect, FfError] = try? EffectBuilder::new().finish(g)
-  inspect(res is Err(_), content="true")
-}
-
-///|
-test "mock gamepad is not ff supported" {
-  let g = GilrsBuilder::new().with_mock_gamepad_count(1).build()
-  let res : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .rumble(1.0, 0.0)
-    .finish(g)
-  inspect(res is Err(_), content="true")
+pub enum PowerInfo {
+  /// Failed to determine power status.
+  Unknown
+  /// Device doesn't have battery.
+  Wired
+  /// Device is running on the battery (0..=100).
+  Discharging(Int)
+  /// Battery is charging (0..=100).
+  Charging(Int)
+  /// Battery is charged.
+  Charged
 }

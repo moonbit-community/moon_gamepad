@@ -23,6 +23,12 @@ pub struct GamepadData {
   state : GamepadState
   mut connected : Bool
   mut mapping : Mapping
+  mut name : String
+  mut uuid : Uuid
+  mut vendor_id : Int?
+  mut product_id : Int?
+  mut ff_supported : Bool
+  mut power_info : PowerInfo
   deadzones : Array[(Code, Double)]
   have_sent_nonzero_for_axis : Array[Bool]
 }
@@ -33,6 +39,12 @@ fn GamepadData::new() -> GamepadData {
     state: GamepadState::new(),
     connected: true,
     mapping: Mapping::new(),
+    name: "",
+    uuid: Uuid::nil(),
+    vendor_id: None,
+    product_id: None,
+    ff_supported: false,
+    power_info: PowerInfo::Unknown,
     deadzones: [],
     have_sent_nonzero_for_axis: Array::make(6, false),
   }
@@ -46,6 +58,7 @@ pub struct Gilrs {
   events : Array[Event]
   mut events_head : Int
   gamepads_data : Array[GamepadData]
+  mappings : MappingDb
   mut now_ms : Int64
   backend : NativeBackend?
 }
@@ -67,6 +80,7 @@ pub fn Gilrs::new_mock(
     events: [],
     events_head: 0,
     gamepads_data: data,
+    mappings: MappingDb::new(),
     now_ms: 0L,
     backend: None,
   }
@@ -84,9 +98,15 @@ pub fn Gilrs::new_native(
     events: [],
     events_head: 0,
     gamepads_data: [],
+    mappings: MappingDb::new(),
     now_ms: 0L,
     backend: Some(NativeBackend::new()),
   }
+}
+
+///|
+pub fn Gilrs::load_mappings(self : Gilrs, s : String) -> Unit {
+  self.mappings.insert(s)
 }
 
 ///|
@@ -192,7 +212,41 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
   match ne.tag {
     NativeEventTag::Connected => {
       self.set_connected(id, true)
+      match self.backend {
+        None => ()
+        Some(b) =>
+          if id >= 0 && id < self.gamepads_data.length() {
+            self.gamepads_data[id].name = b.name(id)
+            let uuid_s = b.uuid_simple(id)
+            let uuid = Uuid::parse(uuid_s) catch { _ => Uuid::nil() }
+            self.gamepads_data[id].uuid = uuid
+            self.gamepads_data[id].vendor_id = b.vendor_id(id)
+            self.gamepads_data[id].product_id = b.product_id(id)
+            self.gamepads_data[id].ff_supported = b.is_ff_supported(id)
+            self.gamepads_data[id].power_info = PowerInfo::Unknown
+          }
+      }
       self.apply_identity_mapping(id)
+      if id >= 0 && id < self.gamepads_data.length() {
+        let uuid = self.gamepads_data[id].uuid
+        match self.mappings.get(uuid) {
+          None => ()
+          Some(line) => {
+            let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+              line,
+              [],
+              [],
+            )
+            match parsed {
+              Ok(m) => {
+                self.gamepads_data[id].mapping.name = m.name()
+                self.gamepads_data[id].mapping.set_hats_mapped(m.hats_mapped())
+              }
+              Err(_) => ()
+            }
+          }
+        }
+      }
       self.insert_event(Event::at(gid, EventType::Connected, ne.time_ms))
     }
     NativeEventTag::Disconnected => {
@@ -636,9 +690,57 @@ pub fn Gamepad::is_connected(self : Gamepad) -> Bool {
 
 ///|
 pub fn Gamepad::name(self : Gamepad) -> String {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    return ""
+  }
+  let n = self.gilrs.gamepads_data[i].name
+  if n.length() != 0 {
+    return n
+  }
   match self.gilrs.mapping(self.id) {
     None => ""
     Some(m) => m.name()
+  }
+}
+
+///|
+pub fn Gamepad::uuid(self : Gamepad) -> Uuid {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    Uuid::nil()
+  } else {
+    self.gilrs.gamepads_data[i].uuid
+  }
+}
+
+///|
+pub fn Gamepad::vendor_id(self : Gamepad) -> Int? {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    None
+  } else {
+    self.gilrs.gamepads_data[i].vendor_id
+  }
+}
+
+///|
+pub fn Gamepad::product_id(self : Gamepad) -> Int? {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    None
+  } else {
+    self.gilrs.gamepads_data[i].product_id
+  }
+}
+
+///|
+pub fn Gamepad::power_info(self : Gamepad) -> PowerInfo {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    PowerInfo::Unknown
+  } else {
+    self.gilrs.gamepads_data[i].power_info
   }
 }
 
@@ -687,6 +789,10 @@ pub fn Gamepad::deadzone(self : Gamepad, code : Code) -> Double? {
 
 ///|
 pub fn Gamepad::is_ff_supported(self : Gamepad) -> Bool {
-  let _ = self
-  false
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    false
+  } else {
+    self.gilrs.gamepads_data[i].ff_supported
+  }
 }

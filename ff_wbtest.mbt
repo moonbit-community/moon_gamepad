@@ -13,18 +13,17 @@
 // limitations under the License.
 
 ///|
-test "finish without gamepads returns NoGamepads" {
-  let g = GilrsBuilder::new().with_mock_gamepad_count(1).build()
-  let res : Result[Effect, FfError] = try? EffectBuilder::new().finish(g)
-  inspect(res is Err(_), content="true")
-}
-
-///|
-test "mock gamepad is not ff supported" {
-  let g = GilrsBuilder::new().with_mock_gamepad_count(1).build()
-  let res : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .rumble(1.0, 0.0)
-    .finish(g)
-  inspect(res is Err(_), content="true")
+test "effect play/stop without backend errors" {
+  let g = Gilrs::new_mock(1)
+  let e : Effect = {
+    gilrs: g,
+    gamepads: [GamepadId::new(0)],
+    strong: 1.0,
+    weak: 1.0,
+    duration_ms: 100L,
+  }
+  let r1 : Result[Unit, FfError] = try? e.play()
+  inspect(r1 is Err(_), content="true")
+  let r2 : Result[Unit, FfError] = try? e.stop()
+  inspect(r2 is Err(_), content="true")
 }

@@ -196,16 +196,28 @@ pub fn ButtonData::timestamp(Self) -> Int64
 pub fn ButtonData::value(Self) -> Double
 
 pub struct Effect {
-  _id : Int
+  gilrs : Gilrs
+  gamepads : Array[GamepadId]
+  strong : Double
+  weak : Double
+  duration_ms : Int64
 }
 pub fn Effect::play(Self) -> Unit raise FfError
 pub fn Effect::stop(Self) -> Unit raise FfError
 
 pub struct EffectBuilder {
-  mut _dummy : Int
+  mut gamepads : Array[GamepadId]
+  mut strong : Double
+  mut weak : Double
+  mut duration_ms : Int64
 }
+pub fn EffectBuilder::add_gamepad(Self, Gamepad) -> Self
+pub fn EffectBuilder::add_gamepad_id(Self, GamepadId) -> Self
+pub fn EffectBuilder::duration(Self, Int64) -> Self
 pub fn EffectBuilder::finish(Self, Gilrs) -> Effect raise FfError
+pub fn EffectBuilder::gamepads(Self, Array[GamepadId]) -> Self
 pub fn EffectBuilder::new() -> Self
+pub fn EffectBuilder::rumble(Self, Double, Double) -> Self
 
 pub struct Event {
   id : GamepadId
@@ -246,13 +258,23 @@ pub fn Gamepad::is_ff_supported(Self) -> Bool
 pub fn Gamepad::is_pressed(Self, Int) -> Bool
 pub fn Gamepad::mapping(Self) -> Mapping?
 pub fn Gamepad::name(Self) -> String
+pub fn Gamepad::power_info(Self) -> PowerInfo
+pub fn Gamepad::product_id(Self) -> Int?
 pub fn Gamepad::state(Self) -> GamepadState
+pub fn Gamepad::uuid(Self) -> Uuid
 pub fn Gamepad::value(Self, Int) -> Double
+pub fn Gamepad::vendor_id(Self) -> Int?
 
 pub struct GamepadData {
   state : GamepadState
   mut connected : Bool
   mut mapping : Mapping
+  mut name : String
+  mut uuid : Uuid
+  mut vendor_id : Int?
+  mut product_id : Int?
+  mut ff_supported : Bool
+  mut power_info : PowerInfo
   deadzones : Array[(Int, Double)]
   have_sent_nonzero_for_axis : Array[Bool]
 }
@@ -282,6 +304,7 @@ pub struct Gilrs {
   events : Array[Event]
   mut events_head : Int
   gamepads_data : Array[GamepadData]
+  mappings : MappingDb
   mut now_ms : Int64
   backend : NativeBackend?
 }
@@ -296,6 +319,7 @@ pub fn Gilrs::gamepads(Self) -> Array[(GamepadId, Gamepad)]
 pub fn Gilrs::inc(Self) -> Unit
 pub fn Gilrs::insert_event(Self, Event) -> Unit
 pub fn Gilrs::is_connected(Self, GamepadId) -> Bool
+pub fn Gilrs::load_mappings(Self, String) -> Unit
 pub fn Gilrs::mapping(Self, GamepadId) -> Mapping?
 pub fn Gilrs::new() -> Self
 pub fn Gilrs::new_mock(Int, update_state? : Bool, default_filters? : Bool) -> Self
@@ -374,10 +398,16 @@ pub struct NativeBackend {
   owner : BackendOwner
 }
 pub fn NativeBackend::gamepad_count(Self) -> Int
+pub fn NativeBackend::is_ff_supported(Self, Int) -> Bool
+pub fn NativeBackend::name(Self, Int) -> String
 pub fn NativeBackend::new() -> Self
 pub fn NativeBackend::next_event(Self) -> NativeEvent?
 pub fn NativeBackend::poll(Self) -> Unit
 pub fn NativeBackend::poll_timeout(Self, Int) -> Unit
+pub fn NativeBackend::product_id(Self, Int) -> Int?
+pub fn NativeBackend::set_rumble(Self, Int, Double, Double, Int) -> Bool
+pub fn NativeBackend::uuid_simple(Self, Int) -> String
+pub fn NativeBackend::vendor_id(Self, Int) -> Int?
 
 pub struct NativeEvent {
   tag : NativeEventTag
@@ -405,6 +435,14 @@ pub(all) enum ParserErrorKind {
   UnknownButton
   InvalidParserState
   UnexpectedEnd
+}
+
+pub enum PowerInfo {
+  Unknown
+  Wired
+  Discharging(Int)
+  Charging(Int)
+  Charged
 }
 
 pub struct Repeat {

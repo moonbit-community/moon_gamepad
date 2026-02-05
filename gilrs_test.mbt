@@ -164,3 +164,18 @@ test "gilrs next_event_blocking timeout 0 behaves like next_event (mock)" {
     })
   inspect(got, content="Some(1)")
 }
+
+///|
+test "gamepad power_info default is Unknown (mock)" {
+  let g = Gilrs::new_mock(1)
+  let id = GamepadId::new(0)
+  let p = g
+    .gamepad(id)
+    .map(fn(gp) {
+      match gp.power_info() {
+        PowerInfo::Unknown => 0
+        _ => 1
+      }
+    })
+  inspect(p, content="Some(0)")
+}
