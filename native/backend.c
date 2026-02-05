@@ -77,6 +77,7 @@ static moonbit_string_t moonbit_string_from_utf8_lossy(const char *s) {
 #include <IOKit/hid/IOHIDLib.h>
 #include <IOKit/hid/IOHIDKeys.h>
 #include <IOKit/hid/IOHIDManager.h>
+#include <IOKit/IOKitLib.h>
 #include <pthread.h>
 #include <time.h>
 #endif
@@ -278,6 +279,8 @@ typedef struct moon_gamepad_backend_t {
   // Simple device list.
   IOHIDDeviceRef devices[32];
   uint32_t device_ids[32];
+  uint64_t entry_ids[32];
+  uint32_t location_ids[32];
   int32_t vendors[32];
   int32_t products[32];
   char uuids[32][33];
@@ -450,6 +453,22 @@ static uint32_t map_hid_gd_usage_to_axis(uint32_t usage) {
 
 static uint32_t mac_hid_code(uint32_t page, uint32_t usage) {
   return (page << 16) | usage;
+}
+
+static int mac_get_i32_prop(IOHIDDeviceRef device, CFStringRef key, int32_t *out) {
+  if (device == NULL || key == NULL || out == NULL) {
+    return 0;
+  }
+  CFTypeRef ref = IOHIDDeviceGetProperty(device, key);
+  if (ref == NULL || CFGetTypeID(ref) != CFNumberGetTypeID()) {
+    return 0;
+  }
+  int32_t v = 0;
+  if (!CFNumberGetValue((CFNumberRef)ref, kCFNumberSInt32Type, &v)) {
+    return 0;
+  }
+  *out = v;
+  return 1;
 }
 
 static int mac_type_is_input(IOHIDElementType type) {
@@ -832,12 +851,57 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
   if (b->devices_len >= 32) {
     return;
   }
+  if (find_device_idx(b, device) >= 0) {
+    return;
+  }
+
+  // Validate required properties, mirroring gilrs-core's early filtering.
+  int32_t location_id_i32 = 0;
+  if (!mac_get_i32_prop(device, CFSTR(kIOHIDLocationIDKey), &location_id_i32) || location_id_i32 <= 0) {
+    return;
+  }
+  uint32_t location_id = (uint32_t)location_id_i32;
+
+  int32_t page_i32 = 0;
+  int32_t usage_i32 = 0;
+  if (!mac_get_i32_prop(device, CFSTR(kIOHIDPrimaryUsagePageKey), &page_i32) ||
+      !mac_get_i32_prop(device, CFSTR(kIOHIDPrimaryUsageKey), &usage_i32)) {
+    return;
+  }
+  uint32_t page = (uint32_t)page_i32;
+  uint32_t usage = (uint32_t)usage_i32;
+  if (page >= 0xFF00u) { // kHIDPage_VendorDefinedStart
+    return;
+  }
+  if (page != 0x01u) { // kHIDPage_GenericDesktop
+    return;
+  }
+  if (!(usage == 0x04u || usage == 0x05u || usage == 0x08u)) { // Joystick/GamePad/MultiAxisController
+    return;
+  }
+
+  // Compute registry entry id; if unavailable, skip the device.
+  io_service_t svc = IOHIDDeviceGetService(device);
+  uint64_t entry_id = 0;
+  if (svc == IO_OBJECT_NULL || IORegistryEntryGetRegistryEntryID(svc, &entry_id) != KERN_SUCCESS) {
+    return;
+  }
+
+  // Dedupe by entry/location in case the callback is invoked multiple times.
+  for (uint32_t i = 0; i < b->devices_len; i++) {
+    if (b->location_ids[i] == location_id && b->entry_ids[i] == entry_id) {
+      return;
+    }
+  }
+
   // Retain device while stored.
   CFRetain(device);
   uint32_t id = b->next_id++;
   uint32_t idx = b->devices_len;
   b->devices[idx] = device;
   b->device_ids[idx] = id;
+  b->entry_ids[idx] = entry_id;
+  b->location_ids[idx] = location_id;
   mac_collect_device_caps(b, idx, device);
   mac_fill_device_info(b, idx, device);
   b->dpad_x[idx] = 0;
@@ -869,6 +933,8 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
   if ((uint32_t)idx != last) {
     b->devices[(uint32_t)idx] = b->devices[last];
     b->device_ids[(uint32_t)idx] = b->device_ids[last];
+    b->entry_ids[(uint32_t)idx] = b->entry_ids[last];
+    b->location_ids[(uint32_t)idx] = b->location_ids[last];
     b->vendors[(uint32_t)idx] = b->vendors[last];
     b->products[(uint32_t)idx] = b->products[last];
     memcpy(b->uuids[(uint32_t)idx], b->uuids[last], sizeof(b->uuids[(uint32_t)idx]));
@@ -889,6 +955,8 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
   }
   b->devices[last] = NULL;
   b->device_ids[last] = 0;
+  b->entry_ids[last] = 0;
+  b->location_ids[last] = 0;
   b->vendors[last] = -1;
   b->products[last] = -1;
   memset(b->uuids[last], 0, sizeof(b->uuids[last]));

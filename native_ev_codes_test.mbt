@@ -36,3 +36,18 @@ test "native_ev_codes: trigger axes map to buttons" {
   }
   inspect(ok, content="true")
 }
+
+///|
+test "native_ev_codes: unconfirmed macOS axes remain unmapped by default" {
+  let rx = hid_code(PAGE_GENERIC_DESKTOP, 0x33)
+  let ry = hid_code(PAGE_GENERIC_DESKTOP, 0x34)
+  let ok_rx = match axis_or_btn_from_code(rx) {
+    None => true
+    _ => false
+  }
+  let ok_ry = match axis_or_btn_from_code(ry) {
+    None => true
+    _ => false
+  }
+  inspect((ok_rx, ok_ry), content="(true, true)")
+}

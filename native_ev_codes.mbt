@@ -44,7 +44,8 @@ pub const AXIS_LSTICKX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x30
 pub const AXIS_LSTICKY : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x31
 
 ///|
-pub const AXIS_LEFTZ : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x33
+// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+pub const AXIS_LEFTZ : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
 pub const AXIS_RSTICKX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x32
@@ -53,7 +54,8 @@ pub const AXIS_RSTICKX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x32
 pub const AXIS_RSTICKY : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x35
 
 ///|
-pub const AXIS_RIGHTZ : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x34
+// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+pub const AXIS_RIGHTZ : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
 pub const AXIS_DPADX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x39
@@ -62,11 +64,12 @@ pub const AXIS_DPADX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x39
 pub const AXIS_DPADY : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x3A
 
 ///|
-// Best-effort: legacy trigger axes (non-macOS backends).
-pub const AXIS_RT : Code = LEGACY_AXIS_RT
+// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+pub const AXIS_RT : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
-pub const AXIS_LT : Code = LEGACY_AXIS_LT
+// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+pub const AXIS_LT : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
 pub const AXIS_RT2 : Code = (PAGE_SIMULATION << 16) | 0xC4
@@ -230,10 +233,10 @@ pub fn axis_from_code(code : Code) -> Axis? {
   match code {
     AXIS_LSTICKX | LEGACY_AXIS_LSTICKX => Some(Axis::LeftStickX)
     AXIS_LSTICKY | LEGACY_AXIS_LSTICKY => Some(Axis::LeftStickY)
-    AXIS_LEFTZ | LEGACY_AXIS_LEFTZ => Some(Axis::LeftZ)
+    LEGACY_AXIS_LEFTZ => Some(Axis::LeftZ)
     AXIS_RSTICKX | LEGACY_AXIS_RSTICKX => Some(Axis::RightStickX)
     AXIS_RSTICKY | LEGACY_AXIS_RSTICKY => Some(Axis::RightStickY)
-    AXIS_RIGHTZ | LEGACY_AXIS_RIGHTZ => Some(Axis::RightZ)
+    LEGACY_AXIS_RIGHTZ => Some(Axis::RightZ)
     AXIS_DPADX | LEGACY_AXIS_DPADX => Some(Axis::DPadX)
     AXIS_DPADY | LEGACY_AXIS_DPADY => Some(Axis::DPadY)
     _ => None

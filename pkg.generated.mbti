@@ -8,23 +8,23 @@ pub const AXIS_DPADX : Int = 65593
 
 pub const AXIS_DPADY : Int = 65594
 
-pub const AXIS_LEFTZ : Int = 65587
+pub const AXIS_LEFTZ : Int = 65536
 
 pub const AXIS_LSTICKX : Int = 65584
 
 pub const AXIS_LSTICKY : Int = 65585
 
-pub const AXIS_LT : Int = 109
+pub const AXIS_LT : Int = 65536
 
 pub const AXIS_LT2 : Int = 131269
 
-pub const AXIS_RIGHTZ : Int = 65588
+pub const AXIS_RIGHTZ : Int = 65536
 
 pub const AXIS_RSTICKX : Int = 65586
 
 pub const AXIS_RSTICKY : Int = 65589
 
-pub const AXIS_RT : Int = 108
+pub const AXIS_RT : Int = 65536
 
 pub const AXIS_RT2 : Int = 131268
 

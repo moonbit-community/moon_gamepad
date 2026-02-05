@@ -32,6 +32,7 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
 ## Notes / Limitations (vs upstream `gilrs`)
 
 - `Code` is backend-specific. On macOS it matches gilrs-core's HID `EvCode` encoding: `(usage_page << 16) | usage`.
+- On macOS, some HID axes (e.g. GenericDesktop `Rx`/`Ry`) are intentionally left **unmapped** to `Axis` by default (matching gilrs-core's "unconfirmed" constants). Use the SDL mapping DB to get semantic axis/button names for these codes.
 - `PowerInfo` is exposed but currently defaults to `Unknown` on native backends.
 
 ## Quickstart (native)

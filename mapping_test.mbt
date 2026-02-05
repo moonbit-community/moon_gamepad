@@ -38,16 +38,12 @@ let buttons : Array[Code] = [
 let axes : Array[Code] = [
   AXIS_LSTICKX,
   AXIS_LSTICKY,
-  AXIS_LEFTZ,
   AXIS_RSTICKX,
   AXIS_RSTICKY,
-  AXIS_RIGHTZ,
-  AXIS_DPADX,
-  AXIS_DPADY,
-  AXIS_RT,
-  AXIS_LT,
-  AXIS_RT2,
   AXIS_LT2,
+  AXIS_RT2,
+  LEGACY_AXIS_LEFTZ,
+  LEGACY_AXIS_RIGHTZ,
 ]
 
 ///|
@@ -118,7 +114,7 @@ test "parse_sdl_mapping" {
     Ok(m) =>
       inspect(
         mapping_debug(m),
-        content="name=GameCube {WiseGroup USB box};hats=15;589825->Btn:South;589844->Btn:East;589829->Btn:North;589826->Btn:West;589832->Btn:Start;589831->Btn:RightTrigger;65594->Axis:DPadY;589840->Btn:DPadUp;65593->Axis:DPadX;589842->Btn:DPadLeft;589841->Btn:DPadDown;589843->Btn:DPadRight;65584->Axis:LeftStickX;65585->Axis:LeftStickY;65587->Axis:RightStickX;65586->Axis:RightStickY;65589->Btn:LeftTrigger2;65588->Btn:RightTrigger2",
+        content="name=GameCube {WiseGroup USB box};hats=15;589825->Btn:South;589844->Btn:East;589829->Btn:North;589826->Btn:West;589832->Btn:Start;589831->Btn:RightTrigger;65594->Axis:DPadY;589840->Btn:DPadUp;65593->Axis:DPadX;589842->Btn:DPadLeft;589841->Btn:DPadDown;589843->Btn:DPadRight;65584->Axis:LeftStickX;65585->Axis:LeftStickY;65586->Axis:RightStickX;65589->Axis:RightStickY;131269->Btn:LeftTrigger2;131268->Btn:RightTrigger2",
       )
     Err(_) => fail("parse_sdl_mapping should not fail")
   }
@@ -159,10 +155,10 @@ test "from_data roundtrip + errors" {
   let data = MappingData::new()
   data.insert_axis(AXIS_LSTICKX, Axis::LeftStickX) |> ignore
   data.insert_axis(AXIS_LSTICKY, Axis::LeftStickY) |> ignore
-  data.insert_axis(AXIS_LEFTZ, Axis::LeftZ) |> ignore
+  data.insert_axis(LEGACY_AXIS_LEFTZ, Axis::LeftZ) |> ignore
   data.insert_axis(AXIS_RSTICKX, Axis::RightStickX) |> ignore
   data.insert_axis(AXIS_RSTICKY, Axis::RightStickY) |> ignore
-  data.insert_axis(AXIS_RIGHTZ, Axis::RightZ) |> ignore
+  data.insert_axis(LEGACY_AXIS_RIGHTZ, Axis::RightZ) |> ignore
   data.insert_btn(buttons[0], Button::South) |> ignore
   data.insert_btn(buttons[1], Button::East) |> ignore
   data.insert_btn(buttons[3], Button::North) |> ignore
