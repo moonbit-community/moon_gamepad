@@ -50,10 +50,10 @@ test "gilrs next_event default filters skip dropped" {
     ),
   )
   let ev1 = g.next_event()
-  inspect(ev1.map(core_event_sig), content="Some((0, 0, 0.5, 100))")
+  inspect(ev1.map(core_event_sig), content="Some((0, 0, 0.5, 65584))")
   let ev2 = g.next_event()
   // The small-delta event is dropped by Jitter and skipped.
-  inspect(ev2.map(core_event_sig), content="Some((0, 0, 0.7, 100))")
+  inspect(ev2.map(core_event_sig), content="Some((0, 0, 0.7, 65584))")
   inspect(g.state(id).map(fn(s) { s.value(AXIS_LSTICKX) }), content="Some(0.7)")
   inspect(g.next_event() is None, content="true")
 }

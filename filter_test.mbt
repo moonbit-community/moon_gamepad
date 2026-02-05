@@ -78,10 +78,10 @@ test "axis_dpad_to_button maps dpad axis to button events" {
     1L,
   )
   let out = axis_dpad_to_button(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 18))")
+  inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 589843))")
   // extra queued event should exist
   let extra = g.next_event()
-  inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 18))")
+  inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 589843))")
 }
 
 ///|
@@ -100,10 +100,10 @@ test "repeat generates repeated events on None" {
   g.set_time(500L)
   let rep = Repeat::new()
   let out1 = rep.filter(None, g)
-  inspect(out1.map(filter_event_sig), content="Some((3, 0, 0, 0))")
+  inspect(out1.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
   // update state with repeat, then next repeat at +30ms
   g.update(out1.unwrap())
   g.set_time(530L)
   let out2 = rep.filter(None, g)
-  inspect(out2.map(filter_event_sig), content="Some((3, 0, 0, 0))")
+  inspect(out2.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
 }

@@ -130,7 +130,7 @@ test "gilrs builder can disable default filters" {
   )
   inspect(
     g.next_event().map(gilrs_event_sig),
-    content="Some((0, 0, 0.505, 100))",
+    content="Some((0, 0, 0.505, 65584))",
   )
 }
 
@@ -144,8 +144,14 @@ test "gilrs next_event runs axis_dpad_to_button in default pipeline" {
   g.insert_event(
     Event::at(id, EventType::AxisChanged(Axis::DPadX, 1.0, AXIS_DPADX), 1L),
   )
-  inspect(g.next_event().map(gilrs_event_sig), content="Some((1, 18, 1, 18))")
-  inspect(g.next_event().map(gilrs_event_sig), content="Some((2, 18, 1, 18))")
+  inspect(
+    g.next_event().map(gilrs_event_sig),
+    content="Some((1, 18, 1, 589843))",
+  )
+  inspect(
+    g.next_event().map(gilrs_event_sig),
+    content="Some((2, 18, 1, 589843))",
+  )
 }
 
 ///|

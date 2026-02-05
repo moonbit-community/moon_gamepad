@@ -4,69 +4,137 @@ package "Milky2018/gamepad"
 // Values
 pub const AXIS_COUNT : Int = 9
 
-pub const AXIS_DPADX : Int = 106
+pub const AXIS_DPADX : Int = 65593
 
-pub const AXIS_DPADY : Int = 107
+pub const AXIS_DPADY : Int = 65594
 
-pub const AXIS_LEFTZ : Int = 102
+pub const AXIS_LEFTZ : Int = 65587
 
-pub const AXIS_LSTICKX : Int = 100
+pub const AXIS_LSTICKX : Int = 65584
 
-pub const AXIS_LSTICKY : Int = 101
+pub const AXIS_LSTICKY : Int = 65585
 
 pub const AXIS_LT : Int = 109
 
-pub const AXIS_LT2 : Int = 111
+pub const AXIS_LT2 : Int = 131269
 
-pub const AXIS_RIGHTZ : Int = 105
+pub const AXIS_RIGHTZ : Int = 65588
 
-pub const AXIS_RSTICKX : Int = 103
+pub const AXIS_RSTICKX : Int = 65586
 
-pub const AXIS_RSTICKY : Int = 104
+pub const AXIS_RSTICKY : Int = 65589
 
 pub const AXIS_RT : Int = 108
 
-pub const AXIS_RT2 : Int = 110
+pub const AXIS_RT2 : Int = 131268
 
-pub const BTN_C : Int = 2
+pub const BTN_C : Int = 589844
 
-pub const BTN_DPAD_DOWN : Int = 16
+pub const BTN_DPAD_DOWN : Int = 589841
 
-pub const BTN_DPAD_LEFT : Int = 17
+pub const BTN_DPAD_LEFT : Int = 589842
 
-pub const BTN_DPAD_RIGHT : Int = 18
+pub const BTN_DPAD_RIGHT : Int = 589843
 
-pub const BTN_DPAD_UP : Int = 15
+pub const BTN_DPAD_UP : Int = 589840
 
-pub const BTN_EAST : Int = 1
+pub const BTN_EAST : Int = 589826
 
-pub const BTN_LT : Int = 6
+pub const BTN_LT : Int = 589831
 
-pub const BTN_LT2 : Int = 8
+pub const BTN_LT2 : Int = 589833
 
-pub const BTN_LTHUMB : Int = 13
+pub const BTN_LTHUMB : Int = 589838
 
-pub const BTN_MODE : Int = 12
+pub const BTN_MODE : Int = 589837
 
-pub const BTN_NORTH : Int = 3
+pub const BTN_NORTH : Int = 589829
 
-pub const BTN_RT : Int = 7
+pub const BTN_RT : Int = 589832
 
-pub const BTN_RT2 : Int = 9
+pub const BTN_RT2 : Int = 589834
 
-pub const BTN_RTHUMB : Int = 14
+pub const BTN_RTHUMB : Int = 589839
 
-pub const BTN_SELECT : Int = 10
+pub const BTN_SELECT : Int = 589835
 
-pub const BTN_SOUTH : Int = 0
+pub const BTN_SOUTH : Int = 589825
 
-pub const BTN_START : Int = 11
+pub const BTN_START : Int = 589836
 
-pub const BTN_WEST : Int = 4
+pub const BTN_WEST : Int = 589828
 
-pub const BTN_Z : Int = 5
+pub const BTN_Z : Int = 589845
 
 pub const BUTTON_COUNT : Int = 20
+
+pub const LEGACY_AXIS_DPADX : Int = 106
+
+pub const LEGACY_AXIS_DPADY : Int = 107
+
+pub const LEGACY_AXIS_LEFTZ : Int = 102
+
+pub const LEGACY_AXIS_LSTICKX : Int = 100
+
+pub const LEGACY_AXIS_LSTICKY : Int = 101
+
+pub const LEGACY_AXIS_LT : Int = 109
+
+pub const LEGACY_AXIS_LT2 : Int = 111
+
+pub const LEGACY_AXIS_RIGHTZ : Int = 105
+
+pub const LEGACY_AXIS_RSTICKX : Int = 103
+
+pub const LEGACY_AXIS_RSTICKY : Int = 104
+
+pub const LEGACY_AXIS_RT : Int = 108
+
+pub const LEGACY_AXIS_RT2 : Int = 110
+
+pub const LEGACY_BTN_C : Int = 2
+
+pub const LEGACY_BTN_DPAD_DOWN : Int = 16
+
+pub const LEGACY_BTN_DPAD_LEFT : Int = 17
+
+pub const LEGACY_BTN_DPAD_RIGHT : Int = 18
+
+pub const LEGACY_BTN_DPAD_UP : Int = 15
+
+pub const LEGACY_BTN_EAST : Int = 1
+
+pub const LEGACY_BTN_LT : Int = 6
+
+pub const LEGACY_BTN_LT2 : Int = 8
+
+pub const LEGACY_BTN_LTHUMB : Int = 13
+
+pub const LEGACY_BTN_MODE : Int = 12
+
+pub const LEGACY_BTN_NORTH : Int = 3
+
+pub const LEGACY_BTN_RT : Int = 7
+
+pub const LEGACY_BTN_RT2 : Int = 9
+
+pub const LEGACY_BTN_RTHUMB : Int = 14
+
+pub const LEGACY_BTN_SELECT : Int = 10
+
+pub const LEGACY_BTN_SOUTH : Int = 0
+
+pub const LEGACY_BTN_START : Int = 11
+
+pub const LEGACY_BTN_WEST : Int = 4
+
+pub const LEGACY_BTN_Z : Int = 5
+
+pub const PAGE_BUTTON : Int = 0x09
+
+pub const PAGE_GENERIC_DESKTOP : Int = 0x01
+
+pub const PAGE_SIMULATION : Int = 0x02
 
 pub fn axis_dpad_to_button(Event?, Gilrs) -> Event?
 
@@ -89,6 +157,12 @@ pub fn deadzone(Event?, Gilrs) -> Event?
 pub fn decode_native_event(Bytes) -> NativeEvent?
 
 pub fn filter_ev(Event?, (Event?, Gilrs) -> Event?, Gilrs) -> Event?
+
+pub fn hid_code(Int, Int) -> Int
+
+pub fn hid_page(Int) -> Int
+
+pub fn hid_usage(Int) -> Int
 
 pub fn jitter(Event?, Gilrs, Double) -> Event?
 

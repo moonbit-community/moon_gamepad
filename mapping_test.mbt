@@ -118,8 +118,36 @@ test "parse_sdl_mapping" {
     Ok(m) =>
       inspect(
         mapping_debug(m),
-        content="name=GameCube {WiseGroup USB box};hats=15;0->Btn:South;2->Btn:East;3->Btn:North;1->Btn:West;7->Btn:Start;6->Btn:RightTrigger;107->Axis:DPadY;15->Btn:DPadUp;106->Axis:DPadX;17->Btn:DPadLeft;16->Btn:DPadDown;18->Btn:DPadRight;100->Axis:LeftStickX;101->Axis:LeftStickY;102->Axis:RightStickX;103->Axis:RightStickY;104->Btn:LeftTrigger2;105->Btn:RightTrigger2",
+        content="name=GameCube {WiseGroup USB box};hats=15;589825->Btn:South;589844->Btn:East;589829->Btn:North;589826->Btn:West;589832->Btn:Start;589831->Btn:RightTrigger;65594->Axis:DPadY;589840->Btn:DPadUp;65593->Axis:DPadX;589842->Btn:DPadLeft;589841->Btn:DPadDown;589843->Btn:DPadRight;65584->Axis:LeftStickX;65585->Axis:LeftStickY;65587->Axis:RightStickX;65586->Axis:RightStickY;65589->Btn:LeftTrigger2;65588->Btn:RightTrigger2",
       )
+    Err(_) => fail("parse_sdl_mapping should not fail")
+  }
+}
+
+///|
+test "parse_sdl_mapping preserves unmapped button indices" {
+  let uuid = Uuid::nil().simple()
+  let line = uuid + ",Test,a:b2,"
+  // Include an extra unmapped button usage (usage=3) at index 2.
+  let buttons2 : Array[Code] = [
+    hid_code(PAGE_BUTTON, 1),
+    hid_code(PAGE_BUTTON, 2),
+    hid_code(PAGE_BUTTON, 3),
+  ]
+  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+    line,
+    buttons2,
+    [],
+  )
+  match res {
+    Ok(m) => {
+      let code = hid_code(PAGE_BUTTON, 3)
+      let ok = match m.map(code) {
+        Some(AxisOrBtn::Btn(Button::South)) => true
+        _ => false
+      }
+      inspect(ok, content="true")
+    }
     Err(_) => fail("parse_sdl_mapping should not fail")
   }
 }

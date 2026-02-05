@@ -448,6 +448,79 @@ static uint32_t map_hid_gd_usage_to_axis(uint32_t usage) {
   }
 }
 
+static uint32_t mac_hid_code(uint32_t page, uint32_t usage) {
+  return (page << 16) | usage;
+}
+
+static int mac_type_is_input(IOHIDElementType type) {
+  return (type == kIOHIDElementTypeInput_Misc) || (type == kIOHIDElementTypeInput_Button) ||
+         (type == kIOHIDElementTypeInput_Axis);
+}
+
+static int mac_element_is_axis(IOHIDElementType type, uint32_t page, uint32_t usage) {
+  if (!mac_type_is_input(type)) {
+    return 0;
+  }
+  if (page == 0x01) {
+    switch (usage) {
+    case 0x30: // X
+    case 0x31: // Y
+    case 0x32: // Z
+    case 0x33: // Rx
+    case 0x34: // Ry
+    case 0x35: // Rz
+    case 0x36: // Slider
+    case 0x37: // Dial
+    case 0x38: // Wheel
+      return 1;
+    default:
+      return 0;
+    }
+  }
+  if (page == 0x02) {
+    switch (usage) {
+    case 0xBA: // Rudder
+    case 0xBB: // Throttle
+    case 0xC4: // Accelerator
+    case 0xC5: // Brake
+      return 1;
+    default:
+      return 0;
+    }
+  }
+  return 0;
+}
+
+static int mac_element_is_button(IOHIDElementType type, uint32_t page, uint32_t usage) {
+  if (!mac_type_is_input(type)) {
+    return 0;
+  }
+  if (page == 0x01) {
+    switch (usage) {
+    case 0x90: // DPadUp
+    case 0x91: // DPadDown
+    case 0x92: // DPadRight
+    case 0x93: // DPadLeft
+    case 0x3D: // Start
+    case 0x3E: // Select
+    case 0x85: // SystemMainMenu
+      return 1;
+    default:
+      return 0;
+    }
+  }
+  // Button page / Consumer page.
+  (void)usage;
+  return (page == 0x09) || (page == 0x0C);
+}
+
+static int mac_element_is_hat(IOHIDElementType type, uint32_t page, uint32_t usage) {
+  if (!mac_type_is_input(type)) {
+    return 0;
+  }
+  return (page == 0x01) && (usage == 0x39);
+}
+
 static double norm_i32(int32_t v, int32_t minv, int32_t maxv) {
   if (maxv == minv) {
     return 0.0;
@@ -663,46 +736,25 @@ static void mac_collect_elements(moon_gamepad_backend_t *b, uint32_t idx, CFArra
     uint32_t page = IOHIDElementGetUsagePage(el);
     uint32_t usage = IOHIDElementGetUsage(el);
 
-    if (page == 0x09) {
-      uint32_t code = map_hid_button_usage(usage);
-      if (code != UINT32_MAX) {
-        uint32_t key = (page << 16) | usage;
-        mac_add_button_code(b, idx, (int32_t)code, key);
+    if (mac_element_is_hat(type, page, usage)) {
+      // Hat -> two axes (append after other axes to match SDL ordering).
+      if (saw_hat != NULL) {
+        *saw_hat = 1;
       }
       continue;
     }
 
-    if (page == 0x01) {
-      if (usage == 0x39) {
-        // Hat -> two axes (append after other axes to match SDL ordering).
-        if (saw_hat != NULL) {
-          *saw_hat = 1;
-        }
-        continue;
-      }
-      uint32_t code = map_hid_gd_usage_to_axis(usage);
-      if (code != UINT32_MAX) {
-        int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
-        int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
-        uint32_t key = (page << 16) | usage;
-        mac_add_axis_code(b, idx, (int32_t)code, key, minv, maxv);
-        continue;
-      }
+    if (mac_element_is_axis(type, page, usage)) {
+      int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
+      int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
+      uint32_t code = mac_hid_code(page, usage);
+      mac_add_axis_code(b, idx, (int32_t)code, code, minv, maxv);
+      continue;
     }
 
-    if (page == 0x02) {
-      // Simulation triggers: treat as axes (mapped to buttons via Mapping).
-      if (usage == 0xC4) {
-        int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
-        int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
-        uint32_t key = (page << 16) | usage;
-        mac_add_axis_code(b, idx, (int32_t)CODE_AXIS_RT2, key, minv, maxv);
-      } else if (usage == 0xC5) {
-        int32_t minv = (int32_t)IOHIDElementGetLogicalMin(el);
-        int32_t maxv = (int32_t)IOHIDElementGetLogicalMax(el);
-        uint32_t key = (page << 16) | usage;
-        mac_add_axis_code(b, idx, (int32_t)CODE_AXIS_LT2, key, minv, maxv);
-      }
+    if (mac_element_is_button(type, page, usage)) {
+      uint32_t code = mac_hid_code(page, usage);
+      mac_add_button_code(b, idx, (int32_t)code, code);
       continue;
     }
   }
@@ -721,9 +773,10 @@ static void mac_collect_device_caps(moon_gamepad_backend_t *b, uint32_t idx, IOH
   mac_collect_elements(b, idx, elements, &saw_hat);
   CFRelease(elements);
   if (saw_hat) {
-    uint32_t key = (0x01u << 16) | 0x39u;
-    mac_add_axis_code_append(b, idx, (int32_t)CODE_AXIS_DPADX, key, -1, 1);
-    mac_add_axis_code_append(b, idx, (int32_t)CODE_AXIS_DPADY, key, -1, 1);
+    uint32_t code_x = mac_hid_code(0x01u, 0x39u);
+    uint32_t code_y = mac_hid_code(0x01u, 0x3Au);
+    mac_add_axis_code_append(b, idx, (int32_t)code_x, code_x, -1, 1);
+    mac_add_axis_code_append(b, idx, (int32_t)code_y, code_y, -1, 1);
   }
 }
 
@@ -865,23 +918,24 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
   if (el == NULL) {
     return;
   }
+  IOHIDElementType type = IOHIDElementGetType(el);
   uint32_t page = IOHIDElementGetUsagePage(el);
   uint32_t usage = IOHIDElementGetUsage(el);
   int64_t t = now_ms();
 
-  // Buttons page 0x09
-  if (page == 0x09) {
-    uint32_t code = map_hid_button_usage(usage);
-    if (code == UINT32_MAX) {
-      return;
-    }
+  if (mac_element_is_axis(type, page, usage)) {
+    uint32_t code = mac_hid_code(page, usage);
+    int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
+    moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, (double)v, t};
+    queue_push(&b->q, ev);
+    return;
+  }
+
+  if (mac_element_is_button(type, page, usage)) {
+    uint32_t code = mac_hid_code(page, usage);
     int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
     moon_gamepad_event_t ev;
-    if (v != 0) {
-      ev.tag = MOON_GAMEPAD_EV_BUTTON_PRESSED;
-    } else {
-      ev.tag = MOON_GAMEPAD_EV_BUTTON_RELEASED;
-    }
+    ev.tag = (v != 0) ? MOON_GAMEPAD_EV_BUTTON_PRESSED : MOON_GAMEPAD_EV_BUTTON_RELEASED;
     ev.id = id;
     ev.code = code;
     ev.pad = 0;
@@ -891,10 +945,8 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
     return;
   }
 
-  // Generic Desktop page 0x01
-  if (page == 0x01) {
-    if (usage == 0x39) {
-      // Hat switch: normalize using reported logical min/max and emit axes only, matching gilrs-core.
+  // Hat: normalize and emit 2 axes only, matching gilrs-core.
+  if (mac_element_is_hat(type, page, usage)) {
       int32_t hat_v = (int32_t)IOHIDValueGetIntegerValue(value);
       int32_t hat_min = (int32_t)IOHIDElementGetLogicalMin(el);
       int32_t hat_max = (int32_t)IOHIDElementGetLogicalMax(el);
@@ -918,55 +970,28 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
         x_raw = 0;
       }
 
-	      // gilrs-core emits an inverted macOS axis here (down positive, up negative) and lets the Y
-	      // inversion stage fix it.
-	      int32_t y_raw;
-	      if (dpad_value >= 3 && dpad_value <= 5) {
-	        y_raw = 1; // down (pre-inversion)
-	      } else if (dpad_value == 0 || dpad_value == 1 || dpad_value == 7) {
-	        y_raw = -1; // up (pre-inversion)
+      // gilrs-core emits an inverted macOS axis here (down positive, up negative) and lets the Y
+      // inversion stage fix it.
+      int32_t y_raw;
+      if (dpad_value >= 3 && dpad_value <= 5) {
+        y_raw = 1; // down (pre-inversion)
+      } else if (dpad_value == 0 || dpad_value == 1 || dpad_value == 7) {
+        y_raw = -1; // up (pre-inversion)
       } else {
         y_raw = 0;
-	      }
+      }
 
-	      double x = (double)x_raw;
-	      double y = (double)y_raw;
+      double x = (double)x_raw;
+      double y = (double)y_raw;
 
-	      moon_gamepad_event_t ex = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADX, 0, x, t};
-	      moon_gamepad_event_t ey = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, CODE_AXIS_DPADY, 0, y, t};
-	      queue_push(&b->q, ex);
+      uint32_t code_x = mac_hid_code(page, 0x39u);
+      uint32_t code_y = mac_hid_code(page, 0x3Au);
+      moon_gamepad_event_t ex = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code_x, 0, x, t};
+      moon_gamepad_event_t ey = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code_y, 0, y, t};
+      queue_push(&b->q, ex);
       queue_push(&b->q, ey);
       return;
-    }
-
-    uint32_t code = map_hid_gd_usage_to_axis(usage);
-	    if (code == UINT32_MAX) {
-	      return;
-	    }
-	    int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
-	    // Emit raw value; mapping/normalization happens in MoonBit.
-	    moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, (double)v, t};
-	    queue_push(&b->q, ev);
-	    return;
-	  }
-
-  // Simulation page 0x02: analog triggers on some controllers.
-  if (page == 0x02) {
-	    // kHIDUsage_Sim_Accelerator (0xC4), kHIDUsage_Sim_Brake (0xC5)
-	    uint32_t code = UINT32_MAX;
-	    if (usage == 0xC4) {
-	      code = CODE_AXIS_RT2;
-	    } else if (usage == 0xC5) {
-	      code = CODE_AXIS_LT2;
-	    }
-	    if (code != UINT32_MAX) {
-	      int32_t v = (int32_t)IOHIDValueGetIntegerValue(value);
-	      // Emit raw value; mapping/normalization happens in MoonBit.
-	      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, (double)v, t};
-	      queue_push(&b->q, ev);
-	      return;
-	    }
-	  }
+  }
 }
 
 static CFDictionaryRef make_matching_dict(uint32_t page, uint32_t usage) {

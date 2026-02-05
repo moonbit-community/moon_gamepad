@@ -44,7 +44,10 @@ test "native remap: digital button emits edge then value" {
     None => return
     Some(e) => e
   }
-  inspect([ev_sig(e1), ev_sig(e2)], content="[(1, 0, 1, 0), (2, 0, 1, 0)]")
+  inspect(
+    [ev_sig(e1), ev_sig(e2)],
+    content="[(1, 0, 1, 589825), (2, 0, 1, 589825)]",
+  )
 }
 
 ///|
@@ -64,7 +67,7 @@ test "native remap: button mapped to axis produces axis change" {
     None => return
     Some(e) => e
   }
-  inspect(ev_sig(e1), content="(0, 7, 1, 15)")
+  inspect(ev_sig(e1), content="(0, 7, 1, 589840)")
 }
 
 ///|
@@ -87,7 +90,7 @@ test "native remap: axis mapped to button uses thresholds" {
     None => return
     Some(e) => e
   }
-  inspect(ev_sig(e1), content="(2, 8, 0, 111)")
+  inspect(ev_sig(e1), content="(2, 8, 0, 131269)")
 
   // 0.75 -> edge + value
   g.push_native_event({
@@ -107,7 +110,7 @@ test "native remap: axis mapped to button uses thresholds" {
   }
   inspect(
     [ev_sig(e2), ev_sig(e3)],
-    content="[(1, 8, 1, 111), (2, 8, 0.75, 111)]",
+    content="[(1, 8, 1, 131269), (2, 8, 0.75, 131269)]",
   )
 
   // 1.0 -> ButtonChanged only
@@ -122,7 +125,7 @@ test "native remap: axis mapped to button uses thresholds" {
     None => return
     Some(e) => e
   }
-  inspect(ev_sig(e4), content="(2, 8, 1, 111)")
+  inspect(ev_sig(e4), content="(2, 8, 1, 131269)")
 
   // 0.5 -> release edge + value
   g.push_native_event({
@@ -142,6 +145,6 @@ test "native remap: axis mapped to button uses thresholds" {
   }
   inspect(
     [ev_sig(e5), ev_sig(e6)],
-    content="[(4, 8, 0, 111), (2, 8, 0.5, 111)]",
+    content="[(4, 8, 0, 131269), (2, 8, 0.5, 131269)]",
   )
 }

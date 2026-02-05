@@ -18,7 +18,7 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
   - [x] Enumeration + hotplug events
   - [x] Buttons + axes events
   - [x] Device identity (`name`, `uuid`, `vendor_id`, `product_id`)
-  - [x] SDL mapping DB lookup on connect (name + hats_mapped overlay)
+  - [x] SDL mapping DB lookup on connect (full mapping)
   - [ ] Force feedback (upstream gilrs-core macOS reports unsupported)
   - [ ] Power info (currently always `Unknown`)
 - Linux (native / evdev) *(planned to harden later)*
@@ -31,7 +31,7 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
 
 ## Notes / Limitations (vs upstream `gilrs`)
 
-- Native backends currently use a built-in logical layout; full per-device remapping requires deeper native evcode coverage.
+- `Code` is backend-specific. On macOS it matches gilrs-core's HID `EvCode` encoding: `(usage_page << 16) | usage`.
 - `PowerInfo` is exposed but currently defaults to `Unknown` on native backends.
 
 ## Quickstart (native)
