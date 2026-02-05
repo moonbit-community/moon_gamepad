@@ -5,27 +5,59 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build-macos:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install MoonBit
+      - name: install moon
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
+      - name: post install
+        run: |
+          moon version --all
+          moon update
+
       - name: moon check
-        run: moon check
+        run: moon check --target native
 
       - name: moon test
-        run: moon test
+        run: moon test --target native
 
-      - name: moon fmt --check
-        run: moon fmt --check
-
-      - name: moon info (no diff)
+      - name: lint
         run: |
-          moon info
-          git diff --exit-code
+          moon fmt && git diff --exit-code
+          moon info && git diff --exit-code
 
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl clang lld
+
+      - name: install moon
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: post install
+        run: |
+          moon version --all
+          moon update
+
+      - name: moon check
+        run: moon check --target native
+
+      - name: moon test
+        run: moon test --target native --no-parallelize -v
+
+      - name: lint
+        run: |
+          moon fmt && git diff --exit-code
+          moon info && git diff --exit-code
