@@ -1,0 +1,435 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Milky2018/gamepad"
+
+// Values
+pub const AXIS_COUNT : Int = 9
+
+pub const AXIS_DPADX : Int = 106
+
+pub const AXIS_DPADY : Int = 107
+
+pub const AXIS_LEFTZ : Int = 102
+
+pub const AXIS_LSTICKX : Int = 100
+
+pub const AXIS_LSTICKY : Int = 101
+
+pub const AXIS_LT : Int = 109
+
+pub const AXIS_LT2 : Int = 111
+
+pub const AXIS_RIGHTZ : Int = 105
+
+pub const AXIS_RSTICKX : Int = 103
+
+pub const AXIS_RSTICKY : Int = 104
+
+pub const AXIS_RT : Int = 108
+
+pub const AXIS_RT2 : Int = 110
+
+pub const BTN_C : Int = 2
+
+pub const BTN_DPAD_DOWN : Int = 16
+
+pub const BTN_DPAD_LEFT : Int = 17
+
+pub const BTN_DPAD_RIGHT : Int = 18
+
+pub const BTN_DPAD_UP : Int = 15
+
+pub const BTN_EAST : Int = 1
+
+pub const BTN_LT : Int = 6
+
+pub const BTN_LT2 : Int = 8
+
+pub const BTN_LTHUMB : Int = 13
+
+pub const BTN_MODE : Int = 12
+
+pub const BTN_NORTH : Int = 3
+
+pub const BTN_RT : Int = 7
+
+pub const BTN_RT2 : Int = 9
+
+pub const BTN_RTHUMB : Int = 14
+
+pub const BTN_SELECT : Int = 10
+
+pub const BTN_SOUTH : Int = 0
+
+pub const BTN_START : Int = 11
+
+pub const BTN_WEST : Int = 4
+
+pub const BTN_Z : Int = 5
+
+pub const BUTTON_COUNT : Int = 20
+
+pub fn axis_dpad_to_button(Event?, Gilrs) -> Event?
+
+pub fn axis_from_code(Int) -> Axis?
+
+pub fn axis_or_btn_from_code(Int) -> AxisOrBtn?
+
+pub fn axis_value(AxisInfo, Int, Axis) -> Double
+
+pub fn btn_value(AxisInfo, Int) -> Double
+
+pub fn button_from_code(Int) -> Button?
+
+pub fn ceil_div(UInt, UInt) -> UInt
+
+pub fn clamp(Double, Double, Double) -> Double
+
+pub fn deadzone(Event?, Gilrs) -> Event?
+
+pub fn decode_native_event(Bytes) -> NativeEvent?
+
+pub fn filter_ev(Event?, (Event?, Gilrs) -> Event?, Gilrs) -> Event?
+
+pub fn jitter(Event?, Gilrs, Double) -> Event?
+
+// Errors
+type FfError
+
+type GilrsError
+
+type MappingError
+
+type ParseSdlMappingError
+
+type ParserError
+pub fn ParserError::kind(Self) -> ParserErrorKind
+pub fn ParserError::position(Self) -> Int
+
+type UuidError
+
+// Types and methods
+pub(all) enum Axis {
+  LeftStickX
+  LeftStickY
+  LeftZ
+  RightStickX
+  RightStickY
+  RightZ
+  DPadX
+  DPadY
+  Unknown
+}
+pub fn Axis::is_stick(Self) -> Bool
+pub fn Axis::second_axis(Self) -> Self?
+pub fn Axis::to_index(Self) -> Int
+
+pub struct AxisData {
+  last_event_ts : Int64
+  last_event_c : Int64
+  value : Double
+}
+pub fn AxisData::counter(Self) -> Int64
+pub fn AxisData::timestamp(Self) -> Int64
+pub fn AxisData::value(Self) -> Double
+
+pub struct AxisInfo {
+  min : Int
+  max : Int
+  deadzone : Int?
+}
+pub fn AxisInfo::new(Int, Int, Int?) -> Self
+
+pub(all) enum AxisOrBtn {
+  Axis(Axis)
+  Btn(Button)
+}
+pub fn AxisOrBtn::is_button(Self) -> Bool
+
+pub(all) enum AxisRange {
+  LowerHalf
+  UpperHalf
+  Full
+}
+
+type BackendOwner
+
+pub(all) enum Button {
+  South
+  East
+  C
+  North
+  West
+  Z
+  LeftTrigger
+  RightTrigger
+  LeftTrigger2
+  RightTrigger2
+  Select
+  Start
+  Mode
+  LeftThumb
+  RightThumb
+  DPadUp
+  DPadDown
+  DPadLeft
+  DPadRight
+  Unknown
+}
+pub fn Button::is_action(Self) -> Bool
+pub fn Button::is_dpad(Self) -> Bool
+pub fn Button::is_menu(Self) -> Bool
+pub fn Button::is_stick(Self) -> Bool
+pub fn Button::is_trigger(Self) -> Bool
+pub fn Button::to_index(Self) -> Int
+
+pub struct ButtonData {
+  last_event_ts : Int64
+  counter : Int64
+  value : Double
+  is_pressed : Bool
+  is_repeating : Bool
+}
+pub fn ButtonData::counter(Self) -> Int64
+pub fn ButtonData::is_pressed(Self) -> Bool
+pub fn ButtonData::is_repeating(Self) -> Bool
+pub fn ButtonData::timestamp(Self) -> Int64
+pub fn ButtonData::value(Self) -> Double
+
+pub struct Effect {
+  _id : Int
+}
+pub fn Effect::play(Self) -> Unit raise FfError
+pub fn Effect::stop(Self) -> Unit raise FfError
+
+pub struct EffectBuilder {
+  mut _dummy : Int
+}
+pub fn EffectBuilder::finish(Self, Gilrs) -> Effect raise FfError
+pub fn EffectBuilder::new() -> Self
+
+pub struct Event {
+  id : GamepadId
+  event : EventType
+  time : Int64
+}
+pub fn Event::at(GamepadId, EventType, Int64) -> Self
+pub fn Event::drop(Self) -> Self
+pub fn Event::event(Self) -> EventType
+pub fn Event::id(Self) -> GamepadId
+pub fn Event::is_dropped(Self) -> Bool
+pub fn Event::new(GamepadId, EventType) -> Self
+pub fn Event::time(Self) -> Int64
+
+pub(all) enum EventType {
+  ButtonPressed(Button, Int)
+  ButtonRepeated(Button, Int)
+  ButtonReleased(Button, Int)
+  ButtonChanged(Button, Double, Int)
+  AxisChanged(Axis, Double, Int)
+  Connected
+  Disconnected
+  Dropped
+  ForceFeedbackEffectCompleted
+}
+
+pub struct Gamepad {
+  gilrs : Gilrs
+  id : GamepadId
+}
+pub fn Gamepad::axis_code(Self, Axis) -> Int?
+pub fn Gamepad::axis_or_btn_name(Self, Int) -> AxisOrBtn?
+pub fn Gamepad::button_code(Self, Button) -> Int?
+pub fn Gamepad::deadzone(Self, Int) -> Double?
+pub fn Gamepad::id(Self) -> GamepadId
+pub fn Gamepad::is_connected(Self) -> Bool
+pub fn Gamepad::is_ff_supported(Self) -> Bool
+pub fn Gamepad::is_pressed(Self, Int) -> Bool
+pub fn Gamepad::mapping(Self) -> Mapping?
+pub fn Gamepad::name(Self) -> String
+pub fn Gamepad::state(Self) -> GamepadState
+pub fn Gamepad::value(Self, Int) -> Double
+
+pub struct GamepadData {
+  state : GamepadState
+  mut connected : Bool
+  mut mapping : Mapping
+  deadzones : Array[(Int, Double)]
+  have_sent_nonzero_for_axis : Array[Bool]
+}
+
+pub struct GamepadId {
+  value : Int
+}
+pub fn GamepadId::new(Int) -> Self
+pub fn GamepadId::value(Self) -> Int
+
+pub struct GamepadState {
+  buttons : Array[(Int, ButtonData)]
+  axes : Array[(Int, AxisData)]
+}
+pub fn GamepadState::axes_entries(Self) -> Array[(Int, AxisData)]
+pub fn GamepadState::axis_data(Self, Int) -> AxisData?
+pub fn GamepadState::button_data(Self, Int) -> ButtonData?
+pub fn GamepadState::buttons_entries(Self) -> Array[(Int, ButtonData)]
+pub fn GamepadState::is_pressed(Self, Int) -> Bool
+pub fn GamepadState::new() -> Self
+pub fn GamepadState::value(Self, Int) -> Double
+
+pub struct Gilrs {
+  mut counter : Int64
+  update_state : Bool
+  mut default_filters : Bool
+  events : Array[Event]
+  mut events_head : Int
+  gamepads_data : Array[GamepadData]
+  mut now_ms : Int64
+  backend : NativeBackend?
+}
+pub fn Gilrs::axis_code(Self, GamepadId, Axis) -> Int?
+pub fn Gilrs::axis_or_btn_name(Self, GamepadId, Int) -> AxisOrBtn?
+pub fn Gilrs::button_code(Self, GamepadId, Button) -> Int?
+pub fn Gilrs::counter(Self) -> Int64
+pub fn Gilrs::deadzone(Self, GamepadId, Int) -> Double?
+pub fn Gilrs::default_filters_enabled(Self) -> Bool
+pub fn Gilrs::gamepad(Self, GamepadId) -> Gamepad?
+pub fn Gilrs::gamepads(Self) -> Array[(GamepadId, Gamepad)]
+pub fn Gilrs::inc(Self) -> Unit
+pub fn Gilrs::insert_event(Self, Event) -> Unit
+pub fn Gilrs::is_connected(Self, GamepadId) -> Bool
+pub fn Gilrs::mapping(Self, GamepadId) -> Mapping?
+pub fn Gilrs::new() -> Self
+pub fn Gilrs::new_mock(Int, update_state? : Bool, default_filters? : Bool) -> Self
+pub fn Gilrs::new_native(update_state? : Bool, default_filters? : Bool) -> Self
+pub fn Gilrs::next_event(Self) -> Event?
+pub fn Gilrs::poll(Self) -> Unit
+pub fn Gilrs::reset_counter(Self) -> Unit
+pub fn Gilrs::set_deadzone(Self, GamepadId, Int, Double) -> Unit
+pub fn Gilrs::set_mapping(Self, GamepadId, Mapping) -> Unit
+pub fn Gilrs::set_time(Self, Int64) -> Unit
+pub fn Gilrs::state(Self, GamepadId) -> GamepadState?
+pub fn Gilrs::time(Self) -> Int64
+pub fn Gilrs::update(Self, Event) -> Unit
+pub fn Gilrs::update_state_enabled(Self) -> Bool
+pub fn Gilrs::with_default_filters(Self, Bool) -> Self
+
+pub struct GilrsBuilder {
+  mut update_state : Bool
+  mut default_filters : Bool
+  mut mock_gamepad_count : Int
+  mut use_native_backend : Bool
+}
+pub fn GilrsBuilder::build(Self) -> Gilrs
+pub fn GilrsBuilder::new() -> Self
+pub fn GilrsBuilder::set_update_state(Self, Bool) -> Self
+pub fn GilrsBuilder::with_default_filters(Self, Bool) -> Self
+pub fn GilrsBuilder::with_mock_gamepad_count(Self, Int) -> Self
+pub fn GilrsBuilder::with_native_backend(Self, Bool) -> Self
+
+pub struct Jitter {
+  threshold : Double
+}
+pub fn Jitter::filter(Self, Event?, Gilrs) -> Event?
+pub fn Jitter::new() -> Self
+
+pub struct Mapping {
+  mappings : Array[(Int, AxisOrBtn)]
+  mut name : String
+  default : Bool
+  mut hats_mapped : Int
+}
+pub fn Mapping::entries(Self) -> Array[(Int, AxisOrBtn)]
+pub fn Mapping::from_data(MappingData, Array[Int], Array[Int], String, Uuid) -> (Self, String) raise MappingError
+pub fn Mapping::hats_mapped(Self) -> Int
+pub fn Mapping::insert(Self, Int, AxisOrBtn) -> Unit
+pub fn Mapping::is_default(Self) -> Bool
+pub fn Mapping::map(Self, Int) -> AxisOrBtn?
+pub fn Mapping::map_rev(Self, AxisOrBtn) -> Int?
+pub fn Mapping::name(Self) -> String
+pub fn Mapping::new() -> Self
+pub fn Mapping::parse_sdl_mapping(String, Array[Int], Array[Int]) -> Self raise ParseSdlMappingError
+pub fn Mapping::set_hats_mapped(Self, Int) -> Unit
+
+pub struct MappingData {
+  buttons : Array[Int?]
+  axes : Array[Int?]
+}
+pub fn MappingData::axis(Self, Axis) -> Int?
+pub fn MappingData::button(Self, Button) -> Int?
+pub fn MappingData::insert_axis(Self, Int, Axis) -> Int?
+pub fn MappingData::insert_btn(Self, Int, Button) -> Int?
+pub fn MappingData::new() -> Self
+pub fn MappingData::remove_axis(Self, Axis) -> Int?
+pub fn MappingData::remove_button(Self, Button) -> Int?
+
+pub struct MappingDb {
+  mappings : Array[(Uuid, String)]
+}
+pub fn MappingDb::get(Self, Uuid) -> String?
+pub fn MappingDb::insert(Self, String) -> Unit
+pub fn MappingDb::len(Self) -> Int
+pub fn MappingDb::new() -> Self
+
+pub struct NativeBackend {
+  owner : BackendOwner
+}
+pub fn NativeBackend::gamepad_count(Self) -> Int
+pub fn NativeBackend::new() -> Self
+pub fn NativeBackend::next_event(Self) -> NativeEvent?
+pub fn NativeBackend::poll(Self) -> Unit
+
+pub struct NativeEvent {
+  tag : NativeEventTag
+  id : Int
+  code : Int
+  value : Double
+  time_ms : Int64
+}
+
+pub(all) enum NativeEventTag {
+  Connected
+  Disconnected
+  ButtonPressed
+  ButtonReleased
+  AxisChanged
+  ButtonChanged
+}
+
+pub(all) enum ParserErrorKind {
+  InvalidGuid
+  InvalidKeyValPair
+  InvalidValue
+  EmptyValue
+  UnknownAxis
+  UnknownButton
+  InvalidParserState
+  UnexpectedEnd
+}
+
+pub struct Repeat {
+  after_ms : Int64
+  every_ms : Int64
+}
+pub fn Repeat::filter(Self, Event?, Gilrs) -> Event?
+pub fn Repeat::new() -> Self
+
+pub(all) enum Token {
+  Uuid(Uuid)
+  Platform(String)
+  Name(String)
+  AxisMapping(Int, AxisOrBtn, AxisRange, AxisRange, Bool)
+  ButtonMapping(Int, AxisOrBtn, AxisRange)
+  HatMapping(Int, Int, AxisOrBtn, AxisRange)
+}
+
+pub struct Uuid {
+  simple : String
+}
+pub fn Uuid::nil() -> Self
+pub fn Uuid::parse(String) -> Self raise UuidError
+pub fn Uuid::simple(Self) -> String
+
+// Type aliases
+pub type Code = Int
+
+// Traits
+
