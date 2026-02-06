@@ -51,3 +51,37 @@ test "native_ev_codes: unconfirmed macOS axes remain unmapped by default" {
   }
   inspect((ok_rx, ok_ry), content="(true, true)")
 }
+
+///|
+test "native_ev_codes: unconfirmed constants use GenericDesktop usage 0" {
+  let zero_usage = hid_code(PAGE_GENERIC_DESKTOP, 0)
+  inspect(zero_usage, content="65536")
+  inspect(
+    (AXIS_LEFTZ, AXIS_RIGHTZ, AXIS_LT, AXIS_RT),
+    content="(65536, 65536, 65536, 65536)",
+  )
+}
+
+///|
+test "native_ev_codes: unconfirmed constants stay unmapped by default" {
+  let ok_leftz = match axis_or_btn_from_code(AXIS_LEFTZ) {
+    None => true
+    _ => false
+  }
+  let ok_rightz = match axis_or_btn_from_code(AXIS_RIGHTZ) {
+    None => true
+    _ => false
+  }
+  let ok_lt = match axis_or_btn_from_code(AXIS_LT) {
+    None => true
+    _ => false
+  }
+  let ok_rt = match axis_or_btn_from_code(AXIS_RT) {
+    None => true
+    _ => false
+  }
+  inspect(
+    (ok_leftz, ok_rightz, ok_lt, ok_rt),
+    content="(true, true, true, true)",
+  )
+}
