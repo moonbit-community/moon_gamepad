@@ -225,51 +225,54 @@ fn find_axis_info(infos : Array[(Code, AxisInfo)], code : Code) -> AxisInfo? {
 ///|
 fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
   let id = ne.id
+  let existed_before = id >= 0 && id < self.gamepads_data.length()
   self.ensure_gamepad_data(id)
   let gid = GamepadId::new(id)
   match ne.tag {
     NativeEventTag::Connected => {
       self.set_connected(id, true)
-      match self.backend {
-        None => ()
-        Some(b) =>
-          if id >= 0 && id < self.gamepads_data.length() {
-            self.gamepads_data[id].name = b.name(id)
-            let uuid_s = b.uuid_simple(id)
-            let uuid = Uuid::parse(uuid_s) catch { _ => Uuid::nil() }
-            self.gamepads_data[id].uuid = uuid
-            self.gamepads_data[id].vendor_id = b.vendor_id(id)
-            self.gamepads_data[id].product_id = b.product_id(id)
-            self.gamepads_data[id].ff_supported = b.is_ff_supported(id)
-            self.gamepads_data[id].power_info = PowerInfo::Unknown
-            let axes = b.axes(id)
-            let buttons = b.buttons(id)
-            self.gamepads_data[id].axes = axes
-            self.gamepads_data[id].buttons = buttons
-            let infos : Array[(Code, AxisInfo)] = []
-            for c in self.gamepads_data[id].axes {
-              match b.axis_info(id, c) {
-                None => ()
-                Some(info) => infos.push((c, info))
-              }
-            }
-            self.gamepads_data[id].axis_info = infos
-          }
-      }
-      self.apply_identity_mapping(id)
-      if id >= 0 && id < self.gamepads_data.length() {
-        let uuid = self.gamepads_data[id].uuid
-        match self.mappings.get(uuid) {
+      if !existed_before {
+        match self.backend {
           None => ()
-          Some(line) => {
-            let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-              line,
-              self.gamepads_data[id].buttons,
-              self.gamepads_data[id].axes,
-            )
-            match parsed {
-              Ok(m) => self.gamepads_data[id].mapping = m
-              Err(_) => ()
+          Some(b) =>
+            if id >= 0 && id < self.gamepads_data.length() {
+              self.gamepads_data[id].name = b.name(id)
+              let uuid_s = b.uuid_simple(id)
+              let uuid = Uuid::parse(uuid_s) catch { _ => Uuid::nil() }
+              self.gamepads_data[id].uuid = uuid
+              self.gamepads_data[id].vendor_id = b.vendor_id(id)
+              self.gamepads_data[id].product_id = b.product_id(id)
+              self.gamepads_data[id].ff_supported = b.is_ff_supported(id)
+              self.gamepads_data[id].power_info = PowerInfo::Unknown
+              let axes = b.axes(id)
+              let buttons = b.buttons(id)
+              self.gamepads_data[id].axes = axes
+              self.gamepads_data[id].buttons = buttons
+              let infos : Array[(Code, AxisInfo)] = []
+              for c in self.gamepads_data[id].axes {
+                match b.axis_info(id, c) {
+                  None => ()
+                  Some(info) => infos.push((c, info))
+                }
+              }
+              self.gamepads_data[id].axis_info = infos
+            }
+        }
+        self.apply_identity_mapping(id)
+        if id >= 0 && id < self.gamepads_data.length() {
+          let uuid = self.gamepads_data[id].uuid
+          match self.mappings.get(uuid) {
+            None => ()
+            Some(line) => {
+              let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+                line,
+                self.gamepads_data[id].buttons,
+                self.gamepads_data[id].axes,
+              )
+              match parsed {
+                Ok(m) => self.gamepads_data[id].mapping = m
+                Err(_) => ()
+              }
             }
           }
         }

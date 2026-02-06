@@ -148,3 +148,23 @@ test "native remap: axis mapped to button uses thresholds" {
     content="[(4, 8, 0, 131269), (2, 8, 0.5, 131269)]",
   )
 }
+
+///|
+test "native connected on existing id should not reset custom mapping" {
+  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let custom = Mapping::new()
+  custom.insert(BTN_SOUTH, AxisOrBtn::Btn(Button::West))
+  g.gamepads_data[0].mapping = custom
+  g.push_native_event({
+    tag: NativeEventTag::Connected,
+    id: 0,
+    code: 0,
+    value: 0.0,
+    time_ms: 1L,
+  })
+  let preserved = match g.gamepads_data[0].mapping.map(BTN_SOUTH) {
+    Some(AxisOrBtn::Btn(Button::West)) => true
+    _ => false
+  }
+  inspect(preserved, content="true")
+}
