@@ -688,6 +688,12 @@ typedef struct mac_cookie_set_t {
   uint16_t len;
 } mac_cookie_set_t;
 
+typedef struct mac_hat_axes_t {
+  int32_t codes[32];
+  uint32_t keys[32];
+  uint8_t len;
+} mac_hat_axes_t;
+
 static int mac_cookie_contains(mac_cookie_set_t *s, uint32_t cookie) {
   if (s == NULL) {
     return 0;
@@ -749,15 +755,10 @@ static void mac_push_code(int32_t *codes, uint32_t *keys, uint8_t *len, uint8_t 
   *len = (uint8_t)(n + 1);
 }
 
-static void mac_add_axis_code(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, uint32_t sort_key, int32_t minv,
-                              int32_t maxv) {
+static void mac_axis_info_add(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, int32_t minv, int32_t maxv) {
   if (b == NULL || idx >= 32) {
     return;
   }
-  if (!mac_codes_contains(b->axes_codes[idx], b->axes_len[idx], code)) {
-    mac_insert_sorted(b->axes_codes[idx], b->axes_key[idx], &b->axes_len[idx], 32, code, sort_key);
-  }
-  // Update axis_info (keep first occurrence; values may differ but best-effort).
   for (uint8_t i = 0; i < b->axis_info_len[idx]; i++) {
     if (b->axis_info_codes[idx][i] == code) {
       return;
@@ -771,6 +772,17 @@ static void mac_add_axis_code(moon_gamepad_backend_t *b, uint32_t idx, int32_t c
   }
 }
 
+static void mac_add_axis_code(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, uint32_t sort_key, int32_t minv,
+                              int32_t maxv) {
+  if (b == NULL || idx >= 32) {
+    return;
+  }
+  if (!mac_codes_contains(b->axes_codes[idx], b->axes_len[idx], code)) {
+    mac_insert_sorted(b->axes_codes[idx], b->axes_key[idx], &b->axes_len[idx], 32, code, sort_key);
+  }
+  mac_axis_info_add(b, idx, code, minv, maxv);
+}
+
 static void mac_add_axis_code_append(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, uint32_t sort_key,
                                      int32_t minv, int32_t maxv) {
   if (b == NULL || idx >= 32) {
@@ -779,17 +791,7 @@ static void mac_add_axis_code_append(moon_gamepad_backend_t *b, uint32_t idx, in
   if (!mac_codes_contains(b->axes_codes[idx], b->axes_len[idx], code)) {
     mac_push_code(b->axes_codes[idx], b->axes_key[idx], &b->axes_len[idx], 32, code, sort_key);
   }
-  for (uint8_t i = 0; i < b->axis_info_len[idx]; i++) {
-    if (b->axis_info_codes[idx][i] == code) {
-      return;
-    }
-  }
-  if (b->axis_info_len[idx] < 32) {
-    uint8_t j = b->axis_info_len[idx]++;
-    b->axis_info_codes[idx][j] = code;
-    b->axis_info_min[idx][j] = minv;
-    b->axis_info_max[idx][j] = maxv;
-  }
+  mac_axis_info_add(b, idx, code, minv, maxv);
 }
 
 static void mac_add_button_code(moon_gamepad_backend_t *b, uint32_t idx, int32_t code, uint32_t sort_key) {
@@ -801,11 +803,20 @@ static void mac_add_button_code(moon_gamepad_backend_t *b, uint32_t idx, int32_t
   }
 }
 
+static void mac_hat_axes_add(mac_hat_axes_t *hats, int32_t code, uint32_t key) {
+  if (hats == NULL) {
+    return;
+  }
+  if (!mac_codes_contains(hats->codes, hats->len, code)) {
+    mac_insert_sorted(hats->codes, hats->keys, &hats->len, 32, code, key);
+  }
+}
+
 static void mac_collect_elements(
   moon_gamepad_backend_t *b,
   uint32_t idx,
   CFArrayRef elements,
-  int *saw_hat,
+  mac_hat_axes_t *hats,
   mac_cookie_set_t *cookies
 ) {
   if (b == NULL || elements == NULL || idx >= 32) {
@@ -821,7 +832,7 @@ static void mac_collect_elements(
     if (type == kIOHIDElementTypeCollection) {
       CFArrayRef children = IOHIDElementGetChildren(el);
       if (children != NULL) {
-        mac_collect_elements(b, idx, children, saw_hat, cookies);
+        mac_collect_elements(b, idx, children, hats, cookies);
       }
       continue;
     }
@@ -833,9 +844,12 @@ static void mac_collect_elements(
       // Hat -> two axes (append after other axes to match SDL ordering).
       if (!mac_cookie_contains(cookies, cookie)) {
         mac_cookie_add(cookies, cookie);
-        if (saw_hat != NULL) {
-          *saw_hat = 1;
-        }
+        uint32_t code_x = mac_hid_code(page, usage);
+        uint32_t code_y = mac_hid_code(page, usage + 1u);
+        mac_axis_info_add(b, idx, (int32_t)code_x, -1, 1);
+        mac_axis_info_add(b, idx, (int32_t)code_y, -1, 1);
+        mac_hat_axes_add(hats, (int32_t)code_x, usage);
+        mac_hat_axes_add(hats, (int32_t)code_y, usage + 1u);
       }
       continue;
     }
@@ -869,20 +883,18 @@ static void mac_collect_device_caps(moon_gamepad_backend_t *b, uint32_t idx, IOH
     return;
   }
   mac_caps_clear(b, idx);
-  int saw_hat = 0;
+  mac_hat_axes_t hats;
+  memset(&hats, 0, sizeof(hats));
   mac_cookie_set_t cookies;
   memset(&cookies, 0, sizeof(cookies));
   CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
   if (elements == NULL) {
     return;
   }
-  mac_collect_elements(b, idx, elements, &saw_hat, &cookies);
+  mac_collect_elements(b, idx, elements, &hats, &cookies);
   CFRelease(elements);
-  if (saw_hat) {
-    uint32_t code_x = mac_hid_code(0x01u, 0x39u);
-    uint32_t code_y = mac_hid_code(0x01u, 0x3Au);
-    mac_add_axis_code_append(b, idx, (int32_t)code_x, 0x39u, -1, 1);
-    mac_add_axis_code_append(b, idx, (int32_t)code_y, 0x3Au, -1, 1);
+  for (uint8_t i = 0; i < hats.len; i++) {
+    mac_add_axis_code_append(b, idx, hats.codes[i], hats.keys[i], -1, 1);
   }
 }
 
