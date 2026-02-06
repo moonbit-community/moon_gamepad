@@ -85,6 +85,74 @@ test "axis_dpad_to_button maps dpad axis to button events" {
 }
 
 ///|
+test "axis_dpad_to_button handles immediate left-to-right transition" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  let m = Mapping::new()
+  m.set_hats_mapped(0b1111)
+  g.set_mapping(id, m)
+  let left_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadX, -1.0, AXIS_DPADX),
+    1L,
+  )
+  let left_out = axis_dpad_to_button(Some(left_ev), g).unwrap()
+  inspect(filter_event_sig(left_out), content="(1, 17, 1, 589842)")
+  g.update(left_out)
+  let left_extra = g.next_event().unwrap()
+  inspect(filter_event_sig(left_extra), content="(2, 17, 1, 589842)")
+  g.update(left_extra)
+  let right_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadX, 1.0, AXIS_DPADX),
+    2L,
+  )
+  let right_out = axis_dpad_to_button(Some(right_ev), g).unwrap()
+  inspect(filter_event_sig(right_out), content="(4, 17, 0, 589842)")
+  let q1 = g.next_event().unwrap()
+  let q2 = g.next_event().unwrap()
+  let q3 = g.next_event().unwrap()
+  inspect(
+    [filter_event_sig(q1), filter_event_sig(q2), filter_event_sig(q3)],
+    content="[(2, 18, 1, 589843), (1, 18, 1, 589843), (2, 17, 0, 589842)]",
+  )
+}
+
+///|
+test "axis_dpad_to_button handles immediate up-to-down transition" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  let m = Mapping::new()
+  m.set_hats_mapped(0b1111)
+  g.set_mapping(id, m)
+  let up_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadY, 1.0, AXIS_DPADY),
+    1L,
+  )
+  let up_out = axis_dpad_to_button(Some(up_ev), g).unwrap()
+  inspect(filter_event_sig(up_out), content="(1, 15, 1, 589840)")
+  g.update(up_out)
+  let up_extra = g.next_event().unwrap()
+  inspect(filter_event_sig(up_extra), content="(2, 15, 1, 589840)")
+  g.update(up_extra)
+  let down_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadY, -1.0, AXIS_DPADY),
+    2L,
+  )
+  let down_out = axis_dpad_to_button(Some(down_ev), g).unwrap()
+  inspect(filter_event_sig(down_out), content="(4, 15, 0, 589840)")
+  let q1 = g.next_event().unwrap()
+  let q2 = g.next_event().unwrap()
+  let q3 = g.next_event().unwrap()
+  inspect(
+    [filter_event_sig(q1), filter_event_sig(q2), filter_event_sig(q3)],
+    content="[(2, 16, 1, 589841), (1, 16, 1, 589841), (2, 15, 0, 589840)]",
+  )
+}
+
+///|
 test "repeat generates repeated events on None" {
   let g = Gilrs::new_mock(1, update_state=false)
   let id = GamepadId::new(0)
