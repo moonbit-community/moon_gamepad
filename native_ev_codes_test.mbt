@@ -63,25 +63,25 @@ test "native_ev_codes: unconfirmed constants use GenericDesktop usage 0" {
 }
 
 ///|
-test "native_ev_codes: unconfirmed constants stay unmapped by default" {
-  let ok_leftz = match axis_or_btn_from_code(AXIS_LEFTZ) {
-    None => true
+test "native_ev_codes: usage-0 constants collide to one default mapping" {
+  let hit_leftz = match axis_or_btn_from_code(AXIS_LEFTZ) {
+    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
     _ => false
   }
-  let ok_rightz = match axis_or_btn_from_code(AXIS_RIGHTZ) {
-    None => true
+  let hit_rightz = match axis_or_btn_from_code(AXIS_RIGHTZ) {
+    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
     _ => false
   }
-  let ok_lt = match axis_or_btn_from_code(AXIS_LT) {
-    None => true
+  let hit_lt = match axis_or_btn_from_code(AXIS_LT) {
+    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
     _ => false
   }
-  let ok_rt = match axis_or_btn_from_code(AXIS_RT) {
-    None => true
+  let hit_rt = match axis_or_btn_from_code(AXIS_RT) {
+    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
     _ => false
   }
   inspect(
-    (ok_leftz, ok_rightz, ok_lt, ok_rt),
+    (hit_leftz, hit_rightz, hit_lt, hit_rt),
     content="(true, true, true, true)",
   )
 }

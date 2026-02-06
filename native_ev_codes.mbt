@@ -230,6 +230,10 @@ pub const LEGACY_AXIS_LT2 : Code = 111
 
 ///|
 pub fn axis_from_code(code : Code) -> Axis? {
+  // On macOS, several "unconfirmed" constants share usage=0 and collapse into one code.
+  if code == AXIS_RIGHTZ {
+    return Some(Axis::RightZ)
+  }
   match code {
     AXIS_LSTICKX | LEGACY_AXIS_LSTICKX => Some(Axis::LeftStickX)
     AXIS_LSTICKY | LEGACY_AXIS_LSTICKY => Some(Axis::LeftStickY)
