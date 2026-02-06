@@ -907,7 +907,8 @@ static void mac_fill_device_info(moon_gamepad_backend_t *b, uint32_t idx, IOHIDD
   memset(b->uuids[idx], 0, sizeof(b->uuids[idx]));
   memset(b->names[idx], 0, sizeof(b->names[idx]));
   b->uuids[idx][0] = '\0';
-  b->names[idx][0] = '\0';
+  strncpy(b->names[idx], "Unknown", sizeof(b->names[idx]) - 1);
+  b->names[idx][sizeof(b->names[idx]) - 1] = '\0';
 
   CFTypeRef vref = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDVendorIDKey));
   if (vref != NULL && CFGetTypeID(vref) == CFNumberGetTypeID()) {
