@@ -301,6 +301,58 @@ test "axis_dpad_to_button passthrough when mapping is missing" {
 }
 
 ///|
+test "axis_dpad_to_button releases X direction on center value" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  let m = Mapping::new()
+  m.set_hats_mapped(0b1111)
+  g.set_mapping(id, m)
+  let press_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadX, 1.0, AXIS_DPADX),
+    1L,
+  )
+  let press_out = axis_dpad_to_button(Some(press_ev), g).unwrap()
+  g.update(press_out)
+  g.update(g.next_event().unwrap())
+  let center_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadX, 0.0, AXIS_DPADX),
+    2L,
+  )
+  let center_out = axis_dpad_to_button(Some(center_ev), g).unwrap()
+  inspect(filter_event_sig(center_out), content="(4, 18, 0, 589843)")
+  let extra = g.next_event().unwrap()
+  inspect(filter_event_sig(extra), content="(2, 18, 0, 589843)")
+}
+
+///|
+test "axis_dpad_to_button releases Y direction on center value" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  let m = Mapping::new()
+  m.set_hats_mapped(0b1111)
+  g.set_mapping(id, m)
+  let press_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadY, 1.0, AXIS_DPADY),
+    1L,
+  )
+  let press_out = axis_dpad_to_button(Some(press_ev), g).unwrap()
+  g.update(press_out)
+  g.update(g.next_event().unwrap())
+  let center_ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadY, 0.0, AXIS_DPADY),
+    2L,
+  )
+  let center_out = axis_dpad_to_button(Some(center_ev), g).unwrap()
+  inspect(filter_event_sig(center_out), content="(4, 15, 0, 589840)")
+  let extra = g.next_event().unwrap()
+  inspect(filter_event_sig(extra), content="(2, 15, 0, 589840)")
+}
+
+///|
 test "repeat generates repeated events on None" {
   let g = Gilrs::new_mock(1, update_state=false)
   let id = GamepadId::new(0)
