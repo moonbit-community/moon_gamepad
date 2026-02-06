@@ -2024,6 +2024,10 @@ void *moon_gamepad_backend_new(void) {
   return p;
 }
 
+void *moon_gamepad_backend_new_null_for_test(void) {
+  return NULL;
+}
+
 static moon_gamepad_backend_t *backend_of(void *owner) {
   moon_gamepad_backend_owner_payload_t *p = (moon_gamepad_backend_owner_payload_t *)owner;
   if (p == NULL) {

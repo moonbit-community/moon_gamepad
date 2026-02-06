@@ -64,3 +64,28 @@ test "axis second axis" {
   inspect(axis_opt_name(Axis::DPadX.second_axis()), content="Some(DPadY)")
   inspect(axis_opt_name(Axis::Unknown.second_axis()), content="None")
 }
+
+///|
+test "ev helper branches parity" {
+  inspect(Axis::LeftStickX.is_stick(), content="true")
+  inspect(Axis::LeftZ.is_stick(), content="false")
+  inspect(
+    Axis::RightStickX.second_axis().map(fn(ax) { ax.to_index() }),
+    content="Some(4)",
+  )
+  inspect(
+    Axis::RightStickY.second_axis().map(fn(ax) { ax.to_index() }),
+    content="Some(3)",
+  )
+  inspect(
+    Axis::DPadY.second_axis().map(fn(ax) { ax.to_index() }),
+    content="Some(6)",
+  )
+  inspect(Button::South.is_trigger(), content="false")
+  inspect(Button::South.is_menu(), content="false")
+  inspect(Button::South.is_stick(), content="false")
+  inspect(Button::South.is_dpad(), content="false")
+  inspect(Button::C.to_index(), content="2")
+  inspect(Button::Z.to_index(), content="5")
+  inspect(AxisOrBtn::Axis(Axis::Unknown).is_button(), content="false")
+}
