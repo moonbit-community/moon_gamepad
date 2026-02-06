@@ -983,27 +983,19 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
     return;
   }
 
-  // Dedupe by entry/location in case the callback is invoked multiple times.
-  uint32_t idx = UINT32_MAX;
+  // Deduplicate only already-connected entry IDs. A reconnect after disconnect
+  // allocates a new slot, matching gilrs-core device_infos behavior.
   for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->entry_ids[i] != entry_id) {
-      continue;
-    }
-    if (b->connected[i]) {
+    if (b->entry_ids[i] == entry_id && b->connected[i]) {
       return;
     }
-    // Reuse disconnected slot (stable id across reconnect).
-    idx = i;
-    break;
   }
-  if (idx == UINT32_MAX) {
-    if (b->devices_len >= 32) {
-      return;
-    }
-    idx = b->devices_len++;
-    b->device_ids[idx] = b->next_id++;
-    b->entry_ids[idx] = entry_id;
+  if (b->devices_len >= 32) {
+    return;
   }
+  uint32_t idx = b->devices_len++;
+  b->device_ids[idx] = b->next_id++;
+  b->entry_ids[idx] = entry_id;
 
   // Retain device while stored.
   CFRetain(device);
