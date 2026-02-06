@@ -186,6 +186,40 @@ test "axis_dpad_to_button handles immediate up-to-down transition" {
 }
 
 ///|
+test "axis_dpad_to_button keeps axis event when hats mapping is partial" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  let m = Mapping::new()
+  m.set_hats_mapped(0b0001)
+  g.set_mapping(id, m)
+  let ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadX, 1.0, AXIS_DPADX),
+    1L,
+  )
+  let out = axis_dpad_to_button(Some(ev), g)
+  inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
+  inspect(g.next_event() is None, content="true")
+}
+
+///|
+test "axis_dpad_to_button keeps axis event when dpad button exists" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  let m = Mapping::new()
+  m.insert(BTN_DPAD_RIGHT, AxisOrBtn::Btn(Button::DPadRight))
+  g.set_mapping(id, m)
+  let ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadX, 1.0, AXIS_DPADX),
+    1L,
+  )
+  let out = axis_dpad_to_button(Some(ev), g)
+  inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
+  inspect(g.next_event() is None, content="true")
+}
+
+///|
 test "repeat generates repeated events on None" {
   let g = Gilrs::new_mock(1, update_state=false)
   let id = GamepadId::new(0)
