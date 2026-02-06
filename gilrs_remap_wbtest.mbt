@@ -150,6 +150,57 @@ test "native remap: axis mapped to button uses thresholds" {
 }
 
 ///|
+test "native remap: axis-to-button threshold edges are inclusive" {
+  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  g.gamepads_data[0].buttons = []
+  g.gamepads_data[0].axes = [AXIS_LT2]
+  g.gamepads_data[0].axis_info = [(AXIS_LT2, AxisInfo::new(0, 100, None))]
+  g.apply_identity_mapping(0)
+
+  // Exactly at pressed threshold (0.75) should trigger press + changed.
+  g.push_native_event({
+    tag: NativeEventTag::AxisChanged,
+    id: 0,
+    code: AXIS_LT2,
+    value: 75.0,
+    time_ms: 1L,
+  })
+  let p1 = match g.next_event() {
+    None => return
+    Some(e) => e
+  }
+  let p2 = match g.next_event() {
+    None => return
+    Some(e) => e
+  }
+  inspect(
+    [ev_sig(p1), ev_sig(p2)],
+    content="[(1, 8, 1, 131269), (2, 8, 0.75, 131269)]",
+  )
+
+  // Exactly at released threshold (0.65) should trigger release + changed.
+  g.push_native_event({
+    tag: NativeEventTag::AxisChanged,
+    id: 0,
+    code: AXIS_LT2,
+    value: 65.0,
+    time_ms: 2L,
+  })
+  let r1 = match g.next_event() {
+    None => return
+    Some(e) => e
+  }
+  let r2 = match g.next_event() {
+    None => return
+    Some(e) => e
+  }
+  inspect(
+    [ev_sig(r1), ev_sig(r2)],
+    content="[(4, 8, 0, 131269), (2, 8, 0.6499999761581421, 131269)]",
+  )
+}
+
+///|
 test "native connected on existing id should not reset custom mapping" {
   let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
   let custom = Mapping::new()
