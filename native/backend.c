@@ -953,7 +953,7 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
 
   // Validate required properties, mirroring gilrs-core's early filtering.
   int32_t location_id_i32 = 0;
-  if (!mac_get_i32_prop(device, CFSTR(kIOHIDLocationIDKey), &location_id_i32) || location_id_i32 <= 0) {
+  if (!mac_get_i32_prop(device, CFSTR(kIOHIDLocationIDKey), &location_id_i32)) {
     return;
   }
   uint32_t location_id = (uint32_t)location_id_i32;
@@ -1022,7 +1022,7 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
     return;
   }
   int32_t location_id_i32 = 0;
-  if (!mac_get_i32_prop(device, CFSTR(kIOHIDLocationIDKey), &location_id_i32) || location_id_i32 <= 0) {
+  if (!mac_get_i32_prop(device, CFSTR(kIOHIDLocationIDKey), &location_id_i32)) {
     return;
   }
   uint32_t location_id = (uint32_t)location_id_i32;
