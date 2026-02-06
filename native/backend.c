@@ -948,9 +948,6 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
   if (b == NULL || device == NULL) {
     return;
   }
-  if (find_device_idx(b, device) >= 0) {
-    return;
-  }
 
   // Validate required properties, mirroring gilrs-core's early filtering.
   int32_t location_id_i32 = 0;
@@ -988,6 +985,8 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
   // allocates a new slot, matching gilrs-core device_infos behavior.
   for (uint32_t i = 0; i < b->devices_len; i++) {
     if (b->entry_ids[i] == entry_id && b->connected[i]) {
+      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, b->device_ids[i], 0, 0, 0.0, now_ms()};
+      queue_push(&b->q, ev);
       return;
     }
   }
