@@ -64,6 +64,39 @@ test "deadzone clamps axis and preserves range" {
 }
 
 ///|
+test "deadzone enqueues paired-axis zero when primary event drops" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.set_deadzone(id, AXIS_LSTICKX, 0.2)
+  g.set_deadzone(id, AXIS_LSTICKY, 0.2)
+  let m = Mapping::new()
+  m.insert(AXIS_LSTICKX, AxisOrBtn::Axis(Axis::LeftStickX))
+  m.insert(AXIS_LSTICKY, AxisOrBtn::Axis(Axis::LeftStickY))
+  g.set_mapping(id, m)
+
+  // Seed non-zero X through deadzone so paired-axis clear path can trigger later.
+  let seed = Event::at(
+    id,
+    EventType::AxisChanged(Axis::LeftStickX, 0.3, AXIS_LSTICKX),
+    1L,
+  )
+  let seed_out = deadzone(Some(seed), g).unwrap()
+  g.update(seed_out)
+
+  // Y event lands both axes in deadzone; Y gets dropped, X clear is queued.
+  let ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::LeftStickY, 0.0, AXIS_LSTICKY),
+    2L,
+  )
+  let out = deadzone(Some(ev), g).unwrap()
+  inspect(out.is_dropped(), content="true")
+  let queued = g.next_event()
+  inspect(queued.map(filter_event_sig), content="Some((0, 0, 0, 65584))")
+  inspect(g.gamepads_data[0].have_sent_nonzero_for_axis[2], content="false")
+}
+
+///|
 test "axis_dpad_to_button maps dpad axis to button events" {
   let g = Gilrs::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
