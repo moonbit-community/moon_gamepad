@@ -185,3 +185,58 @@ test "gamepad power_info default is Unknown (mock)" {
     })
   inspect(p, content="Some(0)")
 }
+
+///|
+test "gilrs keeps historical disconnected ids after reconnect-style sequence" {
+  let g = Gilrs::new_mock(2)
+  let id0 = GamepadId::new(0)
+  let id1 = GamepadId::new(1)
+  g.insert_event(Event::at(id0, EventType::Connected, 1L))
+  g.insert_event(Event::at(id0, EventType::Disconnected, 2L))
+  g.insert_event(Event::at(id1, EventType::Connected, 3L))
+  let t1 = g
+    .next_event()
+    .map(fn(ev) {
+      match ev.event() {
+        EventType::Connected => 1
+        EventType::Disconnected => 2
+        _ => 0
+      }
+    })
+  let t2 = g
+    .next_event()
+    .map(fn(ev) {
+      match ev.event() {
+        EventType::Connected => 1
+        EventType::Disconnected => 2
+        _ => 0
+      }
+    })
+  let t3 = g
+    .next_event()
+    .map(fn(ev) {
+      match ev.event() {
+        EventType::Connected => 1
+        EventType::Disconnected => 2
+        _ => 0
+      }
+    })
+  inspect((t1, t2, t3), content="(Some(1), Some(2), Some(1))")
+  inspect(
+    g.gamepad(id0).map(fn(gp) { gp.is_connected() }),
+    content="Some(false)",
+  )
+  inspect(
+    g.gamepad(id1).map(fn(gp) { gp.is_connected() }),
+    content="Some(true)",
+  )
+  inspect(
+    g
+    .gamepads()
+    .map(fn(pair) {
+      let (id, _) = pair
+      id.value()
+    }),
+    content="[1]",
+  )
+}
