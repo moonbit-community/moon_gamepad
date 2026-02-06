@@ -374,26 +374,6 @@ enum {
 
 #if defined(__APPLE__)
 
-static int find_device_idx(moon_gamepad_backend_t *b, IOHIDDeviceRef dev) {
-  if (b == NULL || dev == NULL) {
-    return -1;
-  }
-  for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->devices[i] == dev) {
-      return (int)i;
-    }
-  }
-  return -1;
-}
-
-static uint32_t device_id_of(moon_gamepad_backend_t *b, IOHIDDeviceRef dev) {
-  int idx = find_device_idx(b, dev);
-  if (idx < 0) {
-    return UINT32_MAX;
-  }
-  return b->device_ids[(uint32_t)idx];
-}
-
 static int mac_idx_by_entry_id(moon_gamepad_backend_t *b, uint64_t entry_id) {
   if (b == NULL) {
     return -1;
