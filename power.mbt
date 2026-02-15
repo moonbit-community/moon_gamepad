@@ -25,3 +25,11 @@ pub enum PowerInfo {
   /// Battery is charged.
   Charged
 }
+
+///|
+let _power_info_keepalive : Array[PowerInfo] = [
+  PowerInfo::Wired,
+  PowerInfo::Discharging(0),
+  PowerInfo::Charging(0),
+  PowerInfo::Charged,
+]

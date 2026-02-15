@@ -36,16 +36,16 @@ fn non_empty_parser_errors(line : String) -> Int {
 }
 
 ///|
-test "representative SDL lines parse without non-empty parser errors" {
-  let lines = [
-    "03000000260900008888000000010001,GameCube {WiseGroup USB box},a:b0,b:b2,y:b3,x:b1,start:b7,rightshoulder:b6,dpup:h0.1,dpleft:h0.8,dpdown:h0.4,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a4,righttrigger:a5,",
-    "030000005e0400008e02000010010000,Microsoft X-Box 360 pad,a:b0,b:b1,x:b2,y:b3,start:b7,guide:,back:b6,leftshoulder:b4,rightshoulder:b5,leftx:a0,lefty:a1,rightx:a3,righty:a4,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,",
-    "03000000c82d00000190000011010000,8BitDo SN30 Pro,a:b1,b:b0,x:b4,y:b3,start:b11,back:b10,leftshoulder:b6,rightshoulder:b7,lefttrigger:b8,righttrigger:b9,leftx:a0,lefty:a1,rightx:a2,righty:a5,dpup:b13,dpright:b16,dpdown:b14,dpleft:b15,platform:Mac OS X,",
-    "03000000de280000ff11000001000000,Example Controller,a:b0,b:b1,x:b2,y:b3,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a4,righttrigger:a5,",
-  ]
+test "full SDL corpus parses without non-empty parser errors" {
   let mut errors = 0
-  for line in lines {
+  let mut parsed = 0
+  for line in sdl_gamecontrollerdb_lines {
+    if line.is_blank() || line.has_prefix("#") {
+      continue
+    }
+    parsed = parsed + 1
     errors = errors + non_empty_parser_errors(line)
   }
+  inspect(parsed > 1000, content="true")
   inspect(errors, content="0")
 }

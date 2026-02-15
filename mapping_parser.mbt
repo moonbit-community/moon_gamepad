@@ -131,9 +131,9 @@ fn parse_u16_decimal(s : String, pos : Int) -> Int raise ParserError {
 ///|
 let axes_sdl : Array[String] = [
   "a", "b", "back", "c", "dpdown", "dpleft", "dpright", "dpup", "guide", "leftshoulder",
-  "leftstick", "lefttrigger", "leftx", "lefty", "leftz", "misc1", "paddle1", "paddle2",
-  "paddle3", "paddle4", "rightshoulder", "rightstick", "righttrigger", "rightx",
-  "righty", "rightz", "start", "touchpad", "x", "y", "z",
+  "leftstick", "lefttrigger", "leftx", "lefty", "leftz", "misc1", "misc2", "paddle1",
+  "paddle2", "paddle3", "paddle4", "rightshoulder", "rightstick", "righttrigger",
+  "rightx", "righty", "rightz", "start", "touchpad", "x", "y", "z",
 ]
 
 ///|
@@ -153,6 +153,7 @@ let axes : Array[AxisOrBtn] = [
   AxisOrBtn::Axis(Axis::LeftStickX),
   AxisOrBtn::Axis(Axis::LeftStickY),
   AxisOrBtn::Axis(Axis::LeftZ),
+  AxisOrBtn::Btn(Button::Unknown),
   AxisOrBtn::Btn(Button::Unknown),
   AxisOrBtn::Btn(Button::Unknown),
   AxisOrBtn::Btn(Button::Unknown),

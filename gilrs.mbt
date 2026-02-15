@@ -19,6 +19,9 @@ suberror GilrsError {
 }
 
 ///|
+let _gilrs_error_keepalive : Array[GilrsError] = [GilrsError::NotImplemented]
+
+///|
 pub struct GamepadData {
   state : GamepadState
   mut connected : Bool
@@ -486,7 +489,7 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
         }
       None => return None
     }
-  } else {
+  } nobreak {
     None
   }
 }
@@ -548,7 +551,7 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
         }
       None => return None
     }
-  } else {
+  } nobreak {
     None
   }
 }

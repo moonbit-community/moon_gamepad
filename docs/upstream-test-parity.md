@@ -17,7 +17,7 @@ Counted upstream unit tests (`#[test]`): **12**.
 | `gilrs/src/gamepad.rs::axis_value_documented_case` | `axis_value_test.mbt::test "axis_value documented case"` | Covered |
 | `gilrs/src/gamepad.rs::axis_value_overflow` | `axis_value_test.mbt::test "axis_value overflow behavior"` | Covered |
 | `gilrs/src/gamepad.rs::btn_value_overflow` | `axis_value_test.mbt::test "btn_value overflow behavior"` | Covered |
-| `gilrs/src/mapping/parser.rs::test_all_sdl_mappings_for_parse_errors` | `mapping_parser_wbtest.mbt::test "representative SDL lines parse without non-empty parser errors"` | Partial (representative corpus) |
+| `gilrs/src/mapping/parser.rs::test_all_sdl_mappings_for_parse_errors` | `mapping_parser_wbtest.mbt::test "full SDL corpus parses without non-empty parser errors"` | Covered |
 | `gilrs/src/mapping/mod.rs::mapping` | `mapping_test.mbt::test "parse_sdl_mapping"` | Covered |
 | `gilrs/src/mapping/mod.rs::from_data` | `mapping_test.mbt::test "from_data roundtrip + errors"` | Covered |
 | `gilrs/src/mapping/mod.rs::with_mappings` | `mapping_test.mbt::test "mapping_db insert/get"` | Covered |
@@ -25,5 +25,5 @@ Counted upstream unit tests (`#[test]`): **12**.
 
 ## Notes
 
-- The upstream parser corpus test depends on `SDL_GameControllerDB/gamecontrollerdb.txt`, which is missing in this local upstream snapshot (empty submodule directory).  
-- Current MoonBit parity keeps the parser behavior contract but runs it against a representative multi-line SDL mapping corpus that includes empty-value tokens and platform segments.
+- The local upstream snapshot still misses the `SDL_GameControllerDB` submodule content.  
+- This repository now vendors the SDL corpus as generated MoonBit test data in `mapping_parser_corpus_data_wbtest.mbt`, sourced from [`gabomdq/SDL_GameControllerDB`](https://github.com/gabomdq/SDL_GameControllerDB).

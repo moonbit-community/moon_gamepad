@@ -24,6 +24,14 @@ suberror MappingError {
 }
 
 ///|
+let _mapping_error_keepalive : Array[MappingError] = [
+  MappingError::NotImplemented,
+  MappingError::NotConnected,
+  MappingError::DuplicatedEntry,
+  MappingError::NotSdl2Compatible,
+]
+
+///|
 suberror ParseSdlMappingError {
   UnknownHatDirection
   ParseError(ParserError)
