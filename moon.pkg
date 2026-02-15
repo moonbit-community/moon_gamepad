@@ -1,0 +1,20 @@
+import {
+}
+
+import {
+  "moonbitlang/core/int",
+} for "test"
+
+options(
+  link: {
+    "native": {
+      "cc": "./scripts/moon_cc.sh",
+      "cc-link-flags": "-framework IOKit -framework CoreFoundation",
+    },
+  },
+  "native-stub": [ "native/backend.c" ],
+  targets: {
+    "native_backend_native.mbt": [ "native" ],
+    "native_backend_stub.mbt": [ "not", "native" ],
+  },
+)

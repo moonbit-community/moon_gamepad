@@ -293,6 +293,15 @@ pub fn EffectBuilder::gamepads(Self, Array[GamepadId]) -> Self
 pub fn EffectBuilder::new() -> Self
 pub fn EffectBuilder::rumble(Self, Double, Double) -> Self
 
+pub struct Envelope {
+  attack_length : Int
+  attack_level : Double
+  fade_length : Int
+  fade_level : Double
+}
+pub fn Envelope::at(Self, Int, Int) -> Double
+pub fn Envelope::default() -> Self
+
 pub struct Event {
   id : GamepadId
   event : EventType
@@ -538,6 +547,14 @@ pub struct Repeat {
 }
 pub fn Repeat::filter(Self, Event?, Gilrs) -> Event?
 pub fn Repeat::new() -> Self
+
+pub struct Replay {
+  after : Int
+  play_for : Int
+  with_delay : Int
+}
+pub fn Replay::at(Self, Int) -> Double
+pub fn Replay::default() -> Self
 
 pub(all) enum Token {
   Uuid(Uuid)

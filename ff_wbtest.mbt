@@ -158,3 +158,47 @@ test "duration conversion branches" {
   inspect(to_duration_int(123L), content="123")
   inspect(to_duration_int(0x8FFF_FFFFL), content="2147483647")
 }
+
+///|
+fn approx(a : Double, b : Double, eps : Double) -> Bool {
+  Double::abs(a - b) <= eps
+}
+
+///|
+test "envelope matches upstream checkpoints" {
+  let env = {
+    attack_length: 10,
+    attack_level: 0.2,
+    fade_length: 10,
+    fade_level: 0.2,
+  }
+  let dur = 40
+  inspect(approx(env.at(0, dur), 0.2, 0.000000001), content="true")
+  inspect(approx(env.at(5, dur), 0.6, 0.000000001), content="true")
+  inspect(approx(env.at(10, dur), 1.0, 0.000000001), content="true")
+  inspect(approx(env.at(20, dur), 1.0, 0.000000001), content="true")
+  inspect(approx(env.at(30, dur), 1.0, 0.000000001), content="true")
+  inspect(approx(env.at(35, dur), 0.6, 0.000000001), content="true")
+  inspect(approx(env.at(40, dur), 0.2, 0.000001), content="true")
+}
+
+///|
+test "envelope default stays at unity" {
+  let env = Envelope::default()
+  let dur = 40
+  inspect(approx(env.at(0, dur), 1.0, 0.000000001), content="true")
+  inspect(approx(env.at(20, dur), 1.0, 0.000000001), content="true")
+  inspect(approx(env.at(40, dur), 1.0, 0.000000001), content="true")
+}
+
+///|
+test "replay matches upstream checkpoints" {
+  let replay = { after: 10, play_for: 50, with_delay: 20 }
+  inspect(approx(replay.at(0), 1.0, 0.000000001), content="true")
+  inspect(approx(replay.at(9), 1.0, 0.000000001), content="true")
+  inspect(approx(replay.at(10), 1.0, 0.000000001), content="true")
+  inspect(approx(replay.at(30), 1.0, 0.000000001), content="true")
+  inspect(approx(replay.at(59), 0.0, 0.000000001), content="true")
+  inspect(approx(replay.at(60), 0.0, 0.000000001), content="true")
+  inspect(approx(replay.at(70), 0.0, 0.000000001), content="true")
+}

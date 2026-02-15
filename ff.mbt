@@ -21,6 +21,57 @@ suberror FfError {
 }
 
 ///|
+pub struct Envelope {
+  attack_length : Int
+  attack_level : Double
+  fade_length : Int
+  fade_level : Double
+}
+
+///|
+pub fn Envelope::default() -> Envelope {
+  { attack_length: 0, attack_level: 1.0, fade_length: 0, fade_level: 1.0 }
+}
+
+///|
+pub fn Envelope::at(self : Envelope, ticks : Int, dur : Int) -> Double {
+  if ticks < self.attack_length {
+    self.attack_level +
+    ticks.to_double() *
+    (1.0 - self.attack_level) /
+    self.attack_length.to_double()
+  } else if ticks + self.fade_length > dur {
+    1.0 +
+    (ticks + self.fade_length - dur).to_double() *
+    (self.fade_level - 1.0) /
+    self.fade_length.to_double()
+  } else {
+    1.0
+  }
+}
+
+///|
+pub struct Replay {
+  after : Int
+  play_for : Int
+  with_delay : Int
+}
+
+///|
+pub fn Replay::default() -> Replay {
+  { after: 0, play_for: 1, with_delay: 0 }
+}
+
+///|
+pub fn Replay::at(self : Replay, ticks : Int) -> Double {
+  if ticks >= self.play_for {
+    0.0
+  } else {
+    1.0
+  }
+}
+
+///|
 pub struct Effect {
   gilrs : Gilrs
   gamepads : Array[GamepadId]

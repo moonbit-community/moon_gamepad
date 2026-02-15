@@ -24,14 +24,16 @@ static void uuid_simple_from_ids(uint16_t bustype, uint16_t vendor, uint16_t pro
                                  char out33[33]) {
   uint8_t b[16];
   memset(b, 0, sizeof(b));
+  // Match gilrs SDL UUID packing:
+  // [bustype(u32 le), vendor(u16 le), 0,0, product(u16 le), 0,0, version(u16 le), 0,0]
   b[0] = (uint8_t)(bustype & 0xFF);
   b[1] = (uint8_t)((bustype >> 8) & 0xFF);
-  b[2] = (uint8_t)(vendor & 0xFF);
-  b[3] = (uint8_t)((vendor >> 8) & 0xFF);
-  b[4] = (uint8_t)(product & 0xFF);
-  b[5] = (uint8_t)((product >> 8) & 0xFF);
-  b[6] = (uint8_t)(version & 0xFF);
-  b[7] = (uint8_t)((version >> 8) & 0xFF);
+  b[4] = (uint8_t)(vendor & 0xFF);
+  b[5] = (uint8_t)((vendor >> 8) & 0xFF);
+  b[8] = (uint8_t)(product & 0xFF);
+  b[9] = (uint8_t)((product >> 8) & 0xFF);
+  b[12] = (uint8_t)(version & 0xFF);
+  b[13] = (uint8_t)((version >> 8) & 0xFF);
   bytes_to_hex32(b, out33);
 }
 
@@ -2026,6 +2028,21 @@ void *moon_gamepad_backend_new(void) {
 
 void *moon_gamepad_backend_new_null_for_test(void) {
   return NULL;
+}
+
+moonbit_string_t moon_gamepad_uuid_simple_from_ids(
+    int32_t bustype,
+    int32_t vendor,
+    int32_t product,
+    int32_t version) {
+  char out33[33];
+  uuid_simple_from_ids(
+      (uint16_t)bustype,
+      (uint16_t)vendor,
+      (uint16_t)product,
+      (uint16_t)version,
+      out33);
+  return moonbit_string_from_utf8_lossy(out33);
 }
 
 static moon_gamepad_backend_t *backend_of(void *owner) {
