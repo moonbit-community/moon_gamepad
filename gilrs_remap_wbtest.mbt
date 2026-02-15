@@ -201,21 +201,36 @@ test "native remap: axis-to-button threshold edges are inclusive" {
 }
 
 ///|
-test "native connected on existing id should not reset custom mapping" {
+test "native connected on existing id resets state and rebuilds mapping" {
   let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.apply_identity_mapping(0)
+
   let custom = Mapping::new()
   custom.insert(BTN_SOUTH, AxisOrBtn::Btn(Button::West))
   g.gamepads_data[0].mapping = custom
+
+  g.update(
+    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 1L),
+  )
+  inspect(g.gamepads_data[0].state.is_pressed(BTN_SOUTH), content="true")
+
   g.push_native_event({
     tag: NativeEventTag::Connected,
     id: 0,
     code: 0,
     value: 0.0,
-    time_ms: 1L,
+    time_ms: 2L,
   })
-  let preserved = match g.gamepads_data[0].mapping.map(BTN_SOUTH) {
-    Some(AxisOrBtn::Btn(Button::West)) => true
+
+  let _ = g.next_event()
+
+  inspect(g.gamepads_data[0].state.is_pressed(BTN_SOUTH), content="false")
+  let remapped = match g.gamepads_data[0].mapping.map(BTN_SOUTH) {
+    Some(AxisOrBtn::Btn(Button::South)) => true
     _ => false
   }
-  inspect(preserved, content="true")
+  inspect(remapped, content="true")
 }

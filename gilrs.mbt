@@ -226,6 +226,74 @@ fn find_axis_info(infos : Array[(Code, AxisInfo)], code : Code) -> AxisInfo? {
 }
 
 ///|
+fn Gilrs::refresh_gamepad_data_on_connected(
+  self : Gilrs,
+  id : Int,
+  existed_before : Bool,
+) -> Unit {
+  if id < 0 || id >= self.gamepads_data.length() {
+    return
+  }
+  let data = GamepadData::new()
+  data.connected = true
+
+  if existed_before {
+    let prev = self.gamepads_data[id]
+    data.name = prev.name
+    data.uuid = prev.uuid
+    data.vendor_id = prev.vendor_id
+    data.product_id = prev.product_id
+    data.ff_supported = prev.ff_supported
+    data.power_info = prev.power_info
+    data.axes = prev.axes
+    data.buttons = prev.buttons
+    data.axis_info = prev.axis_info
+  }
+
+  match self.backend {
+    None => ()
+    Some(b) => {
+      data.name = b.name(id)
+      let uuid_s = b.uuid_simple(id)
+      let uuid = Uuid::parse(uuid_s) catch { _ => Uuid::nil() }
+      data.uuid = uuid
+      data.vendor_id = b.vendor_id(id)
+      data.product_id = b.product_id(id)
+      data.ff_supported = b.is_ff_supported(id)
+      data.power_info = PowerInfo::Unknown
+      data.axes = b.axes(id)
+      data.buttons = b.buttons(id)
+      let infos : Array[(Code, AxisInfo)] = []
+      for c in data.axes {
+        match b.axis_info(id, c) {
+          None => ()
+          Some(info) => infos.push((c, info))
+        }
+      }
+      data.axis_info = infos
+    }
+  }
+
+  self.gamepads_data[id] = data
+  self.apply_identity_mapping(id)
+  let uuid = self.gamepads_data[id].uuid
+  match self.mappings.get(uuid) {
+    None => ()
+    Some(line) => {
+      let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+        line,
+        self.gamepads_data[id].buttons,
+        self.gamepads_data[id].axes,
+      )
+      match parsed {
+        Ok(m) => self.gamepads_data[id].mapping = m
+        Err(_) => ()
+      }
+    }
+  }
+}
+
+///|
 fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
   let id = ne.id
   let existed_before = id >= 0 && id < self.gamepads_data.length()
@@ -233,53 +301,7 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
   let gid = GamepadId::new(id)
   match ne.tag {
     NativeEventTag::Connected => {
-      self.set_connected(id, true)
-      if !existed_before {
-        match self.backend {
-          None => ()
-          Some(b) =>
-            if id >= 0 && id < self.gamepads_data.length() {
-              self.gamepads_data[id].name = b.name(id)
-              let uuid_s = b.uuid_simple(id)
-              let uuid = Uuid::parse(uuid_s) catch { _ => Uuid::nil() }
-              self.gamepads_data[id].uuid = uuid
-              self.gamepads_data[id].vendor_id = b.vendor_id(id)
-              self.gamepads_data[id].product_id = b.product_id(id)
-              self.gamepads_data[id].ff_supported = b.is_ff_supported(id)
-              self.gamepads_data[id].power_info = PowerInfo::Unknown
-              let axes = b.axes(id)
-              let buttons = b.buttons(id)
-              self.gamepads_data[id].axes = axes
-              self.gamepads_data[id].buttons = buttons
-              let infos : Array[(Code, AxisInfo)] = []
-              for c in self.gamepads_data[id].axes {
-                match b.axis_info(id, c) {
-                  None => ()
-                  Some(info) => infos.push((c, info))
-                }
-              }
-              self.gamepads_data[id].axis_info = infos
-            }
-        }
-        self.apply_identity_mapping(id)
-        if id >= 0 && id < self.gamepads_data.length() {
-          let uuid = self.gamepads_data[id].uuid
-          match self.mappings.get(uuid) {
-            None => ()
-            Some(line) => {
-              let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-                line,
-                self.gamepads_data[id].buttons,
-                self.gamepads_data[id].axes,
-              )
-              match parsed {
-                Ok(m) => self.gamepads_data[id].mapping = m
-                Err(_) => ()
-              }
-            }
-          }
-        }
-      }
+      self.refresh_gamepad_data_on_connected(id, existed_before)
       self.insert_event(Event::at(gid, EventType::Connected, ne.time_ms))
     }
     NativeEventTag::Disconnected => {
