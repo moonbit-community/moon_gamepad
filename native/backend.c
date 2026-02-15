@@ -503,6 +503,36 @@ static int mac_element_is_hat(IOHIDElementType type, uint32_t page, uint32_t usa
   return (page == 0x01) && (usage == 0x39 || usage == 0x3A);
 }
 
+static void mac_hat_to_xy_raw(int32_t hat_v, int32_t hat_min, int32_t hat_max, int32_t *x_raw, int32_t *y_raw) {
+  if (x_raw == NULL || y_raw == NULL) {
+    return;
+  }
+  int32_t range = hat_max - hat_min + 1;
+  int32_t shifted = hat_v - hat_min;
+  int32_t dpad_value = -1;
+  if (range == 4) {
+    dpad_value = shifted * 2;
+  } else if (range == 8) {
+    dpad_value = shifted;
+  }
+
+  if (dpad_value >= 5 && dpad_value <= 7) {
+    *x_raw = -1;
+  } else if (dpad_value >= 1 && dpad_value <= 3) {
+    *x_raw = 1;
+  } else {
+    *x_raw = 0;
+  }
+
+  if (dpad_value >= 3 && dpad_value <= 5) {
+    *y_raw = 1;
+  } else if (dpad_value == 0 || dpad_value == 1 || dpad_value == 7) {
+    *y_raw = -1;
+  } else {
+    *y_raw = 0;
+  }
+}
+
 static void mac_caps_clear(moon_gamepad_backend_t *b, uint32_t idx) {
   if (b == NULL || idx >= 32) {
     return;
@@ -944,36 +974,9 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
       int32_t hat_v = (int32_t)IOHIDValueGetIntegerValue(value);
       int32_t hat_min = (int32_t)IOHIDElementGetLogicalMin(el);
       int32_t hat_max = (int32_t)IOHIDElementGetLogicalMax(el);
-      int32_t range = hat_max - hat_min + 1;
-      int32_t shifted = hat_v - hat_min;
-      int32_t dpad_value;
-      if (range == 4) {
-        dpad_value = shifted * 2;
-      } else if (range == 8) {
-        dpad_value = shifted;
-      } else {
-        dpad_value = -1; // treat as centered/unknown
-      }
-
-      int32_t x_raw;
-      if (dpad_value >= 5 && dpad_value <= 7) {
-        x_raw = -1;
-      } else if (dpad_value >= 1 && dpad_value <= 3) {
-        x_raw = 1;
-      } else {
-        x_raw = 0;
-      }
-
-      // gilrs-core emits an inverted macOS axis here (down positive, up negative) and lets the Y
-      // inversion stage fix it.
-      int32_t y_raw;
-      if (dpad_value >= 3 && dpad_value <= 5) {
-        y_raw = 1; // down (pre-inversion)
-      } else if (dpad_value == 0 || dpad_value == 1 || dpad_value == 7) {
-        y_raw = -1; // up (pre-inversion)
-      } else {
-        y_raw = 0;
-      }
+      int32_t x_raw = 0;
+      int32_t y_raw = 0;
+      mac_hat_to_xy_raw(hat_v, hat_min, hat_max, &x_raw, &y_raw);
 
       double x = (double)x_raw;
       double y = (double)y_raw;
@@ -2043,6 +2046,15 @@ moonbit_string_t moon_gamepad_uuid_simple_from_ids(
       (uint16_t)version,
       out33);
   return moonbit_string_from_utf8_lossy(out33);
+}
+
+int32_t moon_gamepad_macos_hat_pack_for_test(int32_t hat_v, int32_t hat_min, int32_t hat_max) {
+  int32_t x_raw = 0;
+  int32_t y_raw = 0;
+  mac_hat_to_xy_raw(hat_v, hat_min, hat_max, &x_raw, &y_raw);
+  int32_t x_pack = (x_raw + 2) & 0x3;
+  int32_t y_pack = (y_raw + 2) & 0x3;
+  return x_pack | (y_pack << 2);
 }
 
 static moon_gamepad_backend_t *backend_of(void *owner) {
