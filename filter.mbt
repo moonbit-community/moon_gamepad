@@ -463,7 +463,8 @@ pub fn Repeat::filter(self : Repeat, ev : Event?, gilrs : Gilrs) -> Event? {
   match ev {
     Some(_) => ev
     None => {
-      let now = gilrs.time()
+      let now0 = gilrs.time()
+      let now = if now0 != 0L { now0 } else { runtime_now_ms() }
       for i in 0..<gilrs.gamepads_data.length() {
         if !gilrs.gamepads_data[i].connected {
           continue

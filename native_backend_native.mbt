@@ -38,6 +38,9 @@ extern "C" fn backend_gamepad_count(owner : BackendOwner) -> Int = "moon_gamepad
 extern "C" fn backend_next_event_bin(owner : BackendOwner) -> Bytes = "moon_gamepad_backend_next_event_bin"
 
 ///|
+extern "C" fn backend_now_ms() -> Int64 = "moon_gamepad_now_ms"
+
+///|
 #borrow(owner)
 extern "C" fn backend_name(owner : BackendOwner, id : Int) -> String = "moon_gamepad_backend_name"
 
@@ -115,6 +118,11 @@ pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
 pub fn NativeBackend::next_event(self : NativeBackend) -> NativeEvent? {
   let b = backend_next_event_bin(self.owner)
   decode_native_event(b)
+}
+
+///|
+pub fn runtime_now_ms() -> Int64 {
+  backend_now_ms()
 }
 
 ///|

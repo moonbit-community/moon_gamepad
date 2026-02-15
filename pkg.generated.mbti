@@ -166,6 +166,8 @@ pub fn hid_usage(Int) -> Int
 
 pub fn jitter(Event?, Gilrs, Double) -> Event?
 
+pub fn runtime_now_ms() -> Int64
+
 // Errors
 type FfError
 

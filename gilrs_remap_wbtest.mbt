@@ -25,6 +25,12 @@ fn ev_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
+extern "C" fn runtime_now_set_for_test(ms : Int64) -> Unit = "moon_gamepad_now_ms_set_for_test"
+
+///|
+extern "C" fn runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_clear_for_test"
+
+///|
 test "native remap: digital button emits edge then value" {
   let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
@@ -289,4 +295,38 @@ test "repeat filter scans connected ids only" {
     out.map(fn(e) { (e.id().value(), ev_sig(e)) }),
     content="Some((1, (3, 1, 0, 589826)))",
   )
+}
+
+///|
+test "repeat uses runtime clock fallback when logical clock is unset" {
+  runtime_now_set_for_test(650L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.apply_identity_mapping(0)
+  g.update(
+    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 100L),
+  )
+  g.set_time(0L)
+  let out = Repeat::new().filter(None, g)
+  runtime_now_clear_for_test()
+  inspect(out.map(ev_sig), content="Some((3, 0, 0, 589825))")
+}
+
+///|
+test "repeat prefers explicit logical clock over runtime clock" {
+  runtime_now_set_for_test(2000L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.apply_identity_mapping(0)
+  g.update(
+    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 100L),
+  )
+  g.set_time(500L)
+  let out = Repeat::new().filter(None, g)
+  runtime_now_clear_for_test()
+  inspect(out is None, content="true")
 }

@@ -45,6 +45,11 @@ pub fn NativeBackend::next_event(self : NativeBackend) -> NativeEvent? {
 }
 
 ///|
+pub fn runtime_now_ms() -> Int64 {
+  0L
+}
+
+///|
 pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
   let _ = self
   0

@@ -188,6 +188,8 @@ static int64_t now_ms(void) {
 #endif
 }
 
+static int64_t g_now_ms_override_for_test = -1;
+
 static void queue_push(moon_gamepad_queue_t *q, moon_gamepad_event_t ev) {
   if (q->buf == NULL || q->cap == 0) {
     return;
@@ -2046,6 +2048,21 @@ moonbit_string_t moon_gamepad_uuid_simple_from_ids(
       (uint16_t)version,
       out33);
   return moonbit_string_from_utf8_lossy(out33);
+}
+
+int64_t moon_gamepad_now_ms(void) {
+  if (g_now_ms_override_for_test >= 0) {
+    return g_now_ms_override_for_test;
+  }
+  return now_ms();
+}
+
+void moon_gamepad_now_ms_set_for_test(int64_t ms) {
+  g_now_ms_override_for_test = ms;
+}
+
+void moon_gamepad_now_ms_clear_for_test(void) {
+  g_now_ms_override_for_test = -1;
 }
 
 int32_t moon_gamepad_macos_hat_pack_for_test(int32_t hat_v, int32_t hat_min, int32_t hat_max) {
