@@ -465,6 +465,9 @@ pub fn Repeat::filter(self : Repeat, ev : Event?, gilrs : Gilrs) -> Event? {
     None => {
       let now = gilrs.time()
       for i in 0..<gilrs.gamepads_data.length() {
+        if !gilrs.gamepads_data[i].connected {
+          continue
+        }
         let id = GamepadId::new(i)
         match gilrs.state(id) {
           None => ()

@@ -18,6 +18,7 @@ fn ev_sig(e : Event) -> (Int, Int, Double, Int) {
     EventType::AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
     EventType::ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
     EventType::ButtonChanged(btn, val, code) => (2, btn.to_index(), val, code)
+    EventType::ButtonRepeated(btn, code) => (3, btn.to_index(), 0.0, code)
     EventType::ButtonReleased(btn, code) => (4, btn.to_index(), 0.0, code)
     _ => (99, 0, 0.0, 0)
   }
@@ -233,4 +234,59 @@ test "native connected on existing id resets state and rebuilds mapping" {
     _ => false
   }
   inspect(remapped, content="true")
+}
+
+///|
+test "repeat filter ignores disconnected gamepads" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.apply_identity_mapping(0)
+
+  g.update(
+    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
+  )
+  g.push_native_event({
+    tag: NativeEventTag::Disconnected,
+    id: 0,
+    code: 0,
+    value: 0.0,
+    time_ms: 1L,
+  })
+  g.set_time(500L)
+  let out = Repeat::new().filter(None, g)
+  inspect(out is None, content="true")
+}
+
+///|
+test "repeat filter scans connected ids only" {
+  let g = Gilrs::new_mock(2, update_state=false, default_filters=false)
+  let id0 = GamepadId::new(0)
+  let id1 = GamepadId::new(1)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.gamepads_data[1].buttons = [BTN_EAST]
+  g.gamepads_data[1].axes = []
+  g.apply_identity_mapping(0)
+  g.apply_identity_mapping(1)
+
+  g.update(
+    Event::at(id0, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
+  )
+  g.update(Event::at(id1, EventType::ButtonPressed(Button::East, BTN_EAST), 0L))
+  g.push_native_event({
+    tag: NativeEventTag::Disconnected,
+    id: 0,
+    code: 0,
+    value: 0.0,
+    time_ms: 1L,
+  })
+  g.set_time(500L)
+
+  let out = Repeat::new().filter(None, g)
+  inspect(
+    out.map(fn(e) { (e.id().value(), ev_sig(e)) }),
+    content="Some((1, (3, 1, 0, 589826)))",
+  )
 }
