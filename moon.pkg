@@ -6,12 +6,7 @@ import {
 } for "test"
 
 options(
-  link: {
-    "native": {
-      "cc": "./scripts/moon_cc.sh",
-      "cc-link-flags": "-framework IOKit -framework CoreFoundation",
-    },
-  },
+  link: { "native": { "stub-cc-flags": "${build.GAMEPAD_STUB_CC_FLAGS}" } },
   "native-stub": [ "native/backend.c" ],
   targets: {
     "native_backend_native.mbt": [ "native" ],
