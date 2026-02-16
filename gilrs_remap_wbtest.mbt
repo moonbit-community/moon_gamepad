@@ -500,3 +500,15 @@ test "mapping_source reports SdlMappings for parsed SDL mapping" {
   }
   inspect(ok, content="true")
 }
+
+///|
+test "mapping_source reports Unmapped for invalid gamepad handle" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let ghost : Gamepad = { gilrs: g, id: GamepadId::new(99) }
+  let source = ghost.mapping_source()
+  let ok = match source {
+    MappingSource::Unmapped => true
+    _ => false
+  }
+  inspect(ok, content="true")
+}
