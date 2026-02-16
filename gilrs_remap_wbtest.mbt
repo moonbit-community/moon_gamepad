@@ -512,3 +512,47 @@ test "mapping_source reports Unmapped for invalid gamepad handle" {
   }
   inspect(ok, content="true")
 }
+
+///|
+test "builder set_axis_to_btn wires thresholds into gilrs" {
+  let g = GilrsBuilder::new()
+    .with_mock_gamepad_count(1)
+    .with_default_filters(false)
+    .set_axis_to_btn(0.5, 0.4)
+    .build()
+  inspect(g.axis_to_btn_pressed, content="0.5")
+  inspect(g.axis_to_btn_released, content="0.4")
+}
+
+///|
+test "builder set_axis_to_btn affects axis-to-button press edge" {
+  let g = GilrsBuilder::new()
+    .with_mock_gamepad_count(1)
+    .with_default_filters(false)
+    .set_axis_to_btn(0.5, 0.4)
+    .build()
+  g.gamepads_data[0].buttons = []
+  g.gamepads_data[0].axes = [AXIS_LT2]
+  g.gamepads_data[0].axis_info = [(AXIS_LT2, AxisInfo::new(0, 100, None))]
+  g.apply_identity_mapping(0)
+
+  g.push_native_event({
+    tag: NativeEventTag::AxisChanged,
+    id: 0,
+    code: AXIS_LT2,
+    value: 50.0,
+    time_ms: 1L,
+  })
+  let e1 = match g.next_event() {
+    None => return
+    Some(e) => e
+  }
+  let e2 = match g.next_event() {
+    None => return
+    Some(e) => e
+  }
+  inspect(
+    [ev_sig(e1), ev_sig(e2)],
+    content="[(1, 8, 1, 131269), (2, 8, 0.5, 131269)]",
+  )
+}

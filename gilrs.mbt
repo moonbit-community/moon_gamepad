@@ -788,6 +788,8 @@ pub fn Gilrs::deadzone(self : Gilrs, id : GamepadId, code : Code) -> Double? {
 pub struct GilrsBuilder {
   mut update_state : Bool
   mut default_filters : Bool
+  mut axis_to_btn_pressed : Double
+  mut axis_to_btn_released : Double
   mut mock_gamepad_count : Int
   mut use_native_backend : Bool
   mapping_inputs : Array[String]
@@ -798,6 +800,8 @@ pub fn GilrsBuilder::new() -> GilrsBuilder {
   {
     update_state: true,
     default_filters: true,
+    axis_to_btn_pressed: 0.75,
+    axis_to_btn_released: 0.65,
     mock_gamepad_count: 0,
     use_native_backend: false,
     mapping_inputs: [],
@@ -850,6 +854,17 @@ pub fn GilrsBuilder::add_mappings(
 }
 
 ///|
+pub fn GilrsBuilder::set_axis_to_btn(
+  self : GilrsBuilder,
+  pressed : Double,
+  released : Double,
+) -> GilrsBuilder {
+  self.axis_to_btn_pressed = pressed
+  self.axis_to_btn_released = released
+  self
+}
+
+///|
 pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
   let gilrs = if self.use_native_backend {
     Gilrs::new_native(
@@ -866,6 +881,8 @@ pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
   for s in self.mapping_inputs {
     gilrs.load_mappings(s)
   }
+  gilrs.axis_to_btn_pressed = self.axis_to_btn_pressed
+  gilrs.axis_to_btn_released = self.axis_to_btn_released
   gilrs
 }
 

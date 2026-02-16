@@ -442,6 +442,8 @@ pub fn Gilrs::with_default_filters(Self, Bool) -> Self
 pub struct GilrsBuilder {
   mut update_state : Bool
   mut default_filters : Bool
+  mut axis_to_btn_pressed : Double
+  mut axis_to_btn_released : Double
   mut mock_gamepad_count : Int
   mut use_native_backend : Bool
   mapping_inputs : Array[String]
@@ -449,6 +451,7 @@ pub struct GilrsBuilder {
 pub fn GilrsBuilder::add_mappings(Self, String) -> Self
 pub fn GilrsBuilder::build(Self) -> Gilrs
 pub fn GilrsBuilder::new() -> Self
+pub fn GilrsBuilder::set_axis_to_btn(Self, Double, Double) -> Self
 pub fn GilrsBuilder::set_update_state(Self, Bool) -> Self
 pub fn GilrsBuilder::with_default_filters(Self, Bool) -> Self
 pub fn GilrsBuilder::with_mock_gamepad_count(Self, Int) -> Self
