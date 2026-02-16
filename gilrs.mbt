@@ -798,9 +798,6 @@ pub struct GilrsBuilder {
 }
 
 ///|
-const INCLUDED_MAPPINGS : String = "030000005e0400008e02000002010000,Xbox 360 Controller,a:b0,b:b1,back:b6,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,leftshoulder:b4,leftstick:b9,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:a5,rightx:a3,righty:a4,start:b7,x:b2,y:b3,"
-
-///|
 pub fn GilrsBuilder::new() -> GilrsBuilder {
   {
     update_state: true,
@@ -907,13 +904,10 @@ pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
     gilrs.load_mappings(s)
   }
   if self.included_mappings {
-    gilrs.load_mappings(INCLUDED_MAPPINGS)
+    gilrs.mappings.add_included_mappings()
   }
   if self.env_mappings {
-    let env = runtime_env_sdl_gamecontrollerconfig()
-    if env.length() != 0 {
-      gilrs.load_mappings(env)
-    }
+    gilrs.mappings.add_env_mappings()
   }
   gilrs.axis_to_btn_pressed = self.axis_to_btn_pressed
   gilrs.axis_to_btn_released = self.axis_to_btn_released

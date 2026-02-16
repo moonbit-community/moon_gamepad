@@ -596,8 +596,36 @@ pub struct MappingDb {
 }
 
 ///|
+const INCLUDED_MAPPINGS : String = "030000005e0400008e02000002010000,Xbox 360 Controller,a:b0,b:b1,back:b6,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,leftshoulder:b4,leftstick:b9,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:a5,rightx:a3,righty:a4,start:b7,x:b2,y:b3,"
+
+///|
 pub fn MappingDb::new() -> MappingDb {
   { mappings: [] }
+}
+
+///|
+fn index_of_substring(s : String, pat : String) -> Int? {
+  let n = s.length()
+  let m = pat.length()
+  if m == 0 {
+    return Some(0)
+  }
+  if n < m {
+    return None
+  }
+  for i in 0..<(n - m + 1) {
+    let mut ok = true
+    for j in 0..<m {
+      if s.code_unit_at(i + j) != pat.code_unit_at(j) {
+        ok = false
+        break
+      }
+    }
+    if ok {
+      return Some(i)
+    }
+  }
+  None
 }
 
 ///|
@@ -608,6 +636,34 @@ fn find_first_comma(s : String) -> Int? {
     }
   }
   None
+}
+
+///|
+fn mapping_line_platform(line : String) -> String? {
+  match index_of_substring(line, "platform:") {
+    None => None
+    Some(idx) => {
+      let start = idx + "platform:".length()
+      if start >= line.length() {
+        return Some("")
+      }
+      let tail = (try! line[start:line.length()]).to_string()
+      let end = match find_first_comma(tail) {
+        None => tail.length()
+        Some(i) => i
+      }
+      Some((try! tail[0:end]).to_string())
+    }
+  }
+}
+
+///|
+fn mapping_line_matches_platform(line : String) -> Bool {
+  let current = runtime_sdl_platform_name()
+  match mapping_line_platform(line) {
+    None => true
+    Some(p) => p == current
+  }
 }
 
 ///|
@@ -629,6 +685,9 @@ pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
     if line.length() == 0 {
       continue
     }
+    if !mapping_line_matches_platform(line) {
+      continue
+    }
     match find_first_comma(line) {
       None => continue
       Some(i) => {
@@ -641,6 +700,19 @@ pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
         }
       }
     }
+  }
+}
+
+///|
+pub fn MappingDb::add_included_mappings(self : MappingDb) -> Unit {
+  self.insert(INCLUDED_MAPPINGS)
+}
+
+///|
+pub fn MappingDb::add_env_mappings(self : MappingDb) -> Unit {
+  let env = runtime_env_sdl_gamecontrollerconfig()
+  if env.length() != 0 {
+    self.insert(env)
   }
 }
 

@@ -55,6 +55,11 @@ pub fn runtime_env_sdl_gamecontrollerconfig() -> String {
 }
 
 ///|
+pub fn runtime_sdl_platform_name() -> String {
+  ""
+}
+
+///|
 pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
   let _ = self
   0

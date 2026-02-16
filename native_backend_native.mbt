@@ -44,6 +44,9 @@ extern "C" fn backend_now_ms() -> Int64 = "moon_gamepad_now_ms"
 extern "C" fn backend_env_sdl_gamecontrollerconfig() -> String = "moon_gamepad_env_sdl_gamecontrollerconfig"
 
 ///|
+extern "C" fn backend_sdl_platform_name() -> String = "moon_gamepad_sdl_platform_name"
+
+///|
 #borrow(owner)
 extern "C" fn backend_name(owner : BackendOwner, id : Int) -> String = "moon_gamepad_backend_name"
 
@@ -131,6 +134,11 @@ pub fn runtime_now_ms() -> Int64 {
 ///|
 pub fn runtime_env_sdl_gamecontrollerconfig() -> String {
   backend_env_sdl_gamecontrollerconfig()
+}
+
+///|
+pub fn runtime_sdl_platform_name() -> String {
+  backend_sdl_platform_name()
 }
 
 ///|

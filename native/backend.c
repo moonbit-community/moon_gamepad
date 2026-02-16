@@ -2085,6 +2085,18 @@ moonbit_string_t moon_gamepad_env_sdl_gamecontrollerconfig(void) {
   return moonbit_string_from_utf8_lossy(getenv("SDL_GAMECONTROLLERCONFIG"));
 }
 
+moonbit_string_t moon_gamepad_sdl_platform_name(void) {
+#if defined(__APPLE__)
+  return moonbit_string_from_utf8_lossy("Mac OS X");
+#elif defined(__linux__)
+  return moonbit_string_from_utf8_lossy("Linux");
+#elif defined(_WIN32)
+  return moonbit_string_from_utf8_lossy("Windows");
+#else
+  return moonbit_string_from_utf8_lossy("");
+#endif
+}
+
 void moon_gamepad_set_sdl_gamecontrollerconfig_for_test(moonbit_string_t value) {
   char *v = moonbit_string_to_ascii_cstr(value);
   if (v == NULL) {

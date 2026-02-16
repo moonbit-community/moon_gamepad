@@ -16,6 +16,13 @@
 const TEST_STR : String = "03000000260900008888000000010001,GameCube {WiseGroup USB box},a:b0,b:b2,y:b3,x:b1,start:b7,rightshoulder:b6,dpup:h0.1,dpleft:h0.8,dpdown:h0.4,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a4,righttrigger:a5,"
 
 ///|
+#borrow(s)
+extern "C" fn runtime_set_sdl_gamecontrollerconfig_for_test(s : String) -> Unit = "moon_gamepad_set_sdl_gamecontrollerconfig_for_test"
+
+///|
+extern "C" fn runtime_clear_sdl_gamecontrollerconfig_for_test() -> Unit = "moon_gamepad_clear_sdl_gamecontrollerconfig_for_test"
+
+///|
 let buttons : Array[Code] = [
   BTN_SOUTH,
   BTN_EAST,
@@ -252,4 +259,40 @@ test "parse_sdl_mapping invalid guid maps to InvalidGuid" {
     Err(_) => is_err = true
   }
   inspect(is_err, content="true")
+}
+
+///|
+test "mapping_db insert respects platform tag" {
+  let db = MappingDb::new()
+  let platform = runtime_sdl_platform_name()
+  let other = if platform == "Mac OS X" { "Linux" } else { "Mac OS X" }
+  let uuid = "22222222222222222222222222222222"
+  let non_match = uuid + ",Wrong,a:b0,platform:" + other + ","
+  let yes_match = uuid + ",Right,a:b0,platform:" + platform + ","
+  db.insert(non_match + "\n" + yes_match)
+  inspect(db.get(Uuid::parse(uuid)) == Some(yes_match), content="true")
+}
+
+///|
+test "mapping_db add_env_mappings reads SDL_GAMECONTROLLERCONFIG" {
+  runtime_set_sdl_gamecontrollerconfig_for_test(
+    "33333333333333333333333333333333,Env Mapping,a:b0,",
+  )
+  let db = MappingDb::new()
+  db.add_env_mappings()
+  inspect(
+    db.get(Uuid::parse("33333333333333333333333333333333")) is Some(_),
+    content="true",
+  )
+  runtime_clear_sdl_gamecontrollerconfig_for_test()
+}
+
+///|
+test "mapping_db add_included_mappings loads bundled mapping" {
+  let db = MappingDb::new()
+  db.add_included_mappings()
+  inspect(
+    db.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
+    content="true",
+  )
 }

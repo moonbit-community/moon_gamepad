@@ -170,6 +170,8 @@ pub fn runtime_env_sdl_gamecontrollerconfig() -> String
 
 pub fn runtime_now_ms() -> Int64
 
+pub fn runtime_sdl_platform_name() -> String
+
 // Errors
 type FfError
 
@@ -503,6 +505,8 @@ pub fn MappingData::remove_button(Self, Button) -> Int?
 pub struct MappingDb {
   mappings : Array[(Uuid, String)]
 }
+pub fn MappingDb::add_env_mappings(Self) -> Unit
+pub fn MappingDb::add_included_mappings(Self) -> Unit
 pub fn MappingDb::get(Self, Uuid) -> String?
 pub fn MappingDb::insert(Self, String) -> Unit
 pub fn MappingDb::len(Self) -> Int
