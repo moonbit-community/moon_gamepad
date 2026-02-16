@@ -644,6 +644,51 @@ pub fn Gilrs::is_connected(self : Gilrs, id : GamepadId) -> Bool {
 }
 
 ///|
+pub fn Gilrs::set_mapping_data(
+  self : Gilrs,
+  id : GamepadId,
+  mapping_data : MappingData,
+  name? : String? = None,
+) -> String raise MappingError {
+  let i = id.value()
+  if i < 0 || i >= self.gamepads_data.length() {
+    raise MappingError::NotConnected
+  }
+  if !self.gamepads_data[i].connected {
+    raise MappingError::NotConnected
+  }
+  let mapping_name = match name {
+    Some(s) => s
+    None => self.gamepads_data[i].name
+  }
+  let (mapping, sdl_line) = Mapping::from_data(
+    mapping_data,
+    self.gamepads_data[i].buttons,
+    self.gamepads_data[i].axes,
+    mapping_name,
+    self.gamepads_data[i].uuid,
+  )
+  self.gamepads_data[i].mapping = mapping
+  sdl_line
+}
+
+///|
+pub fn Gilrs::set_mapping_data_strict(
+  self : Gilrs,
+  id : GamepadId,
+  mapping_data : MappingData,
+  name? : String? = None,
+) -> String raise MappingError {
+  if mapping_data.button(Button::C) is Some(_) ||
+    mapping_data.button(Button::Z) is Some(_) ||
+    mapping_data.axis(Axis::LeftZ) is Some(_) ||
+    mapping_data.axis(Axis::RightZ) is Some(_) {
+    raise MappingError::NotSdl2Compatible
+  }
+  self.set_mapping_data(id, mapping_data, name~)
+}
+
+///|
 pub fn Gilrs::set_mapping(
   self : Gilrs,
   id : GamepadId,

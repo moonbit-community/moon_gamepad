@@ -424,6 +424,8 @@ pub fn Gilrs::reset_counter(Self) -> Unit
 pub fn Gilrs::set_axis_to_btn(Self, Double, Double) -> Unit raise GilrsError
 pub fn Gilrs::set_deadzone(Self, GamepadId, Int, Double) -> Unit
 pub fn Gilrs::set_mapping(Self, GamepadId, Mapping) -> Unit
+pub fn Gilrs::set_mapping_data(Self, GamepadId, MappingData, name? : String?) -> String raise MappingError
+pub fn Gilrs::set_mapping_data_strict(Self, GamepadId, MappingData, name? : String?) -> String raise MappingError
 pub fn Gilrs::set_time(Self, Int64) -> Unit
 pub fn Gilrs::state(Self, GamepadId) -> GamepadState?
 pub fn Gilrs::time(Self) -> Int64

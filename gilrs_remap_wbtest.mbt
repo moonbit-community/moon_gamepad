@@ -330,3 +330,64 @@ test "repeat prefers explicit logical clock over runtime clock" {
   runtime_now_clear_for_test()
   inspect(out is None, content="true")
 }
+
+///|
+test "set_mapping_data updates mapping and returns SDL line" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = [AXIS_LSTICKX]
+  g.gamepads_data[0].name = "Mock Pad"
+
+  let data = MappingData::new()
+  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  let s = g.set_mapping_data(id, data, name=Some("Custom Pad"))
+
+  let mapped_ok = match g.mapping(id).unwrap().map(BTN_SOUTH) {
+    Some(AxisOrBtn::Btn(Button::South)) => true
+    _ => false
+  }
+  inspect(mapped_ok, content="true")
+  inspect(s.contains(",Custom Pad,"), content="true")
+}
+
+///|
+test "set_mapping_data returns NotConnected for disconnected gamepad" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.push_native_event({
+    tag: NativeEventTag::Disconnected,
+    id: 0,
+    code: 0,
+    value: 0.0,
+    time_ms: 1L,
+  })
+
+  let data = MappingData::new()
+  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  let res : Result[String, MappingError] = try? g.set_mapping_data(id, data)
+  let ok = match res {
+    Err(MappingError::NotConnected) => true
+    _ => false
+  }
+  inspect(ok, content="true")
+}
+
+///|
+test "set_mapping_data_strict rejects SDL-incompatible entries" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_C]
+  g.gamepads_data[0].axes = []
+
+  let data = MappingData::new()
+  ignore(data.insert_btn(BTN_C, Button::C))
+  let res : Result[String, MappingError] = try? g.set_mapping_data_strict(
+    id, data,
+  )
+  let ok = match res {
+    Err(MappingError::NotSdl2Compatible) => true
+    _ => false
+  }
+  inspect(ok, content="true")
+}
