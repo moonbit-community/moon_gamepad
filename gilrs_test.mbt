@@ -187,6 +187,14 @@ test "gamepad power_info default is Unknown (mock)" {
 }
 
 ///|
+test "gamepad is_ff_supported default is false (mock)" {
+  let g = Gilrs::new_mock(1)
+  let id = GamepadId::new(0)
+  let supported = g.gamepad(id).map(fn(gp) { gp.is_ff_supported() })
+  inspect(supported, content="Some(false)")
+}
+
+///|
 test "gilrs keeps historical disconnected ids after reconnect-style sequence" {
   let g = Gilrs::new_mock(2)
   let id0 = GamepadId::new(0)

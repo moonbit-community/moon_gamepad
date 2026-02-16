@@ -153,6 +153,22 @@ test "finish returns Disconnected for not connected gamepad" {
 }
 
 ///|
+test "finish returns FfNotSupported when gamepad has no ff capability" {
+  let g = new_ff_ready_mock(1)
+  g.gamepads_data[0].ff_supported = false
+  let er : Result[Effect, FfError] = try? EffectBuilder::new()
+    .add_gamepad_id(GamepadId::new(0))
+    .finish(g)
+  inspect(
+    match er {
+      Err(FfError::FfNotSupported(_)) => true
+      _ => false
+    },
+    content="true",
+  )
+}
+
+///|
 test "duration conversion branches" {
   inspect(to_duration_int(-1L), content="0")
   inspect(to_duration_int(123L), content="123")

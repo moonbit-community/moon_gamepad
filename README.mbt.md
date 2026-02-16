@@ -19,8 +19,8 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
   - [x] Buttons + axes events
   - [x] Device identity (`name`, `uuid`, `vendor_id`, `product_id`)
   - [x] SDL mapping DB lookup on connect (full mapping)
-  - [ ] Force feedback (upstream gilrs-core macOS reports unsupported)
-  - [ ] Power info (currently always `Unknown`)
+  - [x] Force feedback parity (`is_ff_supported == false`; effect APIs return unsupported errors)
+  - [x] Power info parity (`PowerInfo::Unknown`, matching gilrs-core macOS)
 - Linux (native / evdev) *(planned to harden later)*
   - [x] Enumeration + hotplug events (best-effort)
   - [x] Basic rumble (`FF_RUMBLE`) when device can be opened read-write
@@ -33,7 +33,7 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
 
 - `Code` is backend-specific. On macOS it matches gilrs-core's HID `EvCode` encoding: `(usage_page << 16) | usage`.
 - On macOS, some HID axes (e.g. GenericDesktop `Rx`/`Ry`) are intentionally left **unmapped** to `Axis` by default (matching gilrs-core's "unconfirmed" constants). Use the SDL mapping DB to get semantic axis/button names for these codes.
-- `PowerInfo` is exposed but currently defaults to `Unknown` on native backends.
+- On macOS, `PowerInfo` is intentionally `Unknown` (parity with upstream `gilrs-core`).
 
 ## Quickstart (native)
 
