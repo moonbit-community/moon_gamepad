@@ -876,6 +876,14 @@ pub fn Gilrs::gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
 }
 
 ///|
+pub fn Gilrs::connected_gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
+  match self.gamepad(id) {
+    None => None
+    Some(gp) => if gp.is_connected() { Some(gp) } else { None }
+  }
+}
+
+///|
 pub fn Gilrs::gamepads(self : Gilrs) -> Array[(GamepadId, Gamepad)] {
   let out : Array[(GamepadId, Gamepad)] = []
   for i in 0..<self.gamepads_data.length() {
@@ -911,6 +919,24 @@ pub fn Gamepad::name(self : Gamepad) -> String {
   match self.gilrs.mapping(self.id) {
     None => ""
     Some(m) => m.name()
+  }
+}
+
+///|
+pub fn Gamepad::map_name(self : Gamepad) -> String? {
+  match self.mapping() {
+    None => None
+    Some(m) =>
+      if m.is_default() {
+        None
+      } else {
+        let n = m.name()
+        if n.length() == 0 {
+          None
+        } else {
+          Some(n)
+        }
+      }
   }
 }
 

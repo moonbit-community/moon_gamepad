@@ -391,3 +391,40 @@ test "set_mapping_data_strict rejects SDL-incompatible entries" {
   }
   inspect(ok, content="true")
 }
+
+///|
+test "connected_gamepad returns None after disconnect while gamepad still exists" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  inspect(g.connected_gamepad(id) is Some(_), content="true")
+  g.push_native_event({
+    tag: NativeEventTag::Disconnected,
+    id: 0,
+    code: 0,
+    value: 0.0,
+    time_ms: 1L,
+  })
+  inspect(g.connected_gamepad(id) is None, content="true")
+  inspect(g.gamepad(id) is Some(_), content="true")
+}
+
+///|
+test "gamepad map_name follows mapping default/name semantics" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+
+  // Unnamed default mapping => None
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.apply_identity_mapping(0)
+  let n0 = g.gamepad(id).unwrap().map_name()
+  inspect(n0, content="None")
+
+  // Non-default mapping with custom name => Some(name)
+  g.gamepads_data[0].name = "Mock Pad"
+  let data = MappingData::new()
+  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  ignore(g.set_mapping_data(id, data, name=Some("Named Mapping")))
+  let n1 = g.gamepad(id).unwrap().map_name()
+  inspect(n1, content="Some(\"Named Mapping\")")
+}
