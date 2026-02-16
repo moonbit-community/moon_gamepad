@@ -346,6 +346,7 @@ pub fn Gamepad::is_ff_supported(Self) -> Bool
 pub fn Gamepad::is_pressed(Self, Int) -> Bool
 pub fn Gamepad::map_name(Self) -> String?
 pub fn Gamepad::mapping(Self) -> Mapping?
+pub fn Gamepad::mapping_source(Self) -> MappingSource
 pub fn Gamepad::name(Self) -> String
 pub fn Gamepad::power_info(Self) -> PowerInfo
 pub fn Gamepad::product_id(Self) -> Int?
@@ -494,6 +495,12 @@ pub fn MappingDb::get(Self, Uuid) -> String?
 pub fn MappingDb::insert(Self, String) -> Unit
 pub fn MappingDb::len(Self) -> Int
 pub fn MappingDb::new() -> Self
+
+pub enum MappingSource {
+  SdlMappings
+  Driver
+  Unmapped
+}
 
 pub struct NativeBackend {
   owner : BackendOwner

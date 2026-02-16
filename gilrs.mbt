@@ -881,6 +881,16 @@ pub struct Gamepad {
 }
 
 ///|
+pub enum MappingSource {
+  SdlMappings
+  Driver
+  Unmapped
+}
+
+///|
+let _mapping_source_keepalive : Array[MappingSource] = [MappingSource::Unmapped]
+
+///|
 pub fn Gilrs::gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
@@ -952,6 +962,19 @@ pub fn Gamepad::map_name(self : Gamepad) -> String? {
           Some(n)
         }
       }
+  }
+}
+
+///|
+pub fn Gamepad::mapping_source(self : Gamepad) -> MappingSource {
+  match self.mapping() {
+    Some(m) =>
+      if m.is_default() {
+        MappingSource::Driver
+      } else {
+        MappingSource::SdlMappings
+      }
+    None => MappingSource::Unmapped
   }
 }
 

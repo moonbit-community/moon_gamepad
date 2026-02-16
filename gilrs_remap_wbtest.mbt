@@ -467,3 +467,36 @@ test "builder add_mappings participates in connected remap" {
   }
   inspect(mapped, content="true")
 }
+
+///|
+test "mapping_source reports Driver for default mapping" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.apply_identity_mapping(0)
+  let source = g.gamepad(id).unwrap().mapping_source()
+  let ok = match source {
+    MappingSource::Driver => true
+    _ => false
+  }
+  inspect(ok, content="true")
+}
+
+///|
+test "mapping_source reports SdlMappings for parsed SDL mapping" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+  g.gamepads_data[0].name = "Mock Pad"
+  let data = MappingData::new()
+  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  ignore(g.set_mapping_data(id, data, name=Some("Mapped Pad")))
+  let source = g.gamepad(id).unwrap().mapping_source()
+  let ok = match source {
+    MappingSource::SdlMappings => true
+    _ => false
+  }
+  inspect(ok, content="true")
+}
