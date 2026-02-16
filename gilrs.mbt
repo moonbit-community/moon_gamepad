@@ -933,17 +933,9 @@ pub fn Gamepad::is_connected(self : Gamepad) -> Bool {
 
 ///|
 pub fn Gamepad::name(self : Gamepad) -> String {
-  let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
-    return ""
-  }
-  let n = self.gilrs.gamepads_data[i].name
-  if n.length() != 0 {
-    return n
-  }
-  match self.gilrs.mapping(self.id) {
-    None => ""
-    Some(m) => m.name()
+  match self.map_name() {
+    Some(map_name) => map_name
+    None => self.os_name()
   }
 }
 
@@ -951,17 +943,17 @@ pub fn Gamepad::name(self : Gamepad) -> String {
 pub fn Gamepad::map_name(self : Gamepad) -> String? {
   match self.mapping() {
     None => None
-    Some(m) =>
-      if m.is_default() {
-        None
-      } else {
-        let n = m.name()
-        if n.length() == 0 {
-          None
-        } else {
-          Some(n)
-        }
-      }
+    Some(m) => if m.is_default() { None } else { Some(m.name()) }
+  }
+}
+
+///|
+pub fn Gamepad::os_name(self : Gamepad) -> String {
+  let i = self.id.value()
+  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+    ""
+  } else {
+    self.gilrs.gamepads_data[i].name
   }
 }
 
@@ -1062,13 +1054,35 @@ pub fn Gamepad::state(self : Gamepad) -> GamepadState {
 }
 
 ///|
-pub fn Gamepad::is_pressed(self : Gamepad, code : Code) -> Bool {
-  self.state().is_pressed(code)
+pub fn Gamepad::is_pressed(self : Gamepad, btn : Button) -> Bool {
+  match self.button_code(btn) {
+    None => false
+    Some(code) => self.state().is_pressed(code)
+  }
 }
 
 ///|
-pub fn Gamepad::value(self : Gamepad, code : Code) -> Double {
-  self.state().value(code)
+pub fn Gamepad::value(self : Gamepad, axis : Axis) -> Double {
+  match self.axis_code(axis) {
+    None => 0.0
+    Some(code) => self.state().value(code)
+  }
+}
+
+///|
+pub fn Gamepad::button_data(self : Gamepad, btn : Button) -> ButtonData? {
+  match self.button_code(btn) {
+    None => None
+    Some(code) => self.state().button_data(code)
+  }
+}
+
+///|
+pub fn Gamepad::axis_data(self : Gamepad, axis : Axis) -> AxisData? {
+  match self.axis_code(axis) {
+    None => None
+    Some(code) => self.state().axis_data(code)
+  }
 }
 
 ///|

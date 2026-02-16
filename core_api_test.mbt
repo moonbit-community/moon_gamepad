@@ -79,6 +79,7 @@ test "gamepad handle delegates mapping/state" {
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.insert(BTN_SOUTH, AxisOrBtn::Btn(Button::South))
+  m.insert(AXIS_LSTICKX, AxisOrBtn::Axis(Axis::LeftStickX))
   g.set_mapping(id, m)
   let gp = g.gamepad(id).unwrap()
   let ok = match gp.axis_or_btn_name(BTN_SOUTH) {
@@ -89,5 +90,39 @@ test "gamepad handle delegates mapping/state" {
   g.update(
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
   )
-  inspect(g.gamepad(id).unwrap().is_pressed(BTN_SOUTH), content="true")
+  g.update(
+    Event::at(
+      id,
+      EventType::AxisChanged(Axis::LeftStickX, 0.25, AXIS_LSTICKX),
+      1L,
+    ),
+  )
+  let gp2 = g.gamepad(id).unwrap()
+  inspect(gp2.is_pressed(Button::South), content="true")
+  inspect(gp2.value(Axis::LeftStickX), content="0.25")
+  inspect(
+    gp2.button_data(Button::South).map(fn(d) { d.is_pressed() }),
+    content="Some(true)",
+  )
+  inspect(
+    gp2.axis_data(Axis::LeftStickX).map(fn(d) { d.value() }),
+    content="Some(0.25)",
+  )
+}
+
+///|
+test "gamepad name/map_name/os_name semantics" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  let gp0 = g.gamepad(id).unwrap()
+  let os_name = gp0.os_name()
+  inspect(gp0.map_name(), content="Some(\"\")")
+  inspect(gp0.name() == os_name, content="true")
+
+  let data = MappingData::new()
+  ignore(g.set_mapping_data(id, data, name=Some("Mapped Pad")))
+  let gp1 = g.gamepad(id).unwrap()
+  inspect(gp1.map_name(), content="Some(\"Mapped Pad\")")
+  inspect(gp1.name(), content="Mapped Pad")
+  inspect(gp1.os_name() == os_name, content="true")
 }

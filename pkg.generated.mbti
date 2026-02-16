@@ -335,24 +335,27 @@ pub struct Gamepad {
 }
 pub fn Gamepad::axes(Self) -> Array[Int]
 pub fn Gamepad::axis_code(Self, Axis) -> Int?
+pub fn Gamepad::axis_data(Self, Axis) -> AxisData?
 pub fn Gamepad::axis_info(Self, Int) -> AxisInfo?
 pub fn Gamepad::axis_or_btn_name(Self, Int) -> AxisOrBtn?
 pub fn Gamepad::button_code(Self, Button) -> Int?
+pub fn Gamepad::button_data(Self, Button) -> ButtonData?
 pub fn Gamepad::buttons(Self) -> Array[Int]
 pub fn Gamepad::deadzone(Self, Int) -> Double?
 pub fn Gamepad::id(Self) -> GamepadId
 pub fn Gamepad::is_connected(Self) -> Bool
 pub fn Gamepad::is_ff_supported(Self) -> Bool
-pub fn Gamepad::is_pressed(Self, Int) -> Bool
+pub fn Gamepad::is_pressed(Self, Button) -> Bool
 pub fn Gamepad::map_name(Self) -> String?
 pub fn Gamepad::mapping(Self) -> Mapping?
 pub fn Gamepad::mapping_source(Self) -> MappingSource
 pub fn Gamepad::name(Self) -> String
+pub fn Gamepad::os_name(Self) -> String
 pub fn Gamepad::power_info(Self) -> PowerInfo
 pub fn Gamepad::product_id(Self) -> Int?
 pub fn Gamepad::state(Self) -> GamepadState
 pub fn Gamepad::uuid(Self) -> Uuid
-pub fn Gamepad::value(Self, Int) -> Double
+pub fn Gamepad::value(Self, Axis) -> Double
 pub fn Gamepad::vendor_id(Self) -> Int?
 
 pub struct GamepadData {
