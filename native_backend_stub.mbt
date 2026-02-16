@@ -50,6 +50,11 @@ pub fn runtime_now_ms() -> Int64 {
 }
 
 ///|
+pub fn runtime_env_sdl_gamecontrollerconfig() -> String {
+  ""
+}
+
+///|
 pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
   let _ = self
   0

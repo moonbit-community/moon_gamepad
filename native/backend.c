@@ -73,6 +73,30 @@ static moonbit_string_t moonbit_string_from_utf8_lossy(const char *s) {
   return out;
 }
 
+static char *moonbit_string_to_ascii_cstr(moonbit_string_t s) {
+  if (s == NULL) {
+    char *out = (char *)malloc(1);
+    if (out != NULL) {
+      out[0] = '\0';
+    }
+    return out;
+  }
+  int32_t n = Moonbit_array_length(s);
+  if (n < 0) {
+    n = 0;
+  }
+  char *out = (char *)malloc((size_t)n + 1);
+  if (out == NULL) {
+    return NULL;
+  }
+  for (int32_t i = 0; i < n; i++) {
+    uint16_t c = s[i];
+    out[i] = (c < 0x80) ? (char)c : '?';
+  }
+  out[n] = '\0';
+  return out;
+}
+
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
 #include <errno.h>
@@ -2055,6 +2079,31 @@ int64_t moon_gamepad_now_ms(void) {
     return g_now_ms_override_for_test;
   }
   return now_ms();
+}
+
+moonbit_string_t moon_gamepad_env_sdl_gamecontrollerconfig(void) {
+  return moonbit_string_from_utf8_lossy(getenv("SDL_GAMECONTROLLERCONFIG"));
+}
+
+void moon_gamepad_set_sdl_gamecontrollerconfig_for_test(moonbit_string_t value) {
+  char *v = moonbit_string_to_ascii_cstr(value);
+  if (v == NULL) {
+    return;
+  }
+#if defined(_WIN32)
+  _putenv_s("SDL_GAMECONTROLLERCONFIG", v);
+#else
+  setenv("SDL_GAMECONTROLLERCONFIG", v, 1);
+#endif
+  free(v);
+}
+
+void moon_gamepad_clear_sdl_gamecontrollerconfig_for_test(void) {
+#if defined(_WIN32)
+  _putenv_s("SDL_GAMECONTROLLERCONFIG", "");
+#else
+  unsetenv("SDL_GAMECONTROLLERCONFIG");
+#endif
 }
 
 void moon_gamepad_now_ms_set_for_test(int64_t ms) {

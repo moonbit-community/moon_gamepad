@@ -31,6 +31,13 @@ extern "C" fn runtime_now_set_for_test(ms : Int64) -> Unit = "moon_gamepad_now_m
 extern "C" fn runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_clear_for_test"
 
 ///|
+#borrow(s)
+extern "C" fn runtime_set_sdl_gamecontrollerconfig_for_test(s : String) -> Unit = "moon_gamepad_set_sdl_gamecontrollerconfig_for_test"
+
+///|
+extern "C" fn runtime_clear_sdl_gamecontrollerconfig_for_test() -> Unit = "moon_gamepad_clear_sdl_gamecontrollerconfig_for_test"
+
+///|
 test "native remap: digital button emits edge then value" {
   let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
@@ -555,4 +562,53 @@ test "builder set_axis_to_btn affects axis-to-button press edge" {
     [ev_sig(e1), ev_sig(e2)],
     content="[(1, 8, 1, 131269), (2, 8, 0.5, 131269)]",
   )
+}
+
+///|
+test "builder loads included mappings by default" {
+  runtime_clear_sdl_gamecontrollerconfig_for_test()
+  let g = GilrsBuilder::new().with_mock_gamepad_count(0).build()
+  inspect(
+    g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
+    content="true",
+  )
+}
+
+///|
+test "builder add_included_mappings false disables built-in mapping load" {
+  runtime_clear_sdl_gamecontrollerconfig_for_test()
+  let g = GilrsBuilder::new()
+    .with_mock_gamepad_count(0)
+    .add_included_mappings(false)
+    .build()
+  inspect(
+    g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is None,
+    content="true",
+  )
+}
+
+///|
+test "builder loads env mappings by default and can disable them" {
+  runtime_set_sdl_gamecontrollerconfig_for_test(
+    "11111111111111111111111111111111,Env Pad,a:b0,",
+  )
+  let g0 = GilrsBuilder::new()
+    .with_mock_gamepad_count(0)
+    .add_included_mappings(false)
+    .build()
+  inspect(
+    g0.mappings.get(Uuid::parse("11111111111111111111111111111111")) is Some(_),
+    content="true",
+  )
+
+  let g1 = GilrsBuilder::new()
+    .with_mock_gamepad_count(0)
+    .add_included_mappings(false)
+    .add_env_mappings(false)
+    .build()
+  inspect(
+    g1.mappings.get(Uuid::parse("11111111111111111111111111111111")) is None,
+    content="true",
+  )
+  runtime_clear_sdl_gamecontrollerconfig_for_test()
 }

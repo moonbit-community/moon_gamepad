@@ -166,6 +166,8 @@ pub fn hid_usage(Int) -> Int
 
 pub fn jitter(Event?, Gilrs, Double) -> Event?
 
+pub fn runtime_env_sdl_gamecontrollerconfig() -> String
+
 pub fn runtime_now_ms() -> Int64
 
 // Errors
@@ -444,10 +446,14 @@ pub struct GilrsBuilder {
   mut default_filters : Bool
   mut axis_to_btn_pressed : Double
   mut axis_to_btn_released : Double
+  mut env_mappings : Bool
+  mut included_mappings : Bool
   mut mock_gamepad_count : Int
   mut use_native_backend : Bool
   mapping_inputs : Array[String]
 }
+pub fn GilrsBuilder::add_env_mappings(Self, Bool) -> Self
+pub fn GilrsBuilder::add_included_mappings(Self, Bool) -> Self
 pub fn GilrsBuilder::add_mappings(Self, String) -> Self
 pub fn GilrsBuilder::build(Self) -> Gilrs
 pub fn GilrsBuilder::new() -> Self

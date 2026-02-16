@@ -790,10 +790,15 @@ pub struct GilrsBuilder {
   mut default_filters : Bool
   mut axis_to_btn_pressed : Double
   mut axis_to_btn_released : Double
+  mut env_mappings : Bool
+  mut included_mappings : Bool
   mut mock_gamepad_count : Int
   mut use_native_backend : Bool
   mapping_inputs : Array[String]
 }
+
+///|
+const INCLUDED_MAPPINGS : String = "030000005e0400008e02000002010000,Xbox 360 Controller,a:b0,b:b1,back:b6,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,leftshoulder:b4,leftstick:b9,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:a5,rightx:a3,righty:a4,start:b7,x:b2,y:b3,"
 
 ///|
 pub fn GilrsBuilder::new() -> GilrsBuilder {
@@ -802,6 +807,8 @@ pub fn GilrsBuilder::new() -> GilrsBuilder {
     default_filters: true,
     axis_to_btn_pressed: 0.75,
     axis_to_btn_released: 0.65,
+    env_mappings: true,
+    included_mappings: true,
     mock_gamepad_count: 0,
     use_native_backend: false,
     mapping_inputs: [],
@@ -865,6 +872,24 @@ pub fn GilrsBuilder::set_axis_to_btn(
 }
 
 ///|
+pub fn GilrsBuilder::add_env_mappings(
+  self : GilrsBuilder,
+  env_mappings : Bool,
+) -> GilrsBuilder {
+  self.env_mappings = env_mappings
+  self
+}
+
+///|
+pub fn GilrsBuilder::add_included_mappings(
+  self : GilrsBuilder,
+  included_mappings : Bool,
+) -> GilrsBuilder {
+  self.included_mappings = included_mappings
+  self
+}
+
+///|
 pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
   let gilrs = if self.use_native_backend {
     Gilrs::new_native(
@@ -880,6 +905,15 @@ pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
   }
   for s in self.mapping_inputs {
     gilrs.load_mappings(s)
+  }
+  if self.included_mappings {
+    gilrs.load_mappings(INCLUDED_MAPPINGS)
+  }
+  if self.env_mappings {
+    let env = runtime_env_sdl_gamecontrollerconfig()
+    if env.length() != 0 {
+      gilrs.load_mappings(env)
+    }
   }
   gilrs.axis_to_btn_pressed = self.axis_to_btn_pressed
   gilrs.axis_to_btn_released = self.axis_to_btn_released

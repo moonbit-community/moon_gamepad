@@ -41,6 +41,9 @@ extern "C" fn backend_next_event_bin(owner : BackendOwner) -> Bytes = "moon_game
 extern "C" fn backend_now_ms() -> Int64 = "moon_gamepad_now_ms"
 
 ///|
+extern "C" fn backend_env_sdl_gamecontrollerconfig() -> String = "moon_gamepad_env_sdl_gamecontrollerconfig"
+
+///|
 #borrow(owner)
 extern "C" fn backend_name(owner : BackendOwner, id : Int) -> String = "moon_gamepad_backend_name"
 
@@ -123,6 +126,11 @@ pub fn NativeBackend::next_event(self : NativeBackend) -> NativeEvent? {
 ///|
 pub fn runtime_now_ms() -> Int64 {
   backend_now_ms()
+}
+
+///|
+pub fn runtime_env_sdl_gamecontrollerconfig() -> String {
+  backend_env_sdl_gamecontrollerconfig()
 }
 
 ///|
