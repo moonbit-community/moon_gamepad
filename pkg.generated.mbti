@@ -515,7 +515,7 @@ pub fn MappingDb::new() -> Self
 pub enum MappingSource {
   SdlMappings
   Driver
-  Unmapped
+  None
 }
 
 pub struct NativeBackend {

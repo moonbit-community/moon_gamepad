@@ -486,14 +486,14 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
     if self.events_head >= self.events.length() {
       self.poll()
     }
-    let raw = if self.events_head >= self.events.length() {
+    let raw : Event? = if self.events_head >= self.events.length() {
       None
     } else {
       let ev = self.events[self.events_head]
       self.events_head = self.events_head + 1
       Some(ev)
     }
-    let mut ev = raw
+    let mut ev : Event? = raw
     if self.default_filters {
       ev = filter_ev(ev, axis_dpad_to_button, self)
       ev = filter_ev(ev, fn(ev, g) { jitter_filter.filter(ev, g) }, self)
@@ -548,14 +548,14 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
         Some(_) => Some(0L)
       }
     }
-    let raw = if self.events_head >= self.events.length() {
+    let raw : Event? = if self.events_head >= self.events.length() {
       None
     } else {
       let ev = self.events[self.events_head]
       self.events_head = self.events_head + 1
       Some(ev)
     }
-    let mut ev = raw
+    let mut ev : Event? = raw
     if self.default_filters {
       ev = filter_ev(ev, axis_dpad_to_button, self)
       ev = filter_ev(ev, fn(ev, g) { jitter_filter.filter(ev, g) }, self)
@@ -929,11 +929,11 @@ pub struct Gamepad {
 pub enum MappingSource {
   SdlMappings
   Driver
-  Unmapped
+  None
 }
 
 ///|
-let _mapping_source_keepalive : Array[MappingSource] = [MappingSource::Unmapped]
+let _mapping_source_keepalive : Array[MappingSource] = [MappingSource::None]
 
 ///|
 pub fn Gilrs::gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
@@ -1011,7 +1011,7 @@ pub fn Gamepad::mapping_source(self : Gamepad) -> MappingSource {
       } else {
         MappingSource::SdlMappings
       }
-    None => MappingSource::Unmapped
+    None => MappingSource::None
   }
 }
 
