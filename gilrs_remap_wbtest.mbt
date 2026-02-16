@@ -428,3 +428,42 @@ test "gamepad map_name follows mapping default/name semantics" {
   let n1 = g.gamepad(id).unwrap().map_name()
   inspect(n1, content="Some(\"Named Mapping\")")
 }
+
+///|
+test "builder add_mappings loads mapping DB entries" {
+  let g = GilrsBuilder::new()
+    .with_mock_gamepad_count(1)
+    .add_mappings("00000000000000000000000000000000,Pad One,a:b0,")
+    .add_mappings("030000005e0400008e02000000000000,Pad Two,a:b0,")
+    .build()
+  inspect(g.mappings.get(Uuid::nil()) is Some(_), content="true")
+  inspect(
+    g.mappings.get(Uuid::parse("030000005e0400008e02000000000000")),
+    content="Some(\"030000005e0400008e02000000000000,Pad Two,a:b0,\")",
+  )
+}
+
+///|
+test "builder add_mappings participates in connected remap" {
+  let g = GilrsBuilder::new()
+    .with_mock_gamepad_count(1)
+    .add_mappings("00000000000000000000000000000000,Pad From DB,b:b0,")
+    .build()
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].buttons = [BTN_SOUTH]
+  g.gamepads_data[0].axes = []
+
+  g.push_native_event({
+    tag: NativeEventTag::Connected,
+    id: 0,
+    code: 0,
+    value: 0.0,
+    time_ms: 1L,
+  })
+  ignore(g.next_event())
+  let mapped = match g.mapping(id).unwrap().map(BTN_SOUTH) {
+    Some(AxisOrBtn::Btn(Button::East)) => true
+    _ => false
+  }
+  inspect(mapped, content="true")
+}

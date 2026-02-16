@@ -440,7 +440,9 @@ pub struct GilrsBuilder {
   mut default_filters : Bool
   mut mock_gamepad_count : Int
   mut use_native_backend : Bool
+  mapping_inputs : Array[String]
 }
+pub fn GilrsBuilder::add_mappings(Self, String) -> Self
 pub fn GilrsBuilder::build(Self) -> Gilrs
 pub fn GilrsBuilder::new() -> Self
 pub fn GilrsBuilder::set_update_state(Self, Bool) -> Self

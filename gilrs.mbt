@@ -790,6 +790,7 @@ pub struct GilrsBuilder {
   mut default_filters : Bool
   mut mock_gamepad_count : Int
   mut use_native_backend : Bool
+  mapping_inputs : Array[String]
 }
 
 ///|
@@ -799,6 +800,7 @@ pub fn GilrsBuilder::new() -> GilrsBuilder {
     default_filters: true,
     mock_gamepad_count: 0,
     use_native_backend: false,
+    mapping_inputs: [],
   }
 }
 
@@ -839,8 +841,17 @@ pub fn GilrsBuilder::with_native_backend(
 }
 
 ///|
+pub fn GilrsBuilder::add_mappings(
+  self : GilrsBuilder,
+  mappings : String,
+) -> GilrsBuilder {
+  self.mapping_inputs.push(mappings)
+  self
+}
+
+///|
 pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
-  if self.use_native_backend {
+  let gilrs = if self.use_native_backend {
     Gilrs::new_native(
       update_state=self.update_state,
       default_filters=self.default_filters,
@@ -852,6 +863,10 @@ pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
       default_filters=self.default_filters,
     )
   }
+  for s in self.mapping_inputs {
+    gilrs.load_mappings(s)
+  }
+  gilrs
 }
 
 ///|
