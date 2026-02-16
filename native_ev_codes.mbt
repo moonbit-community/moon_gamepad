@@ -294,3 +294,44 @@ pub fn axis_or_btn_from_code(code : Code) -> AxisOrBtn? {
       }
   }
 }
+
+///|
+pub fn default_axis_code(axis : Axis) -> Code? {
+  match axis {
+    Axis::LeftStickX => Some(AXIS_LSTICKX)
+    Axis::LeftStickY => Some(AXIS_LSTICKY)
+    Axis::LeftZ => Some(LEGACY_AXIS_LEFTZ)
+    Axis::RightStickX => Some(AXIS_RSTICKX)
+    Axis::RightStickY => Some(AXIS_RSTICKY)
+    Axis::RightZ => Some(LEGACY_AXIS_RIGHTZ)
+    Axis::DPadX => Some(AXIS_DPADX)
+    Axis::DPadY => Some(AXIS_DPADY)
+    Axis::Unknown => None
+  }
+}
+
+///|
+pub fn default_button_code(btn : Button) -> Code? {
+  match btn {
+    Button::South => Some(BTN_SOUTH)
+    Button::East => Some(BTN_EAST)
+    Button::C => Some(BTN_C)
+    Button::North => Some(BTN_NORTH)
+    Button::West => Some(BTN_WEST)
+    Button::Z => Some(BTN_Z)
+    Button::LeftTrigger => Some(BTN_LT)
+    Button::RightTrigger => Some(BTN_RT)
+    Button::LeftTrigger2 => Some(BTN_LT2)
+    Button::RightTrigger2 => Some(BTN_RT2)
+    Button::Select => Some(BTN_SELECT)
+    Button::Start => Some(BTN_START)
+    Button::Mode => Some(BTN_MODE)
+    Button::LeftThumb => Some(BTN_LTHUMB)
+    Button::RightThumb => Some(BTN_RTHUMB)
+    Button::DPadUp => Some(BTN_DPAD_UP)
+    Button::DPadDown => Some(BTN_DPAD_DOWN)
+    Button::DPadLeft => Some(BTN_DPAD_LEFT)
+    Button::DPadRight => Some(BTN_DPAD_RIGHT)
+    Button::Unknown => None
+  }
+}

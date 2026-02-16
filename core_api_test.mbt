@@ -126,3 +126,30 @@ test "gamepad name/map_name/os_name semantics" {
   inspect(gp1.name(), content="Mapped Pad")
   inspect(gp1.os_name() == os_name, content="true")
 }
+
+///|
+test "gamepad semantic accessors fallback to default native codes" {
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let id = GamepadId::new(0)
+  g.update(
+    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
+  )
+  g.update(
+    Event::at(
+      id,
+      EventType::AxisChanged(Axis::LeftStickX, 0.42, AXIS_LSTICKX),
+      1L,
+    ),
+  )
+  let gp = g.gamepad(id).unwrap()
+  inspect(gp.is_pressed(Button::South), content="true")
+  inspect(gp.value(Axis::LeftStickX), content="0.42")
+  inspect(
+    gp.button_data(Button::South).map(fn(d) { d.is_pressed() }),
+    content="Some(true)",
+  )
+  inspect(
+    gp.axis_data(Axis::LeftStickX).map(fn(d) { d.value() }),
+    content="Some(0.42)",
+  )
+}

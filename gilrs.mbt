@@ -1100,7 +1100,11 @@ pub fn Gamepad::state(self : Gamepad) -> GamepadState {
 
 ///|
 pub fn Gamepad::is_pressed(self : Gamepad, btn : Button) -> Bool {
-  match self.button_code(btn) {
+  let code = match self.button_code(btn) {
+    Some(code) => Some(code)
+    None => default_button_code(btn)
+  }
+  match code {
     None => false
     Some(code) => self.state().is_pressed(code)
   }
@@ -1108,7 +1112,11 @@ pub fn Gamepad::is_pressed(self : Gamepad, btn : Button) -> Bool {
 
 ///|
 pub fn Gamepad::value(self : Gamepad, axis : Axis) -> Double {
-  match self.axis_code(axis) {
+  let code = match self.axis_code(axis) {
+    Some(code) => Some(code)
+    None => default_axis_code(axis)
+  }
+  match code {
     None => 0.0
     Some(code) => self.state().value(code)
   }
@@ -1116,7 +1124,11 @@ pub fn Gamepad::value(self : Gamepad, axis : Axis) -> Double {
 
 ///|
 pub fn Gamepad::button_data(self : Gamepad, btn : Button) -> ButtonData? {
-  match self.button_code(btn) {
+  let code = match self.button_code(btn) {
+    Some(code) => Some(code)
+    None => default_button_code(btn)
+  }
+  match code {
     None => None
     Some(code) => self.state().button_data(code)
   }
@@ -1124,7 +1136,11 @@ pub fn Gamepad::button_data(self : Gamepad, btn : Button) -> ButtonData? {
 
 ///|
 pub fn Gamepad::axis_data(self : Gamepad, axis : Axis) -> AxisData? {
-  match self.axis_code(axis) {
+  let code = match self.axis_code(axis) {
+    Some(code) => Some(code)
+    None => default_axis_code(axis)
+  }
+  match code {
     None => None
     Some(code) => self.state().axis_data(code)
   }

@@ -156,6 +156,10 @@ pub fn deadzone(Event?, Gilrs) -> Event?
 
 pub fn decode_native_event(Bytes) -> NativeEvent?
 
+pub fn default_axis_code(Axis) -> Int?
+
+pub fn default_button_code(Button) -> Int?
+
 pub fn filter_ev(Event?, (Event?, Gilrs) -> Event?, Gilrs) -> Event?
 
 pub fn hid_code(Int, Int) -> Int
