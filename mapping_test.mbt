@@ -295,4 +295,9 @@ test "mapping_db add_included_mappings loads bundled mapping" {
     db.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
     content="true",
   )
+  inspect(db.len() >= 200, content="true")
+  inspect(
+    db.get(Uuid::parse("03000000c82d00001930000000000000")) is Some(_),
+    content="true",
+  )
 }

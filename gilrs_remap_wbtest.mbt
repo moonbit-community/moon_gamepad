@@ -441,12 +441,12 @@ test "builder add_mappings loads mapping DB entries" {
   let g = GilrsBuilder::new()
     .with_mock_gamepad_count(1)
     .add_mappings("00000000000000000000000000000000,Pad One,a:b0,")
-    .add_mappings("030000005e0400008e02000000000000,Pad Two,a:b0,")
+    .add_mappings("11111111111111111111111111111111,Pad Two,a:b0,")
     .build()
   inspect(g.mappings.get(Uuid::nil()) is Some(_), content="true")
   inspect(
-    g.mappings.get(Uuid::parse("030000005e0400008e02000000000000")),
-    content="Some(\"030000005e0400008e02000000000000,Pad Two,a:b0,\")",
+    g.mappings.get(Uuid::parse("11111111111111111111111111111111")),
+    content="Some(\"11111111111111111111111111111111,Pad Two,a:b0,\")",
   )
 }
 

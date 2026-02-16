@@ -596,7 +596,7 @@ pub struct MappingDb {
 }
 
 ///|
-const INCLUDED_MAPPINGS : String = "030000005e0400008e02000002010000,Xbox 360 Controller,a:b0,b:b1,back:b6,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,leftshoulder:b4,leftstick:b9,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:a5,rightx:a3,righty:a4,start:b7,x:b2,y:b3,"
+const INCLUDED_MAPPINGS_FALLBACK : String = "030000005e0400008e02000002010000,Xbox 360 Controller,a:b0,b:b1,back:b6,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,leftshoulder:b4,leftstick:b9,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:a5,rightx:a3,righty:a4,start:b7,x:b2,y:b3,"
 
 ///|
 pub fn MappingDb::new() -> MappingDb {
@@ -705,7 +705,10 @@ pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
 
 ///|
 pub fn MappingDb::add_included_mappings(self : MappingDb) -> Unit {
-  self.insert(INCLUDED_MAPPINGS)
+  self.insert(INCLUDED_MAPPINGS_FALLBACK)
+  if runtime_sdl_platform_name() == "Mac OS X" {
+    self.insert(included_mappings_macos_blob())
+  }
 }
 
 ///|
