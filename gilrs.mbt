@@ -1180,3 +1180,18 @@ pub fn Gamepad::is_ff_supported(self : Gamepad) -> Bool {
     self.gilrs.gamepads_data[i].ff_supported
   }
 }
+
+///|
+pub fn Gamepad::set_listener_position(
+  self : Gamepad,
+  position : (Double, Double, Double),
+) -> Unit raise FfError {
+  ignore(position)
+  if !self.is_connected() {
+    raise FfError::Disconnected(self.id)
+  } else if !self.is_ff_supported() {
+    raise FfError::FfNotSupported(self.id)
+  } else {
+    ()
+  }
+}

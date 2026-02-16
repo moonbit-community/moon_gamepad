@@ -177,6 +177,8 @@ pub fn runtime_now_ms() -> Int64
 pub fn runtime_sdl_platform_name() -> String
 
 // Errors
+type DistanceModelError
+
 type FfError
 
 type GilrsError
@@ -237,6 +239,18 @@ pub(all) enum AxisRange {
 
 type BackendOwner
 
+pub struct BaseEffect {
+  kind : BaseEffectType
+  scheduling : Replay
+  envelope : Envelope
+}
+pub fn BaseEffect::default() -> Self
+
+pub(all) enum BaseEffectType {
+  Weak(Int)
+  Strong(Int)
+}
+
 pub(all) enum Button {
   South
   East
@@ -279,28 +293,60 @@ pub fn ButtonData::is_repeating(Self) -> Bool
 pub fn ButtonData::timestamp(Self) -> Int64
 pub fn ButtonData::value(Self) -> Double
 
+pub enum DistanceModel {
+  None
+  Linear(ref_distance~ : Double, rolloff_factor~ : Double, max_distance~ : Double)
+  LinearClamped(ref_distance~ : Double, rolloff_factor~ : Double, max_distance~ : Double)
+  Inverse(ref_distance~ : Double, rolloff_factor~ : Double)
+  InverseClamped(ref_distance~ : Double, rolloff_factor~ : Double, max_distance~ : Double)
+  Exponential(ref_distance~ : Double, rolloff_factor~ : Double)
+  ExponentialClamped(ref_distance~ : Double, rolloff_factor~ : Double, max_distance~ : Double)
+}
+pub fn DistanceModel::validate(Self) -> Unit raise DistanceModelError
+
 pub struct Effect {
   gilrs : Gilrs
-  gamepads : Array[GamepadId]
+  mut gamepads : Array[GamepadId]
   strong : Double
   weak : Double
   duration_ms : Int64
+  base_effects : Array[BaseEffect]
+  mut repeat_mode : FfRepeat
+  mut distance_model : DistanceModel
+  mut position : (Double, Double, Double)
+  mut gain : Double
 }
+pub fn Effect::add_gamepad(Self, Gamepad) -> Unit raise FfError
 pub fn Effect::play(Self) -> Unit raise FfError
+pub fn Effect::set_distance_model(Self, DistanceModel) -> Unit raise FfError
+pub fn Effect::set_gain(Self, Double) -> Unit
+pub fn Effect::set_gamepads(Self, Array[GamepadId], Gilrs) -> Unit raise FfError
+pub fn Effect::set_position(Self, (Double, Double, Double)) -> Unit
+pub fn Effect::set_repeat(Self, FfRepeat) -> Unit
 pub fn Effect::stop(Self) -> Unit raise FfError
 
 pub struct EffectBuilder {
-  mut gamepads : Array[GamepadId]
+  gamepads : Array[GamepadId]
+  base_effects : Array[BaseEffect]
+  mut repeat_mode : FfRepeat
+  mut distance_model : DistanceModel
+  mut position : (Double, Double, Double)
+  mut gain : Double
   mut strong : Double
   mut weak : Double
   mut duration_ms : Int64
 }
+pub fn EffectBuilder::add_effect(Self, BaseEffect) -> Self
 pub fn EffectBuilder::add_gamepad(Self, Gamepad) -> Self
 pub fn EffectBuilder::add_gamepad_id(Self, GamepadId) -> Self
+pub fn EffectBuilder::distance_model(Self, DistanceModel) -> Self
 pub fn EffectBuilder::duration(Self, Int64) -> Self
 pub fn EffectBuilder::finish(Self, Gilrs) -> Effect raise FfError
+pub fn EffectBuilder::gain(Self, Double) -> Self
 pub fn EffectBuilder::gamepads(Self, Array[GamepadId]) -> Self
 pub fn EffectBuilder::new() -> Self
+pub fn EffectBuilder::position(Self, (Double, Double, Double)) -> Self
+pub fn EffectBuilder::repeat(Self, FfRepeat) -> Self
 pub fn EffectBuilder::rumble(Self, Double, Double) -> Self
 
 pub struct Envelope {
@@ -337,6 +383,11 @@ pub(all) enum EventType {
   ForceFeedbackEffectCompleted
 }
 
+pub enum FfRepeat {
+  Infinitely
+  For(Int64)
+}
+
 pub struct Gamepad {
   gilrs : Gilrs
   id : GamepadId
@@ -361,6 +412,7 @@ pub fn Gamepad::name(Self) -> String
 pub fn Gamepad::os_name(Self) -> String
 pub fn Gamepad::power_info(Self) -> PowerInfo
 pub fn Gamepad::product_id(Self) -> Int?
+pub fn Gamepad::set_listener_position(Self, (Double, Double, Double)) -> Unit raise FfError
 pub fn Gamepad::state(Self) -> GamepadState
 pub fn Gamepad::uuid(Self) -> Uuid
 pub fn Gamepad::value(Self, Axis) -> Double
@@ -590,6 +642,12 @@ pub struct Replay {
 }
 pub fn Replay::at(Self, Int) -> Double
 pub fn Replay::default() -> Self
+
+pub struct Ticks {
+  ms : Int64
+}
+pub fn Ticks::as_ms(Self) -> Int64
+pub fn Ticks::from_ms(Int64) -> Self
 
 pub(all) enum Token {
   Uuid(Uuid)

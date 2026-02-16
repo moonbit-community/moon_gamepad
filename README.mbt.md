@@ -34,6 +34,7 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
 - `Code` is backend-specific. On macOS it matches gilrs-core's HID `EvCode` encoding: `(usage_page << 16) | usage`.
 - On macOS, some HID axes (e.g. GenericDesktop `Rx`/`Ry`) are intentionally left **unmapped** to `Axis` by default (matching gilrs-core's "unconfirmed" constants). Use the SDL mapping DB to get semantic axis/button names for these codes.
 - On macOS, `PowerInfo` is intentionally `Unknown` (parity with upstream `gilrs-core`).
+- Force-feedback repeat mode is exposed as `FfRepeat` to avoid naming collision with event filter `Repeat`.
 
 ## Quickstart (native)
 
