@@ -2127,12 +2127,19 @@ void moon_gamepad_now_ms_clear_for_test(void) {
 }
 
 int32_t moon_gamepad_macos_hat_pack_for_test(int32_t hat_v, int32_t hat_min, int32_t hat_max) {
+#if defined(__APPLE__)
   int32_t x_raw = 0;
   int32_t y_raw = 0;
   mac_hat_to_xy_raw(hat_v, hat_min, hat_max, &x_raw, &y_raw);
   int32_t x_pack = (x_raw + 2) & 0x3;
   int32_t y_pack = (y_raw + 2) & 0x3;
   return x_pack | (y_pack << 2);
+#else
+  (void)hat_v;
+  (void)hat_min;
+  (void)hat_max;
+  return 0;
+#endif
 }
 
 static moon_gamepad_backend_t *backend_of(void *owner) {

@@ -37,7 +37,7 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
 
 ## Quickstart (native)
 
-```moonbit
+```moonbit nocheck
 let gilrs = Gilrs::new()
 
 while true {
@@ -50,7 +50,7 @@ while true {
 
 ## Quickstart (mock)
 
-```moonbit
+```moonbit nocheck
 let gilrs =
   GilrsBuilder::new()
   .with_mock_gamepad_count(1)
