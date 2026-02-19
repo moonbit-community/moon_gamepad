@@ -1027,11 +1027,11 @@ static CFDictionaryRef make_matching_dict(uint32_t page, uint32_t usage) {
   CFNumberRef page_n = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &page);
   CFNumberRef usage_n = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &usage);
   if (page_n != NULL) {
-    CFDictionarySetValue(dict, kIOHIDDeviceUsagePageKey, page_n);
+    CFDictionarySetValue(dict, CFSTR(kIOHIDDeviceUsagePageKey), page_n);
     CFRelease(page_n);
   }
   if (usage_n != NULL) {
-    CFDictionarySetValue(dict, kIOHIDDeviceUsageKey, usage_n);
+    CFDictionarySetValue(dict, CFSTR(kIOHIDDeviceUsageKey), usage_n);
     CFRelease(usage_n);
   }
   return dict;
