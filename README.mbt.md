@@ -23,11 +23,14 @@ This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may
   - [x] Power info parity (`PowerInfo::Unknown`, matching gilrs-core macOS)
 - Linux (native / evdev) *(planned to harden later)*
   - [x] Enumeration + hotplug events (best-effort)
+  - [x] Device identity + capability metadata (`name`, `uuid`, `vendor_id`, `product_id`, `axes`, `buttons`, `axis_info`)
   - [x] Basic rumble (`FF_RUMBLE`) when device can be opened read-write
   - [ ] Permissions/udev guidance + broader device coverage
 - Windows (native / XInput) *(planned to harden later)*
   - [x] Basic input + rumble (via `XInputSetState` when available)
-  - [ ] CI coverage and device identity parity
+  - [x] Device identity semantics (gilrs xinput-compatible `name` + nil UUID; `vendor_id`/`product_id` unavailable)
+  - [x] Capability metadata (`axes`, `buttons`, `axis_info`)
+  - [ ] CI coverage on real Windows runners
 
 ## Notes / Limitations (vs upstream `gilrs`)
 

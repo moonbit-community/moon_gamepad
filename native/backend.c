@@ -341,6 +341,14 @@ typedef struct moon_gamepad_backend_t {
   int32_t products[64];
   char uuids[64][33];
   char names[64][256];
+  int32_t axes_codes[64][32];
+  uint8_t axes_len[64];
+  int32_t buttons_codes[64][64];
+  uint8_t buttons_len[64];
+  int32_t axis_info_codes[64][32];
+  int32_t axis_info_min[64][32];
+  int32_t axis_info_max[64][32];
+  uint8_t axis_info_len[64];
   uint8_t ff_supported[64];
   uint8_t rw[64];
   int32_t ff_id[64];
@@ -1218,24 +1226,129 @@ static uint32_t map_linux_abs(uint16_t code) {
   }
 }
 
-static double norm_linux_abs(int32_t v, uint16_t code) {
-  // Hat axes are already -1/0/1 typically.
-  if (code == ABS_HAT0X || code == ABS_HAT0Y) {
-    if (v < 0)
-      return -1.0;
-    if (v > 0)
-      return 1.0;
-    return 0.0;
+static void linux_push_button_cap(moon_gamepad_backend_t *b, uint32_t idx, uint32_t code) {
+  if (b == NULL || idx >= 64 || code == UINT32_MAX) {
+    return;
   }
-  // Best-effort: treat as signed 16-bit centered.
-  // Many controllers report in [-32768, 32767].
-  const double denom = 32767.0;
-  double dv = (double)v;
-  if (dv < -32768.0)
-    dv = -32768.0;
-  if (dv > 32767.0)
-    dv = 32767.0;
-  return dv / denom;
+  uint8_t len = b->buttons_len[idx];
+  for (uint8_t i = 0; i < len; i++) {
+    if ((uint32_t)b->buttons_codes[idx][i] == code) {
+      return;
+    }
+  }
+  if (len >= 64) {
+    return;
+  }
+  b->buttons_codes[idx][len] = (int32_t)code;
+  b->buttons_len[idx] = (uint8_t)(len + 1);
+}
+
+static void linux_push_axis_cap(moon_gamepad_backend_t *b, uint32_t idx, uint32_t code) {
+  if (b == NULL || idx >= 64 || code == UINT32_MAX) {
+    return;
+  }
+  uint8_t len = b->axes_len[idx];
+  for (uint8_t i = 0; i < len; i++) {
+    if ((uint32_t)b->axes_codes[idx][i] == code) {
+      return;
+    }
+  }
+  if (len >= 32) {
+    return;
+  }
+  b->axes_codes[idx][len] = (int32_t)code;
+  b->axes_len[idx] = (uint8_t)(len + 1);
+}
+
+static void linux_upsert_axis_info(moon_gamepad_backend_t *b, uint32_t idx, uint32_t code, int32_t minv,
+                                   int32_t maxv) {
+  if (b == NULL || idx >= 64 || code == UINT32_MAX) {
+    return;
+  }
+  uint8_t len = b->axis_info_len[idx];
+  for (uint8_t i = 0; i < len; i++) {
+    if ((uint32_t)b->axis_info_codes[idx][i] == code) {
+      b->axis_info_min[idx][i] = minv;
+      b->axis_info_max[idx][i] = maxv;
+      return;
+    }
+  }
+  if (len >= 32) {
+    return;
+  }
+  b->axis_info_codes[idx][len] = (int32_t)code;
+  b->axis_info_min[idx][len] = minv;
+  b->axis_info_max[idx][len] = maxv;
+  b->axis_info_len[idx] = (uint8_t)(len + 1);
+}
+
+typedef struct linux_code_map_t {
+  uint16_t src;
+  uint32_t dst;
+} linux_code_map_t;
+
+static const linux_code_map_t LINUX_BUTTON_MAPS[] = {
+    {BTN_SOUTH, CODE_BTN_SOUTH},     {BTN_EAST, CODE_BTN_EAST},       {BTN_C, CODE_BTN_C},
+    {BTN_NORTH, CODE_BTN_NORTH},     {BTN_WEST, CODE_BTN_WEST},       {BTN_Z, CODE_BTN_Z},
+    {BTN_TL, CODE_BTN_LT},           {BTN_TR, CODE_BTN_RT},           {BTN_TL2, CODE_BTN_LT2},
+    {BTN_TR2, CODE_BTN_RT2},         {BTN_SELECT, CODE_BTN_SELECT},   {BTN_START, CODE_BTN_START},
+    {BTN_MODE, CODE_BTN_MODE},       {BTN_THUMBL, CODE_BTN_LTHUMB},   {BTN_THUMBR, CODE_BTN_RTHUMB},
+    {BTN_DPAD_UP, CODE_BTN_DPAD_UP}, {BTN_DPAD_DOWN, CODE_BTN_DPAD_DOWN},
+    {BTN_DPAD_LEFT, CODE_BTN_DPAD_LEFT}, {BTN_DPAD_RIGHT, CODE_BTN_DPAD_RIGHT},
+};
+
+static const linux_code_map_t LINUX_AXIS_MAPS[] = {
+    {ABS_X, CODE_AXIS_LSTICKX},   {ABS_Y, CODE_AXIS_LSTICKY}, {ABS_Z, CODE_AXIS_LEFTZ},
+    {ABS_RX, CODE_AXIS_RSTICKX},  {ABS_RY, CODE_AXIS_RSTICKY}, {ABS_RZ, CODE_AXIS_RIGHTZ},
+    {ABS_HAT0X, CODE_AXIS_DPADX}, {ABS_HAT0Y, CODE_AXIS_DPADY},
+};
+
+static void linux_collect_device_caps(moon_gamepad_backend_t *b, uint32_t idx, int fd) {
+  if (b == NULL || idx >= 64 || fd < 0) {
+    return;
+  }
+  b->axes_len[idx] = 0;
+  b->buttons_len[idx] = 0;
+  b->axis_info_len[idx] = 0;
+  memset(b->axes_codes[idx], 0, sizeof(b->axes_codes[idx]));
+  memset(b->buttons_codes[idx], 0, sizeof(b->buttons_codes[idx]));
+  memset(b->axis_info_codes[idx], 0, sizeof(b->axis_info_codes[idx]));
+  memset(b->axis_info_min[idx], 0, sizeof(b->axis_info_min[idx]));
+  memset(b->axis_info_max[idx], 0, sizeof(b->axis_info_max[idx]));
+
+  unsigned long keybit[NBITS(KEY_MAX)];
+  unsigned long absbit[NBITS(ABS_MAX)];
+  memset(keybit, 0, sizeof(keybit));
+  memset(absbit, 0, sizeof(absbit));
+  (void)ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybit)), keybit);
+  (void)ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(absbit)), absbit);
+
+  size_t btn_maps_len = sizeof(LINUX_BUTTON_MAPS) / sizeof(LINUX_BUTTON_MAPS[0]);
+  for (size_t i = 0; i < btn_maps_len; i++) {
+    if (test_bit((int)LINUX_BUTTON_MAPS[i].src, keybit)) {
+      linux_push_button_cap(b, idx, LINUX_BUTTON_MAPS[i].dst);
+    }
+  }
+
+  size_t axis_maps_len = sizeof(LINUX_AXIS_MAPS) / sizeof(LINUX_AXIS_MAPS[0]);
+  for (size_t i = 0; i < axis_maps_len; i++) {
+    uint16_t src = LINUX_AXIS_MAPS[i].src;
+    uint32_t dst = LINUX_AXIS_MAPS[i].dst;
+    if (!test_bit((int)src, absbit)) {
+      continue;
+    }
+    linux_push_axis_cap(b, idx, dst);
+
+    struct input_absinfo ai;
+    memset(&ai, 0, sizeof(ai));
+    if (ioctl(fd, EVIOCGABS((int)src), &ai) >= 0) {
+      linux_upsert_axis_info(b, idx, dst, ai.minimum, ai.maximum);
+      continue;
+    }
+    if (src == ABS_HAT0X || src == ABS_HAT0Y) {
+      linux_upsert_axis_info(b, idx, dst, -1, 1);
+    }
+  }
 }
 
 static int linux_is_gamepad_fd(int fd) {
@@ -1406,6 +1519,14 @@ static void linux_compact(moon_gamepad_backend_t *b) {
       b->products[out] = b->products[i];
       memcpy(b->uuids[out], b->uuids[i], sizeof(b->uuids[out]));
       memcpy(b->names[out], b->names[i], sizeof(b->names[out]));
+      memcpy(b->axes_codes[out], b->axes_codes[i], sizeof(b->axes_codes[out]));
+      b->axes_len[out] = b->axes_len[i];
+      memcpy(b->buttons_codes[out], b->buttons_codes[i], sizeof(b->buttons_codes[out]));
+      b->buttons_len[out] = b->buttons_len[i];
+      memcpy(b->axis_info_codes[out], b->axis_info_codes[i], sizeof(b->axis_info_codes[out]));
+      memcpy(b->axis_info_min[out], b->axis_info_min[i], sizeof(b->axis_info_min[out]));
+      memcpy(b->axis_info_max[out], b->axis_info_max[i], sizeof(b->axis_info_max[out]));
+      b->axis_info_len[out] = b->axis_info_len[i];
       b->ff_supported[out] = b->ff_supported[i];
       b->rw[out] = b->rw[i];
       b->ff_id[out] = b->ff_id[i];
@@ -1457,6 +1578,14 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
     b->rw[b->fds_len] = (uint8_t)rw;
     b->vendors[b->fds_len] = -1;
     b->products[b->fds_len] = -1;
+    memset(b->axes_codes[b->fds_len], 0, sizeof(b->axes_codes[b->fds_len]));
+    b->axes_len[b->fds_len] = 0;
+    memset(b->buttons_codes[b->fds_len], 0, sizeof(b->buttons_codes[b->fds_len]));
+    b->buttons_len[b->fds_len] = 0;
+    memset(b->axis_info_codes[b->fds_len], 0, sizeof(b->axis_info_codes[b->fds_len]));
+    memset(b->axis_info_min[b->fds_len], 0, sizeof(b->axis_info_min[b->fds_len]));
+    memset(b->axis_info_max[b->fds_len], 0, sizeof(b->axis_info_max[b->fds_len]));
+    b->axis_info_len[b->fds_len] = 0;
     b->ff_supported[b->fds_len] = 0;
     memset(b->uuids[b->fds_len], 0, sizeof(b->uuids[b->fds_len]));
     memset(b->names[b->fds_len], 0, sizeof(b->names[b->fds_len]));
@@ -1478,6 +1607,8 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
     if (ioctl(fd, EVIOCGNAME((int)sizeof(name)), name) >= 0) {
       strncpy(b->names[b->fds_len], name, sizeof(b->names[b->fds_len]) - 1);
     }
+
+    linux_collect_device_caps(b, b->fds_len, fd);
 
     unsigned long ffbit[NBITS(FF_MAX)];
     memset(ffbit, 0, sizeof(ffbit));
@@ -1507,6 +1638,14 @@ static void linux_backend_init(moon_gamepad_backend_t *b) {
   memset(b->products, 0, sizeof(b->products));
   memset(b->uuids, 0, sizeof(b->uuids));
   memset(b->names, 0, sizeof(b->names));
+  memset(b->axes_codes, 0, sizeof(b->axes_codes));
+  memset(b->axes_len, 0, sizeof(b->axes_len));
+  memset(b->buttons_codes, 0, sizeof(b->buttons_codes));
+  memset(b->buttons_len, 0, sizeof(b->buttons_len));
+  memset(b->axis_info_codes, 0, sizeof(b->axis_info_codes));
+  memset(b->axis_info_min, 0, sizeof(b->axis_info_min));
+  memset(b->axis_info_max, 0, sizeof(b->axis_info_max));
+  memset(b->axis_info_len, 0, sizeof(b->axis_info_len));
   memset(b->ff_supported, 0, sizeof(b->ff_supported));
   memset(b->rw, 0, sizeof(b->rw));
   for (int i = 0; i < 64; i++) {
@@ -1537,6 +1676,14 @@ static void linux_backend_shutdown(moon_gamepad_backend_t *b) {
     b->products[i] = -1;
     memset(b->uuids[i], 0, sizeof(b->uuids[i]));
     memset(b->names[i], 0, sizeof(b->names[i]));
+    memset(b->axes_codes[i], 0, sizeof(b->axes_codes[i]));
+    b->axes_len[i] = 0;
+    memset(b->buttons_codes[i], 0, sizeof(b->buttons_codes[i]));
+    b->buttons_len[i] = 0;
+    memset(b->axis_info_codes[i], 0, sizeof(b->axis_info_codes[i]));
+    memset(b->axis_info_min[i], 0, sizeof(b->axis_info_min[i]));
+    memset(b->axis_info_max[i], 0, sizeof(b->axis_info_max[i]));
+    b->axis_info_len[i] = 0;
     b->ff_supported[i] = 0;
     b->rw[i] = 0;
     b->ff_id[i] = -1;
@@ -1586,6 +1733,14 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
       b->products[i] = -1;
       memset(b->uuids[i], 0, sizeof(b->uuids[i]));
       memset(b->names[i], 0, sizeof(b->names[i]));
+      memset(b->axes_codes[i], 0, sizeof(b->axes_codes[i]));
+      b->axes_len[i] = 0;
+      memset(b->buttons_codes[i], 0, sizeof(b->buttons_codes[i]));
+      b->buttons_len[i] = 0;
+      memset(b->axis_info_codes[i], 0, sizeof(b->axis_info_codes[i]));
+      memset(b->axis_info_min[i], 0, sizeof(b->axis_info_min[i]));
+      memset(b->axis_info_max[i], 0, sizeof(b->axis_info_max[i]));
+      b->axis_info_len[i] = 0;
       b->ff_supported[i] = 0;
       b->rw[i] = 0;
       b->ff_id[i] = -1;
@@ -1605,12 +1760,15 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
         if (code == UINT32_MAX) {
           continue;
         }
+        if (ev.value != 0 && ev.value != 1) {
+          continue;
+        }
         moon_gamepad_event_t out;
-        out.tag = (ev.value != 0) ? MOON_GAMEPAD_EV_BUTTON_PRESSED : MOON_GAMEPAD_EV_BUTTON_RELEASED;
+        out.tag = (ev.value == 1) ? MOON_GAMEPAD_EV_BUTTON_PRESSED : MOON_GAMEPAD_EV_BUTTON_RELEASED;
         out.id = id;
         out.code = code;
         out.pad = 0;
-        out.value = (ev.value != 0) ? 1.0 : 0.0;
+        out.value = (ev.value == 1) ? 1.0 : 0.0;
         out.time_ms = t;
         queue_push(&b->q, out);
       } else if (ev.type == EV_ABS) {
@@ -1618,8 +1776,7 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
         if (code == UINT32_MAX) {
           continue;
         }
-        double nv = norm_linux_abs((int32_t)ev.value, (uint16_t)ev.code);
-        moon_gamepad_event_t out = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, nv, t};
+        moon_gamepad_event_t out = {MOON_GAMEPAD_EV_AXIS_CHANGED, id, code, 0, (double)((int32_t)ev.value), t};
         queue_push(&b->q, out);
       }
     }
@@ -1635,6 +1792,14 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
       b->products[i] = -1;
       memset(b->uuids[i], 0, sizeof(b->uuids[i]));
       memset(b->names[i], 0, sizeof(b->names[i]));
+      memset(b->axes_codes[i], 0, sizeof(b->axes_codes[i]));
+      b->axes_len[i] = 0;
+      memset(b->buttons_codes[i], 0, sizeof(b->buttons_codes[i]));
+      b->buttons_len[i] = 0;
+      memset(b->axis_info_codes[i], 0, sizeof(b->axis_info_codes[i]));
+      memset(b->axis_info_min[i], 0, sizeof(b->axis_info_min[i]));
+      memset(b->axis_info_max[i], 0, sizeof(b->axis_info_max[i]));
+      b->axis_info_len[i] = 0;
       b->ff_supported[i] = 0;
       b->rw[i] = 0;
       b->ff_id[i] = -1;
@@ -1782,17 +1947,6 @@ static int32_t windows_rumble_set_idx(moon_gamepad_backend_t *b, uint32_t idx, u
   return 1;
 }
 
-static double norm_i16(int16_t v) {
-  if (v == (int16_t)-32768) {
-    return -1.0;
-  }
-  return (double)v / 32767.0;
-}
-
-static double norm_u8(uint8_t v) {
-  return (double)v / 255.0;
-}
-
 static void push_btn_edge(moon_gamepad_backend_t *b, uint32_t id, int pressed, uint32_t code,
                           int64_t t) {
   moon_gamepad_event_t ev;
@@ -1815,6 +1969,32 @@ static void push_btn_diff_mask(moon_gamepad_backend_t *b, uint32_t id, uint16_t 
   push_btn_edge(b, id, is, code, t);
 }
 
+typedef struct windows_axis_info_t {
+  int32_t code;
+  int32_t minv;
+  int32_t maxv;
+} windows_axis_info_t;
+
+static const int32_t WINDOWS_BUTTON_CODES[] = {
+    CODE_BTN_SOUTH, CODE_BTN_EAST,  CODE_BTN_NORTH, CODE_BTN_WEST, CODE_BTN_LT,
+    CODE_BTN_RT,    CODE_BTN_SELECT, CODE_BTN_START, CODE_BTN_MODE, CODE_BTN_LTHUMB,
+    CODE_BTN_RTHUMB, CODE_BTN_DPAD_UP, CODE_BTN_DPAD_DOWN, CODE_BTN_DPAD_LEFT, CODE_BTN_DPAD_RIGHT,
+};
+
+static const int32_t WINDOWS_AXIS_CODES[] = {
+    CODE_AXIS_LSTICKX, CODE_AXIS_LSTICKY, CODE_AXIS_RSTICKX, CODE_AXIS_RSTICKY, CODE_AXIS_RT2,
+    CODE_AXIS_LT2,
+};
+
+static const windows_axis_info_t WINDOWS_AXIS_INFO[] = {
+    {CODE_AXIS_LSTICKX, -32768, 32767},
+    {CODE_AXIS_LSTICKY, -32768, 32767},
+    {CODE_AXIS_RSTICKX, -32768, 32767},
+    {CODE_AXIS_RSTICKY, -32768, 32767},
+    {CODE_AXIS_RT2, 0, 255},
+    {CODE_AXIS_LT2, 0, 255},
+};
+
 static void windows_backend_init(moon_gamepad_backend_t *b) {
   b->xinput_dll = NULL;
   for (int i = 0; i < 4; i++) {
@@ -1828,8 +2008,8 @@ static void windows_backend_init(moon_gamepad_backend_t *b) {
     b->win_rumble_until_ms[i] = 0;
     memset(b->win_names[i], 0, sizeof(b->win_names[i]));
     memset(b->win_uuids[i], 0, sizeof(b->win_uuids[i]));
-    strncpy(b->win_uuids[i], "xinput", sizeof(b->win_uuids[i]) - 1);
-    snprintf(b->win_names[i], sizeof(b->win_names[i]), "XInput Gamepad %d", i);
+    strncpy(b->win_uuids[i], "00000000000000000000000000000000", sizeof(b->win_uuids[i]) - 1);
+    strncpy(b->win_names[i], "Xbox Controller", sizeof(b->win_names[i]) - 1);
   }
   b->gamepad_count = 0;
 }
@@ -1926,43 +2106,43 @@ static void windows_backend_poll(moon_gamepad_backend_t *b) {
     push_btn_diff_mask(b, idx, old_buttons, new_buttons, XINPUT_GAMEPAD_DPAD_LEFT, CODE_BTN_DPAD_LEFT, t);
     push_btn_diff_mask(b, idx, old_buttons, new_buttons, XINPUT_GAMEPAD_DPAD_RIGHT, CODE_BTN_DPAD_RIGHT, t);
 
-    // Analog triggers -> ButtonChanged in [0, 1].
+    // Triggers -> AxisChanged with raw [0, 255] values.
     if (b->win_lt2[idx] != st.Gamepad.bLeftTrigger) {
       b->win_lt2[idx] = st.Gamepad.bLeftTrigger;
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_CHANGED, idx, CODE_BTN_LT2, 0,
-                                 norm_u8(st.Gamepad.bLeftTrigger), t};
+      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, idx, CODE_AXIS_LT2, 0,
+                                 (double)((int32_t)st.Gamepad.bLeftTrigger), t};
       queue_push(&b->q, ev);
     }
     if (b->win_rt2[idx] != st.Gamepad.bRightTrigger) {
       b->win_rt2[idx] = st.Gamepad.bRightTrigger;
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_BUTTON_CHANGED, idx, CODE_BTN_RT2, 0,
-                                 norm_u8(st.Gamepad.bRightTrigger), t};
+      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, idx, CODE_AXIS_RT2, 0,
+                                 (double)((int32_t)st.Gamepad.bRightTrigger), t};
       queue_push(&b->q, ev);
     }
 
-    // Sticks -> AxisChanged in [-1, 1].
+    // Sticks -> AxisChanged with raw i16 values.
     if (b->win_lx[idx] != st.Gamepad.sThumbLX) {
       b->win_lx[idx] = st.Gamepad.sThumbLX;
       moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, idx, CODE_AXIS_LSTICKX, 0,
-                                 norm_i16(st.Gamepad.sThumbLX), t};
+                                 (double)((int32_t)st.Gamepad.sThumbLX), t};
       queue_push(&b->q, ev);
     }
     if (b->win_ly[idx] != st.Gamepad.sThumbLY) {
       b->win_ly[idx] = st.Gamepad.sThumbLY;
       moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, idx, CODE_AXIS_LSTICKY, 0,
-                                 norm_i16(st.Gamepad.sThumbLY), t};
+                                 (double)((int32_t)st.Gamepad.sThumbLY), t};
       queue_push(&b->q, ev);
     }
     if (b->win_rx[idx] != st.Gamepad.sThumbRX) {
       b->win_rx[idx] = st.Gamepad.sThumbRX;
       moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, idx, CODE_AXIS_RSTICKX, 0,
-                                 norm_i16(st.Gamepad.sThumbRX), t};
+                                 (double)((int32_t)st.Gamepad.sThumbRX), t};
       queue_push(&b->q, ev);
     }
     if (b->win_ry[idx] != st.Gamepad.sThumbRY) {
       b->win_ry[idx] = st.Gamepad.sThumbRY;
       moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_AXIS_CHANGED, idx, CODE_AXIS_RSTICKY, 0,
-                                 norm_i16(st.Gamepad.sThumbRY), t};
+                                 (double)((int32_t)st.Gamepad.sThumbRY), t};
       queue_push(&b->q, ev);
     }
   }
@@ -2347,6 +2527,35 @@ moonbit_bytes_t moon_gamepad_backend_axes_bin(void *owner, int32_t id) {
     memcpy(out + (int32_t)i * 4, &v, 4);
   }
   return out;
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+  uint8_t len = b->axes_len[(uint32_t)idx];
+  moonbit_bytes_t out = moonbit_make_bytes_raw((int32_t)len * 4);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  for (uint8_t i = 0; i < len; i++) {
+    int32_t v = b->axes_codes[(uint32_t)idx][i];
+    memcpy(out + (int32_t)i * 4, &v, 4);
+  }
+  return out;
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4 || !b->win_connected[(uint32_t)id]) {
+    return moonbit_make_bytes_raw(0);
+  }
+  uint8_t len = (uint8_t)(sizeof(WINDOWS_AXIS_CODES) / sizeof(WINDOWS_AXIS_CODES[0]));
+  moonbit_bytes_t out = moonbit_make_bytes_raw((int32_t)len * 4);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  for (uint8_t i = 0; i < len; i++) {
+    int32_t v = WINDOWS_AXIS_CODES[i];
+    memcpy(out + (int32_t)i * 4, &v, 4);
+  }
+  return out;
 #else
   (void)b;
   (void)id;
@@ -2371,6 +2580,35 @@ moonbit_bytes_t moon_gamepad_backend_buttons_bin(void *owner, int32_t id) {
   }
   for (uint8_t i = 0; i < len; i++) {
     int32_t v = b->buttons_codes[(uint32_t)idx][i];
+    memcpy(out + (int32_t)i * 4, &v, 4);
+  }
+  return out;
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+  uint8_t len = b->buttons_len[(uint32_t)idx];
+  moonbit_bytes_t out = moonbit_make_bytes_raw((int32_t)len * 4);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  for (uint8_t i = 0; i < len; i++) {
+    int32_t v = b->buttons_codes[(uint32_t)idx][i];
+    memcpy(out + (int32_t)i * 4, &v, 4);
+  }
+  return out;
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4 || !b->win_connected[(uint32_t)id]) {
+    return moonbit_make_bytes_raw(0);
+  }
+  uint8_t len = (uint8_t)(sizeof(WINDOWS_BUTTON_CODES) / sizeof(WINDOWS_BUTTON_CODES[0]));
+  moonbit_bytes_t out = moonbit_make_bytes_raw((int32_t)len * 4);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  for (uint8_t i = 0; i < len; i++) {
+    int32_t v = WINDOWS_BUTTON_CODES[i];
     memcpy(out + (int32_t)i * 4, &v, 4);
   }
   return out;
@@ -2400,6 +2638,55 @@ moonbit_bytes_t moon_gamepad_backend_axis_info_bin(void *owner, int32_t id, int3
       present = 1;
       minv = b->axis_info_min[(uint32_t)idx][i];
       maxv = b->axis_info_max[(uint32_t)idx][i];
+      break;
+    }
+  }
+  moonbit_bytes_t out = moonbit_make_bytes_raw(12);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  memcpy(out + 0, &present, 4);
+  memcpy(out + 4, &minv, 4);
+  memcpy(out + 8, &maxv, 4);
+  return out;
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx < 0) {
+    return moonbit_make_bytes_raw(0);
+  }
+  int32_t present = 0;
+  int32_t minv = 0;
+  int32_t maxv = 0;
+  uint8_t len = b->axis_info_len[(uint32_t)idx];
+  for (uint8_t i = 0; i < len; i++) {
+    if (b->axis_info_codes[(uint32_t)idx][i] == code) {
+      present = 1;
+      minv = b->axis_info_min[(uint32_t)idx][i];
+      maxv = b->axis_info_max[(uint32_t)idx][i];
+      break;
+    }
+  }
+  moonbit_bytes_t out = moonbit_make_bytes_raw(12);
+  if (out == NULL) {
+    return moonbit_make_bytes_raw(0);
+  }
+  memcpy(out + 0, &present, 4);
+  memcpy(out + 4, &minv, 4);
+  memcpy(out + 8, &maxv, 4);
+  return out;
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4 || !b->win_connected[(uint32_t)id]) {
+    return moonbit_make_bytes_raw(0);
+  }
+  int32_t present = 0;
+  int32_t minv = 0;
+  int32_t maxv = 0;
+  size_t info_len = sizeof(WINDOWS_AXIS_INFO) / sizeof(WINDOWS_AXIS_INFO[0]);
+  for (size_t i = 0; i < info_len; i++) {
+    if (WINDOWS_AXIS_INFO[i].code == code) {
+      present = 1;
+      minv = WINDOWS_AXIS_INFO[i].minv;
+      maxv = WINDOWS_AXIS_INFO[i].maxv;
       break;
     }
   }
