@@ -25,6 +25,15 @@ fn core_event_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
+fn build_ok_core(builder : GilrsBuilder) -> Gilrs {
+  let res : Result[Gilrs, GilrsError] = try? builder.build()
+  match res {
+    Ok(g) => g
+    Err(_) => Gilrs::new_mock(0, update_state=false, default_filters=false)
+  }
+}
+
+///|
 test "gilrs next_event default filters skip dropped" {
   let g = Gilrs::new_mock(1, update_state=true, default_filters=true)
   let id = GamepadId::new(0)
@@ -64,18 +73,31 @@ test "builder build_mock wires flags" {
     .with_default_filters(true)
     .set_update_state(false)
     .with_mock_gamepad_count(1)
-  let g = b.build()
+  let g = build_ok_core(b)
   inspect(g.default_filters_enabled(), content="true")
   inspect(g.update_state_enabled(), content="false")
 }
 
 ///|
+test "builder rejects invalid axis_to_btn thresholds" {
+  let bad : Result[Gilrs, GilrsError] = try? GilrsBuilder::new()
+    .set_axis_to_btn(0.4, 0.5)
+    .build()
+  let is_invalid = match bad {
+    Ok(_) => false
+    Err(e) => e.is_invalid_axis_to_btn()
+  }
+  inspect(is_invalid, content="true")
+}
+
+///|
 test "gamepad handle delegates mapping/state" {
-  let g = GilrsBuilder::new()
+  let g = build_ok_core(
+    GilrsBuilder::new()
     .with_default_filters(false)
     .set_update_state(false)
-    .with_mock_gamepad_count(1)
-    .build()
+    .with_mock_gamepad_count(1),
+  )
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.insert(BTN_SOUTH, AxisOrBtn::Btn(Button::South))

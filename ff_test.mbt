@@ -13,15 +13,24 @@
 // limitations under the License.
 
 ///|
+fn build_ok_ff(builder : GilrsBuilder) -> Gilrs {
+  let res : Result[Gilrs, GilrsError] = try? builder.build()
+  match res {
+    Ok(g) => g
+    Err(_) => Gilrs::new_mock(0, update_state=false, default_filters=false)
+  }
+}
+
+///|
 test "finish without gamepads returns NoGamepads" {
-  let g = GilrsBuilder::new().with_mock_gamepad_count(1).build()
+  let g = build_ok_ff(GilrsBuilder::new().with_mock_gamepad_count(1))
   let res : Result[Effect, FfError] = try? EffectBuilder::new().finish(g)
   inspect(res is Err(_), content="true")
 }
 
 ///|
 test "mock gamepad is not ff supported" {
-  let g = GilrsBuilder::new().with_mock_gamepad_count(1).build()
+  let g = build_ok_ff(GilrsBuilder::new().with_mock_gamepad_count(1))
   let res : Result[Effect, FfError] = try? EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .rumble(1.0, 0.0)

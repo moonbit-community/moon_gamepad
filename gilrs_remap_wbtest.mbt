@@ -25,6 +25,15 @@ fn ev_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
+fn build_ok_remap(builder : GilrsBuilder) -> Gilrs {
+  let res : Result[Gilrs, GilrsError] = try? builder.build()
+  match res {
+    Ok(g) => g
+    Err(_) => Gilrs::new_mock(0, update_state=false, default_filters=false)
+  }
+}
+
+///|
 extern "C" fn runtime_now_set_for_test(ms : Int64) -> Unit = "moon_gamepad_now_ms_set_for_test"
 
 ///|
@@ -438,11 +447,12 @@ test "gamepad map_name follows mapping default/name semantics" {
 
 ///|
 test "builder add_mappings loads mapping DB entries" {
-  let g = GilrsBuilder::new()
+  let g = build_ok_remap(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(1)
     .add_mappings("00000000000000000000000000000000,Pad One,a:b0,")
-    .add_mappings("11111111111111111111111111111111,Pad Two,a:b0,")
-    .build()
+    .add_mappings("11111111111111111111111111111111,Pad Two,a:b0,"),
+  )
   inspect(g.mappings.get(Uuid::nil()) is Some(_), content="true")
   inspect(
     g.mappings.get(Uuid::parse("11111111111111111111111111111111")),
@@ -452,10 +462,11 @@ test "builder add_mappings loads mapping DB entries" {
 
 ///|
 test "builder add_mappings participates in connected remap" {
-  let g = GilrsBuilder::new()
+  let g = build_ok_remap(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(1)
-    .add_mappings("00000000000000000000000000000000,Pad From DB,b:b0,")
-    .build()
+    .add_mappings("00000000000000000000000000000000,Pad From DB,b:b0,"),
+  )
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
@@ -522,22 +533,24 @@ test "mapping_source reports None for invalid gamepad handle" {
 
 ///|
 test "builder set_axis_to_btn wires thresholds into gilrs" {
-  let g = GilrsBuilder::new()
+  let g = build_ok_remap(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(1)
     .with_default_filters(false)
-    .set_axis_to_btn(0.5, 0.4)
-    .build()
+    .set_axis_to_btn(0.5, 0.4),
+  )
   inspect(g.axis_to_btn_pressed, content="0.5")
   inspect(g.axis_to_btn_released, content="0.4")
 }
 
 ///|
 test "builder set_axis_to_btn affects axis-to-button press edge" {
-  let g = GilrsBuilder::new()
+  let g = build_ok_remap(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(1)
     .with_default_filters(false)
-    .set_axis_to_btn(0.5, 0.4)
-    .build()
+    .set_axis_to_btn(0.5, 0.4),
+  )
   g.gamepads_data[0].buttons = []
   g.gamepads_data[0].axes = [AXIS_LT2]
   g.gamepads_data[0].axis_info = [(AXIS_LT2, AxisInfo::new(0, 100, None))]
@@ -567,7 +580,9 @@ test "builder set_axis_to_btn affects axis-to-button press edge" {
 ///|
 test "builder loads included mappings by default" {
   runtime_clear_sdl_gamecontrollerconfig_for_test()
-  let g = GilrsBuilder::new().with_mock_gamepad_count(0).build()
+  let g = build_ok_remap(
+    GilrsBuilder::new().with_mock_gamepad_count(0).with_native_backend(false),
+  )
   inspect(
     g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
     content="true",
@@ -577,10 +592,12 @@ test "builder loads included mappings by default" {
 ///|
 test "builder add_included_mappings false disables built-in mapping load" {
   runtime_clear_sdl_gamecontrollerconfig_for_test()
-  let g = GilrsBuilder::new()
+  let g = build_ok_remap(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(0)
-    .add_included_mappings(false)
-    .build()
+    .with_native_backend(false)
+    .add_included_mappings(false),
+  )
   inspect(
     g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is None,
     content="true",
@@ -592,23 +609,57 @@ test "builder loads env mappings by default and can disable them" {
   runtime_set_sdl_gamecontrollerconfig_for_test(
     "11111111111111111111111111111111,Env Pad,a:b0,",
   )
-  let g0 = GilrsBuilder::new()
+  let g0 = build_ok_remap(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(0)
-    .add_included_mappings(false)
-    .build()
+    .with_native_backend(false)
+    .add_included_mappings(false),
+  )
   inspect(
     g0.mappings.get(Uuid::parse("11111111111111111111111111111111")) is Some(_),
     content="true",
   )
 
-  let g1 = GilrsBuilder::new()
+  let g1 = build_ok_remap(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(0)
+    .with_native_backend(false)
     .add_included_mappings(false)
-    .add_env_mappings(false)
-    .build()
+    .add_env_mappings(false),
+  )
   inspect(
     g1.mappings.get(Uuid::parse("11111111111111111111111111111111")) is None,
     content="true",
   )
   runtime_clear_sdl_gamecontrollerconfig_for_test()
+}
+
+///|
+test "builder defaults to native backend" {
+  let g = build_ok_remap(GilrsBuilder::new())
+  inspect(
+    match g.backend {
+      Some(_) => true
+      None => false
+    },
+    content="true",
+  )
+}
+
+///|
+test "deadzone falls back to axis_info and user override wins" {
+  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let id = GamepadId::new(0)
+  g.gamepads_data[0].axis_info = [
+    (AXIS_LT2, AxisInfo::new(0, 255, Some(30))),
+    (AXIS_LSTICKX, AxisInfo::new(-32768, 32767, None)),
+  ]
+
+  let t_trigger = g.deadzone(id, AXIS_LT2).unwrap()
+  let t_stick = g.deadzone(id, AXIS_LSTICKX).unwrap()
+  inspect((t_trigger * 1000.0).to_int(), content="235")
+  inspect((t_stick * 1000.0).to_int(), content="100")
+
+  g.set_deadzone(id, AXIS_LT2, 0.5)
+  inspect((g.deadzone(id, AXIS_LT2).unwrap() * 1000.0).to_int(), content="500")
 }

@@ -32,6 +32,14 @@ let _mapping_error_keepalive : Array[MappingError] = [
 ]
 
 ///|
+pub fn MappingError::invalid_code(self : MappingError) -> Code? {
+  match self {
+    MappingError::InvalidCode(code) => Some(code)
+    _ => None
+  }
+}
+
+///|
 suberror ParseSdlMappingError {
   UnknownHatDirection
   ParseError(ParserError)

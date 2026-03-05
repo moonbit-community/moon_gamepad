@@ -18,16 +18,7 @@ pub fn filter_ev(
   filter : (Event?, Gilrs) -> Event?,
   gilrs : Gilrs,
 ) -> Event? {
-  let out = filter(ev, gilrs)
-  // Mirror gilrs' contract: Some(event) must not become None.
-  match ev {
-    Some(e) =>
-      match out {
-        None => Some(e.drop())
-        Some(_) => out
-      }
-    None => out
-  }
+  filter(ev, gilrs)
 }
 
 ///|

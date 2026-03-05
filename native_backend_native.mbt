@@ -68,6 +68,10 @@ extern "C" fn backend_is_ff_supported(owner : BackendOwner, id : Int) -> Int = "
 
 ///|
 #borrow(owner)
+extern "C" fn backend_power_info_bin(owner : BackendOwner, id : Int) -> Bytes = "moon_gamepad_backend_power_info_bin"
+
+///|
+#borrow(owner)
 extern "C" fn backend_axes_bin(owner : BackendOwner, id : Int) -> Bytes = "moon_gamepad_backend_axes_bin"
 
 ///|
@@ -177,6 +181,23 @@ pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
 }
 
 ///|
+pub fn NativeBackend::power_info(self : NativeBackend, id : Int) -> PowerInfo {
+  let b = backend_power_info_bin(self.owner, id)
+  if b.length() < 8 {
+    return PowerInfo::Unknown
+  }
+  let tag = read_i32_le(b, 0)
+  let value = read_i32_le(b, 4)
+  match tag {
+    1 => PowerInfo::Wired
+    2 => PowerInfo::Discharging(value)
+    3 => PowerInfo::Charging(value)
+    4 => PowerInfo::Charged
+    _ => PowerInfo::Unknown
+  }
+}
+
+///|
 fn read_i32_le(b : Bytes, off : Int) -> Int {
   let b0 = b[off + 0].to_int()
   let b1 = b[off + 1].to_int()
@@ -215,7 +236,7 @@ pub fn NativeBackend::axis_info(
   code : Int,
 ) -> AxisInfo? {
   let b = backend_axis_info_bin(self.owner, id, code)
-  if b.length() < 12 {
+  if b.length() < 16 {
     return None
   }
   let present = read_i32_le(b, 0)
@@ -224,7 +245,9 @@ pub fn NativeBackend::axis_info(
   }
   let minv = read_i32_le(b, 4)
   let maxv = read_i32_le(b, 8)
-  Some(AxisInfo::new(minv, maxv, None))
+  let dz = read_i32_le(b, 12)
+  let deadzone : Int? = if dz < 0 { None } else { Some(dz) }
+  Some(AxisInfo::new(minv, maxv, deadzone))
 }
 
 ///|

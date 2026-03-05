@@ -101,6 +101,13 @@ pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
 }
 
 ///|
+pub fn NativeBackend::power_info(self : NativeBackend, id : Int) -> PowerInfo {
+  let _ = self
+  let _ = id
+  PowerInfo::Unknown
+}
+
+///|
 pub fn NativeBackend::axes(self : NativeBackend, id : Int) -> Array[Int] {
   let _ = self
   let _ = id

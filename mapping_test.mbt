@@ -197,14 +197,15 @@ test "from_data roundtrip + errors" {
   |> ignore)
   inspect(bad_name, content="Err(Milky2018/gamepad.MappingError.InvalidName)")
   data.insert_btn(BTN_DPAD_RIGHT, Button::DPadRight) |> ignore
-  let invalid_code : Result[Unit, Error] = try? (Mapping::from_data(
+  let invalid_code : Result[Unit, MappingError] = try? (Mapping::from_data(
     data, buttons, axes, name, uuid,
   )
   |> ignore)
-  inspect(
-    invalid_code,
-    content="Err(Milky2018/gamepad.MappingError.InvalidCode)",
-  )
+  let invalid_code_payload = match invalid_code {
+    Ok(_) => None
+    Err(e) => e.invalid_code()
+  }
+  inspect(invalid_code_payload == Some(BTN_DPAD_RIGHT), content="true")
   data.insert_btn(buttons[3], Button::Unknown) |> ignore
   let unknown_el : Result[Unit, Error] = try? (Mapping::from_data(
     data, buttons, axes, name, uuid,
@@ -228,6 +229,21 @@ test "mapping_db insert/get" {
     content=(
       #|Some("03000000260900008888000000010001,GameCube {WiseGroup USB box},a:b0,b:b2,y:b3,x:b1,start:b7,rightshoulder:b6,dpup:h0.1,dpleft:h0.8,dpdown:h0.4,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a4,righttrigger:a5,")
     ),
+  )
+}
+
+///|
+test "mapping_db insert works after preloading included mappings" {
+  let db = MappingDb::new()
+  db.add_included_mappings()
+  let platform = runtime_sdl_platform_name()
+  let mapping = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,AfterInclude,a:b0,platform:" +
+    platform +
+    ","
+  db.insert(mapping)
+  inspect(
+    db.get(Uuid::parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")) == Some(mapping),
+    content="true",
   )
 }
 

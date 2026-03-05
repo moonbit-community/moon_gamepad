@@ -22,6 +22,14 @@ suberror GilrsError {
 let _gilrs_error_keepalive : Array[GilrsError] = [GilrsError::NotImplemented]
 
 ///|
+pub fn GilrsError::is_invalid_axis_to_btn(self : GilrsError) -> Bool {
+  match self {
+    GilrsError::InvalidAxisToBtn => true
+    _ => false
+  }
+}
+
+///|
 pub struct GamepadData {
   state : GamepadState
   mut connected : Bool
@@ -173,6 +181,16 @@ pub fn Gilrs::insert_event(self : Gilrs, ev : Event) -> Unit {
 }
 
 ///|
+fn Gilrs::apply_connection_event(self : Gilrs, ev : Event) -> Unit {
+  let id = ev.id().value()
+  match ev.event() {
+    EventType::Connected => self.set_connected(id, true)
+    EventType::Disconnected => self.set_connected(id, false)
+    _ => ()
+  }
+}
+
+///|
 fn Gilrs::ensure_gamepad_data(self : Gilrs, id : Int) -> Unit {
   if id < 0 {
     return
@@ -260,7 +278,7 @@ fn Gilrs::refresh_gamepad_data_on_connected(
       data.vendor_id = b.vendor_id(id)
       data.product_id = b.product_id(id)
       data.ff_supported = b.is_ff_supported(id)
-      data.power_info = PowerInfo::Unknown
+      data.power_info = b.power_info(id)
       data.axes = b.axes(id)
       data.buttons = b.buttons(id)
       let infos : Array[(Code, AxisInfo)] = []
@@ -493,6 +511,10 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
       self.events_head = self.events_head + 1
       Some(ev)
     }
+    match raw {
+      None => ()
+      Some(ev) => self.apply_connection_event(ev)
+    }
     let mut ev : Event? = raw
     if self.default_filters {
       ev = filter_ev(ev, axis_dpad_to_button, self)
@@ -501,7 +523,7 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
     }
     match ev {
       Some(e) =>
-        if e.is_dropped() {
+        if self.default_filters && e.is_dropped() {
           continue
         } else {
           if self.update_state {
@@ -519,13 +541,12 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
 ///|
 pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
   let jitter_filter = Jitter::new()
-  let mut timeout2 = timeout_ms
   while true {
     if self.events_head >= self.events.length() {
       match self.backend {
         None => ()
         Some(b) => {
-          let t : Int = match timeout2 {
+          let t : Int = match timeout_ms {
             None => -1
             Some(ms) =>
               if ms <= 0L {
@@ -543,10 +564,6 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
           }
         }
       }
-      timeout2 = match timeout2 {
-        None => None
-        Some(_) => Some(0L)
-      }
     }
     let raw : Event? = if self.events_head >= self.events.length() {
       None
@@ -554,6 +571,10 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
       let ev = self.events[self.events_head]
       self.events_head = self.events_head + 1
       Some(ev)
+    }
+    match raw {
+      None => ()
+      Some(ev) => self.apply_connection_event(ev)
     }
     let mut ev : Event? = raw
     if self.default_filters {
@@ -563,7 +584,7 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
     }
     match ev {
       Some(e) =>
-        if e.is_dropped() {
+        if self.default_filters && e.is_dropped() {
           continue
         } else {
           if self.update_state {
@@ -598,9 +619,10 @@ pub fn Gilrs::update(self : Gilrs, event : Event) -> Unit {
       data.state.set_btn_value(code, value, counter, time)
     EventType::AxisChanged(_, value, code) =>
       data.state.set_axis_value(code, value, counter, time)
-    EventType::Connected => data.connected = true
-    EventType::Disconnected => data.connected = false
-    EventType::Dropped | EventType::ForceFeedbackEffectCompleted => ()
+    EventType::Connected
+    | EventType::Disconnected
+    | EventType::Dropped
+    | EventType::ForceFeedbackEffectCompleted => ()
   }
 }
 
@@ -776,7 +798,26 @@ pub fn Gilrs::deadzone(self : Gilrs, id : GamepadId, code : Code) -> Double? {
   }
   let dz = self.gamepads_data[i].deadzones
   match find_deadzone_idx(dz, code) {
-    None => None
+    None => {
+      for pair in self.gamepads_data[i].axis_info {
+        let (c, info) = pair
+        if c != code {
+          continue
+        }
+        let range_i64 = info.max.to_int64() - info.min.to_int64()
+        if range_i64 <= 0L {
+          return Some(0.0)
+        }
+        match info.deadzone {
+          Some(d) =>
+            return Some(
+              clamp(d.to_double() / range_i64.to_double() * 2.0, 0.0, 1.0),
+            )
+          None => return Some(0.1)
+        }
+      }
+      None
+    }
     Some(j) => {
       let (_, t) = dz[j]
       Some(t)
@@ -807,7 +848,7 @@ pub fn GilrsBuilder::new() -> GilrsBuilder {
     env_mappings: true,
     included_mappings: true,
     mock_gamepad_count: 0,
-    use_native_backend: false,
+    use_native_backend: true,
     mapping_inputs: [],
   }
 }
@@ -887,8 +928,17 @@ pub fn GilrsBuilder::add_included_mappings(
 }
 
 ///|
-pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
-  let gilrs = if self.use_native_backend {
+pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs raise GilrsError {
+  if self.axis_to_btn_pressed <= self.axis_to_btn_released ||
+    self.axis_to_btn_pressed < 0.0 ||
+    self.axis_to_btn_pressed > 1.0 ||
+    self.axis_to_btn_released < 0.0 ||
+    self.axis_to_btn_released > 1.0 {
+    raise GilrsError::InvalidAxisToBtn
+  }
+  let use_native_backend = self.use_native_backend &&
+    self.mock_gamepad_count <= 0
+  let gilrs = if use_native_backend {
     Gilrs::new_native(
       update_state=self.update_state,
       default_filters=self.default_filters,
@@ -916,7 +966,13 @@ pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs {
 
 ///|
 pub fn Gilrs::new() -> Gilrs {
-  GilrsBuilder::new().with_native_backend(true).build()
+  let built : Result[Gilrs, GilrsError] = try? GilrsBuilder::new()
+    .with_native_backend(true)
+    .build()
+  match built {
+    Ok(g) => g
+    Err(_) => Gilrs::new_native()
+  }
 }
 
 ///|

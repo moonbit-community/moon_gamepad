@@ -25,7 +25,9 @@ pub fn AxisInfo::new(min : Int, max : Int, deadzone : Int?) -> AxisInfo {
 }
 
 ///|
-const IS_Y_AXIS_REVERSED : Bool = true
+fn is_y_axis_reversed() -> Bool {
+  runtime_sdl_platform_name() != "Windows"
+}
 
 ///|
 const INT_MAX_I64 : Int64 = 2147483647L
@@ -53,7 +55,7 @@ pub fn axis_value(info : AxisInfo, val : Int, axis : Axis) -> Double {
     Axis::LeftStickY | Axis::RightStickY | Axis::DPadY => true
     _ => false
   }
-  if IS_Y_AXIS_REVERSED && is_y_axis && out != 0.0 {
+  if is_y_axis_reversed() && is_y_axis && out != 0.0 {
     out = -out
   }
   clamp(out, -1.0, 1.0)

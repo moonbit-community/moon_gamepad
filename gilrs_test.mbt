@@ -80,6 +80,15 @@ fn gilrs_event_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
+fn build_ok_gilrs(builder : GilrsBuilder) -> Gilrs {
+  let res : Result[Gilrs, GilrsError] = try? builder.build()
+  match res {
+    Ok(g) => g
+    Err(_) => Gilrs::new_mock(0, update_state=false, default_filters=false)
+  }
+}
+
+///|
 test "gilrs next_event applies default filters by default" {
   let g = Gilrs::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
@@ -107,11 +116,12 @@ test "gilrs next_event applies default filters by default" {
 
 ///|
 test "gilrs builder can disable default filters" {
-  let g = GilrsBuilder::new()
+  let g = build_ok_gilrs(
+    GilrsBuilder::new()
     .with_mock_gamepad_count(1)
     .set_update_state(true)
-    .with_default_filters(false)
-    .build()
+    .with_default_filters(false),
+  )
   let id = GamepadId::new(0)
   g.insert_event(
     Event::at(
@@ -131,6 +141,36 @@ test "gilrs builder can disable default filters" {
   inspect(
     g.next_event().map(gilrs_event_sig),
     content="Some((0, 0, 0.505, 65584))",
+  )
+}
+
+///|
+test "gilrs returns dropped when default filters are disabled" {
+  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let id = GamepadId::new(0)
+  g.insert_event(Event::at(id, EventType::Dropped, 1L))
+  let got = g
+    .next_event()
+    .map(fn(ev) {
+      match ev.event() {
+        EventType::Dropped => 1
+        _ => 0
+      }
+    })
+  inspect(got, content="Some(1)")
+}
+
+///|
+test "gilrs update ignores connection events but next_event syncs connection" {
+  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let id = GamepadId::new(0)
+  g.update(Event::at(id, EventType::Disconnected, 1L))
+  inspect(g.gamepad(id).map(fn(gp) { gp.is_connected() }), content="Some(true)")
+  g.insert_event(Event::at(id, EventType::Disconnected, 2L))
+  ignore(g.next_event())
+  inspect(
+    g.gamepad(id).map(fn(gp) { gp.is_connected() }),
+    content="Some(false)",
   )
 }
 

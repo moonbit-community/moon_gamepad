@@ -38,7 +38,7 @@ test "jitter drops small delta" {
 }
 
 ///|
-test "filter_ev converts Some->None into dropped event" {
+test "filter_ev passes through filter output" {
   let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let ev = Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 1L)
@@ -47,7 +47,7 @@ test "filter_ev converts Some->None into dropped event" {
     fn(_ev : Event?, _gilrs : Gilrs) -> Event? { None },
     g,
   )
-  inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
+  inspect(out is None, content="true")
 }
 
 ///|
