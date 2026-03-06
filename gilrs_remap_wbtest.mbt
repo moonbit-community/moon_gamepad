@@ -450,6 +450,8 @@ test "builder add_mappings loads mapping DB entries" {
   let g = build_ok_remap(
     GilrsBuilder::new()
     .with_mock_gamepad_count(1)
+    .add_included_mappings(false)
+    .add_env_mappings(false)
     .add_mappings("00000000000000000000000000000000,Pad One,a:b0,")
     .add_mappings("11111111111111111111111111111111,Pad Two,a:b0,"),
   )
@@ -465,6 +467,8 @@ test "builder add_mappings participates in connected remap" {
   let g = build_ok_remap(
     GilrsBuilder::new()
     .with_mock_gamepad_count(1)
+    .add_included_mappings(false)
+    .add_env_mappings(false)
     .add_mappings("00000000000000000000000000000000,Pad From DB,b:b0,"),
   )
   let id = GamepadId::new(0)

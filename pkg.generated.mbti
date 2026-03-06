@@ -318,6 +318,7 @@ pub struct Effect {
   mut distance_model : DistanceModel
   mut position : (Double, Double, Double)
   mut gain : Double
+  mut playing_since_ms : Int64?
 }
 pub fn Effect::add_gamepad(Self, Gamepad) -> Unit raise FfError
 pub fn Effect::play(Self) -> Unit raise FfError
