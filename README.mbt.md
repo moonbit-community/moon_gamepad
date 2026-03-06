@@ -1,71 +1,87 @@
 # Milky2018/gamepad
 
-MoonBit port of core `gilrs` concepts (mappings, events, state, and filters), with a native-first focus.
+`Milky2018/gamepad` is a MoonBit gamepad input library for native targets. It provides `gilrs`-style events, state tracking, SDL controller mappings, input filters, force-feedback APIs, and a mock backend for tests.
 
-## Status
+## Install
 
-- Core types: `Axis`, `Button`, `Event`, `EventType`, `GamepadState`
-- SDL mapping parser + mapping utilities
-- Filters: `jitter`, `deadzone`, `axis_dpad_to_button`, `Repeat`
-- Mockable core: `Gilrs::new_mock`, `GilrsBuilder` (mock), `Gamepad` handle
-- Blocking event wait: `Gilrs::next_event_blocking(timeout_ms)`
+```bash
+moon add Milky2018/gamepad
+```
 
-## Platform Support (Checklist)
+Use the native target for real device input:
 
-This project is **macOS-first**. Linux/Windows are tracked as follow-ups and may have behavioral gaps.
+```bash
+moon test --target native
+moon run --target native
+```
 
-- macOS (native / IOHIDManager)
-  - [x] Enumeration + hotplug events
-  - [x] Buttons + axes events
-  - [x] Device identity (`name`, `uuid`, `vendor_id`, `product_id`)
-  - [x] SDL mapping DB lookup on connect (full mapping)
-  - [x] Force feedback parity (`is_ff_supported == false`; effect APIs return unsupported errors)
-  - [x] Power info parity (`PowerInfo::Unknown`, matching gilrs-core macOS)
-- Linux (native / evdev) *(planned to harden later)*
-  - [x] Enumeration + hotplug events (best-effort)
-  - [x] Device identity + capability metadata (`name`, `uuid`, `vendor_id`, `product_id`, `axes`, `buttons`, `axis_info`)
-  - [x] Basic rumble (`FF_RUMBLE`) when device can be opened read-write
-  - [ ] Permissions/udev guidance + broader device coverage
-- Windows (native / XInput) *(planned to harden later)*
-  - [x] Basic input + rumble (via `XInputSetState` when available)
-  - [x] Device identity semantics (gilrs xinput-compatible `name` + nil UUID; `vendor_id`/`product_id` unavailable)
-  - [x] Capability metadata (`axes`, `buttons`, `axis_info`)
-  - [ ] CI coverage on real Windows runners
+## Platform Support
 
-## Notes / Limitations (vs upstream `gilrs`)
+Best support today is on macOS. Linux and Windows are available on native targets as well.
 
-- `Code` is backend-specific. On macOS it matches gilrs-core's HID `EvCode` encoding: `(usage_page << 16) | usage`.
-- On macOS, some HID axes (e.g. GenericDesktop `Rx`/`Ry`) are intentionally left **unmapped** to `Axis` by default (matching gilrs-core's "unconfirmed" constants). Use the SDL mapping DB to get semantic axis/button names for these codes.
-- On macOS, `PowerInfo` is intentionally `Unknown` (parity with upstream `gilrs-core`).
-- Force-feedback repeat mode is exposed as `FfRepeat` to avoid naming collision with event filter `Repeat`.
+- [x] macOS native backend (`IOHIDManager`)
+- [x] Linux native backend (`evdev`)
+- [x] Windows native backend (`XInput`)
+- [ ] Non-native targets for real device input
 
-## Quickstart (native)
+## Features
 
-```moonbit nocheck
-let gilrs = Gilrs::new()
+- Native gamepad discovery and hotplug events
+- `Gilrs` event polling and blocking waits
+- Per-device state tracking through `Gamepad` and `GamepadState`
+- SDL controller mapping database support, including bundled mappings
+- Input filters: `jitter`, `deadzone`, `axis_dpad_to_button`, `Repeat`
+- Force-feedback APIs with platform-specific backend support
+- Mock backend for deterministic tests
 
-while true {
-  match gilrs.next_event() {
-    None => break
-    Some(ev) => println(ev)
+## Quick Start
+
+```moonbit
+import Milky2018/gamepad
+
+fn main {
+  let gilrs = Gilrs::new()
+
+  while true {
+    match gilrs.next_event() {
+      None => break
+      Some(ev) => {
+        println(ev)
+      }
+    }
   }
 }
 ```
 
-## Quickstart (mock)
+## Mock Example
 
-```moonbit nocheck
-let gilrs =
-  GilrsBuilder::new()
-  .with_mock_gamepad_count(1)
-  .with_default_filters(true)
-  .build()
+```moonbit
+import Milky2018/gamepad
 
-let id = GamepadId::new(0)
-gilrs.insert_event(Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L))
+test "mock button press" {
+  let gilrs =
+    GilrsBuilder::new()
+    .with_mock_gamepad_count(1)
+    .with_default_filters(false)
+    .build()
 
-match gilrs.next_event() {
-  None => ()
-  Some(ev) => println(ev.id().value())
+  let id = GamepadId::new(0)
+  gilrs.insert_event(
+    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
+  )
+
+  inspect(gilrs.next_event(), content="Some(...)")
 }
 ```
+
+## Notes
+
+- `Code` values are backend-specific raw input codes.
+- On macOS, some raw HID axes such as `Rx` and `Ry` may need SDL mappings before they resolve to semantic `Axis` values.
+- On macOS, `PowerInfo` currently reports `Unknown`.
+- On non-native targets, the package builds with a stub backend and does not provide real device events.
+- Force-feedback repeat mode is exposed as `FfRepeat`.
+
+## License
+
+Apache-2.0.
