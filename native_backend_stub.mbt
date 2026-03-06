@@ -66,6 +66,12 @@ pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
 }
 
 ///|
+pub fn NativeBackend::last_gamepad_hint(self : NativeBackend) -> Int {
+  let _ = self
+  0
+}
+
+///|
 pub fn NativeBackend::name(self : NativeBackend, id : Int) -> String {
   let _ = self
   let _ = id
@@ -91,6 +97,13 @@ pub fn NativeBackend::product_id(self : NativeBackend, id : Int) -> Int? {
   let _ = self
   let _ = id
   None
+}
+
+///|
+pub fn NativeBackend::is_connected(self : NativeBackend, id : Int) -> Bool {
+  let _ = self
+  let _ = id
+  false
 }
 
 ///|

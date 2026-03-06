@@ -35,6 +35,10 @@ extern "C" fn backend_gamepad_count(owner : BackendOwner) -> Int = "moon_gamepad
 
 ///|
 #borrow(owner)
+extern "C" fn backend_last_gamepad_hint(owner : BackendOwner) -> Int = "moon_gamepad_backend_last_gamepad_hint"
+
+///|
+#borrow(owner)
 extern "C" fn backend_next_event_bin(owner : BackendOwner) -> Bytes = "moon_gamepad_backend_next_event_bin"
 
 ///|
@@ -61,6 +65,10 @@ extern "C" fn backend_vendor_id(owner : BackendOwner, id : Int) -> Int = "moon_g
 ///|
 #borrow(owner)
 extern "C" fn backend_product_id(owner : BackendOwner, id : Int) -> Int = "moon_gamepad_backend_product_id"
+
+///|
+#borrow(owner)
+extern "C" fn backend_is_connected(owner : BackendOwner, id : Int) -> Int = "moon_gamepad_backend_is_connected"
 
 ///|
 #borrow(owner)
@@ -125,6 +133,11 @@ pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
 }
 
 ///|
+pub fn NativeBackend::last_gamepad_hint(self : NativeBackend) -> Int {
+  backend_last_gamepad_hint(self.owner)
+}
+
+///|
 pub fn NativeBackend::next_event(self : NativeBackend) -> NativeEvent? {
   let b = backend_next_event_bin(self.owner)
   decode_native_event(b)
@@ -173,6 +186,11 @@ pub fn NativeBackend::product_id(self : NativeBackend, id : Int) -> Int? {
   } else {
     Some(v)
   }
+}
+
+///|
+pub fn NativeBackend::is_connected(self : NativeBackend, id : Int) -> Bool {
+  backend_is_connected(self.owner, id) != 0
 }
 
 ///|

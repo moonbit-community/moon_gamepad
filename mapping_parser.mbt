@@ -121,6 +121,9 @@ fn parse_u16_decimal(s : String, pos : Int) -> Int raise ParserError {
   for c in s {
     if c is ('0'..='9') {
       acc = acc * 10 + (c.to_int() - '0'.to_int())
+      if acc > 65535 {
+        raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
+      }
     } else {
       raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
     }
@@ -210,6 +213,15 @@ fn Parser::next_token(self : Parser) -> Token? raise ParserError {
 fn Parser::parse_uuid(self : Parser) -> Token raise ParserError {
   let next_comma = next_comma_or_end(self.data, self.pos)
   let uuid_field = slice_to_string(self.data, self.pos, next_comma)
+  if uuid_field == "xinput" {
+    if next_comma == self.data.length() {
+      self.state = State::Invalid
+      raise ParserError::Error(ParserErrorKind::UnexpectedEnd, self.pos)
+    }
+    self.state = State::Name
+    self.pos = next_comma + 1
+    return Token::Uuid(Uuid::nil())
+  }
   let uuid = Token::Uuid(Uuid::parse(uuid_field)) catch {
     _ => {
       self.state = State::Invalid

@@ -17,6 +17,7 @@ test "effect play/stop without backend errors" {
   let g = Gilrs::new_mock(1)
   let e : Effect = {
     gilrs: g,
+    effect_token: 1,
     gamepads: [GamepadId::new(0)],
     strong: 1.0,
     weak: 1.0,
@@ -26,6 +27,7 @@ test "effect play/stop without backend errors" {
     distance_model: DistanceModel::None,
     position: (0.0, 0.0, 0.0),
     gain: 1.0,
+    playing_since_ms: None,
   }
   let r1 : Result[Unit, FfError] = try? e.play()
   inspect(r1 is Err(_), content="true")
@@ -35,6 +37,12 @@ test "effect play/stop without backend errors" {
 
 ///|
 extern "C" fn backend_new_null_for_test() -> BackendOwner = "moon_gamepad_backend_new_null_for_test"
+
+///|
+extern "C" fn ff_runtime_now_set_for_test(ms : Int64) -> Unit = "moon_gamepad_now_ms_set_for_test"
+
+///|
+extern "C" fn ff_runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_clear_for_test"
 
 ///|
 fn native_backend_null_for_test() -> NativeBackend {
@@ -69,6 +77,8 @@ fn new_ff_ready_with_null_backend(gamepad_count : Int) -> Gilrs {
     gamepads_data: data,
     mappings: MappingDb::new(),
     now_ms: 0L,
+    next_effect_token: 1,
+    ff_pending_completions: [],
     backend: Some(native_backend_null_for_test()),
   }
 }
@@ -525,4 +535,109 @@ test "effect set_repeat/set_position/set_distance_model update state" {
     },
     content="true",
   )
+}
+
+///|
+test "set_repeat schedules completion for running effect" {
+  ff_runtime_now_set_for_test(149L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let effect : Effect = {
+    gilrs: g,
+    effect_token: 101,
+    gamepads: [GamepadId::new(0)],
+    strong: 0.0,
+    weak: 0.0,
+    duration_ms: 0L,
+    base_effects: [],
+    repeat_mode: FfRepeat::Infinitely,
+    distance_model: DistanceModel::None,
+    position: (0.0, 0.0, 0.0),
+    gain: 1.0,
+    playing_since_ms: Some(100L),
+  }
+  effect.set_repeat(FfRepeat::For(50L))
+  inspect(g.next_event() is None, content="true")
+  ff_runtime_now_set_for_test(150L)
+  let ev = match g.next_event() {
+    None => {
+      ff_runtime_now_clear_for_test()
+      return
+    }
+    Some(ev) => ev
+  }
+  inspect(
+    match ev.event() {
+      EventType::ForceFeedbackEffectCompleted => ev.id().value() == 0
+      _ => false
+    },
+    content="true",
+  )
+  ff_runtime_now_clear_for_test()
+}
+
+///|
+test "set_repeat infinitely cancels completion for running effect" {
+  ff_runtime_now_set_for_test(100L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let effect : Effect = {
+    gilrs: g,
+    effect_token: 102,
+    gamepads: [GamepadId::new(0)],
+    strong: 0.0,
+    weak: 0.0,
+    duration_ms: 0L,
+    base_effects: [],
+    repeat_mode: FfRepeat::Infinitely,
+    distance_model: DistanceModel::None,
+    position: (0.0, 0.0, 0.0),
+    gain: 1.0,
+    playing_since_ms: Some(100L),
+  }
+  effect.set_repeat(FfRepeat::For(20L))
+  effect.set_repeat(FfRepeat::Infinitely)
+  ff_runtime_now_set_for_test(200L)
+  inspect(g.next_event() is None, content="true")
+  ff_runtime_now_clear_for_test()
+}
+
+///|
+test "set_gamepads reschedules completion targets for running effect" {
+  ff_runtime_now_set_for_test(100L)
+  let g = new_ff_ready_mock(2)
+  let effect : Effect = {
+    gilrs: g,
+    effect_token: 103,
+    gamepads: [GamepadId::new(0)],
+    strong: 0.0,
+    weak: 0.0,
+    duration_ms: 0L,
+    base_effects: [],
+    repeat_mode: FfRepeat::Infinitely,
+    distance_model: DistanceModel::None,
+    position: (0.0, 0.0, 0.0),
+    gain: 1.0,
+    playing_since_ms: Some(100L),
+  }
+  effect.set_repeat(FfRepeat::For(20L))
+  let set_res : Result[Unit, FfError] = try? effect.set_gamepads(
+    [GamepadId::new(1)],
+    g,
+  )
+  inspect(set_res is Ok(_), content="true")
+  ff_runtime_now_set_for_test(120L)
+  let ev = match g.next_event() {
+    None => {
+      ff_runtime_now_clear_for_test()
+      return
+    }
+    Some(ev) => ev
+  }
+  inspect(
+    match ev.event() {
+      EventType::ForceFeedbackEffectCompleted => ev.id().value() == 1
+      _ => false
+    },
+    content="true",
+  )
+  ff_runtime_now_clear_for_test()
 }

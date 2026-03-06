@@ -68,6 +68,13 @@ fn GamepadData::new() -> GamepadData {
 }
 
 ///|
+struct FfPendingCompletion {
+  token : Int
+  id : Int
+  due_time_ms : Int64
+}
+
+///|
 pub struct Gilrs {
   mut counter : Int64
   update_state : Bool
@@ -79,6 +86,8 @@ pub struct Gilrs {
   gamepads_data : Array[GamepadData]
   mappings : MappingDb
   mut now_ms : Int64
+  mut next_effect_token : Int
+  mut ff_pending_completions : Array[FfPendingCompletion]
   backend : NativeBackend?
 }
 
@@ -103,6 +112,8 @@ pub fn Gilrs::new_mock(
     gamepads_data: data,
     mappings: MappingDb::new(),
     now_ms: 0L,
+    next_effect_token: 1,
+    ff_pending_completions: [],
     backend: None,
   }
 }
@@ -123,6 +134,8 @@ pub fn Gilrs::new_native(
     gamepads_data: [],
     mappings: MappingDb::new(),
     now_ms: 0L,
+    next_effect_token: 1,
+    ff_pending_completions: [],
     backend: Some(NativeBackend::new()),
   }
 }
@@ -173,6 +186,138 @@ pub fn Gilrs::set_time(self : Gilrs, now_ms : Int64) -> Unit {
 ///|
 pub fn Gilrs::time(self : Gilrs) -> Int64 {
   self.now_ms
+}
+
+///|
+fn contains_id(ids : Array[Int], id : Int) -> Bool {
+  for x in ids {
+    if x == id {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn Gilrs::new_effect_token(self : Gilrs) -> Int {
+  let token = self.next_effect_token
+  if token >= 0x7FFF_FFFF {
+    self.next_effect_token = 1
+  } else {
+    self.next_effect_token = token + 1
+  }
+  token
+}
+
+///|
+fn Gilrs::schedule_ff_effect_completion(
+  self : Gilrs,
+  token : Int,
+  ids : Array[GamepadId],
+  due_time_ms : Int64,
+) -> Unit {
+  self.cancel_ff_effect_completion(token)
+  let uniq : Array[Int] = []
+  for gid in ids {
+    let id = gid.value()
+    if id < 0 {
+      continue
+    }
+    if !contains_id(uniq, id) {
+      uniq.push(id)
+    }
+  }
+  for id in uniq {
+    self.ff_pending_completions.push({ token, id, due_time_ms })
+  }
+}
+
+///|
+fn Gilrs::cancel_ff_effect_completion(self : Gilrs, token : Int) -> Unit {
+  let pending : Array[FfPendingCompletion] = []
+  for item in self.ff_pending_completions {
+    if item.token != token {
+      pending.push(item)
+    }
+  }
+  self.ff_pending_completions = pending
+}
+
+///|
+fn Gilrs::cancel_ff_effect_completion_for_gamepad(
+  self : Gilrs,
+  id : Int,
+) -> Unit {
+  let pending : Array[FfPendingCompletion] = []
+  for item in self.ff_pending_completions {
+    if item.id != id {
+      pending.push(item)
+    }
+  }
+  self.ff_pending_completions = pending
+}
+
+///|
+fn Gilrs::next_due_ff_completion_time(self : Gilrs) -> Int64? {
+  if self.ff_pending_completions.length() == 0 {
+    return None
+  }
+  let mut next_due = self.ff_pending_completions[0].due_time_ms
+  for item in self.ff_pending_completions {
+    if item.due_time_ms < next_due {
+      next_due = item.due_time_ms
+    }
+  }
+  Some(next_due)
+}
+
+///|
+fn Gilrs::take_due_ff_completion(self : Gilrs, now_ms : Int64) -> Event? {
+  while true {
+    let mut chosen_idx : Int? = None
+    let mut chosen_due = 0L
+    for i in 0..<self.ff_pending_completions.length() {
+      let item = self.ff_pending_completions[i]
+      if item.due_time_ms > now_ms {
+        continue
+      }
+      match chosen_idx {
+        None => {
+          chosen_idx = Some(i)
+          chosen_due = item.due_time_ms
+        }
+        Some(_) =>
+          if item.due_time_ms < chosen_due {
+            chosen_idx = Some(i)
+            chosen_due = item.due_time_ms
+          }
+      }
+    }
+    match chosen_idx {
+      None => return None
+      Some(idx) => {
+        let chosen = self.ff_pending_completions[idx]
+        let pending : Array[FfPendingCompletion] = []
+        for i in 0..<self.ff_pending_completions.length() {
+          if i != idx {
+            pending.push(self.ff_pending_completions[i])
+          }
+        }
+        self.ff_pending_completions = pending
+        if chosen.id >= 0 && self.is_connected(GamepadId::new(chosen.id)) {
+          return Some(
+            Event::at(
+              GamepadId::new(chosen.id),
+              EventType::ForceFeedbackEffectCompleted,
+              now_ms,
+            ),
+          )
+        }
+      }
+    }
+  } nobreak {
+    None
+  }
 }
 
 ///|
@@ -312,6 +457,22 @@ fn Gilrs::refresh_gamepad_data_on_connected(
 }
 
 ///|
+fn Gilrs::finish_gamepads_creation(self : Gilrs) -> Unit {
+  match self.backend {
+    None => ()
+    Some(b) => {
+      let hint = b.last_gamepad_hint()
+      for id in 0..<hint {
+        let existed_before = id >= 0 && id < self.gamepads_data.length()
+        self.ensure_gamepad_data(id)
+        self.refresh_gamepad_data_on_connected(id, existed_before)
+        self.set_connected(id, b.is_connected(id))
+      }
+    }
+  }
+}
+
+///|
 fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
   let id = ne.id
   let existed_before = id >= 0 && id < self.gamepads_data.length()
@@ -323,6 +484,7 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
       self.insert_event(Event::at(gid, EventType::Connected, ne.time_ms))
     }
     NativeEventTag::Disconnected => {
+      self.cancel_ff_effect_completion_for_gamepad(id)
       self.set_connected(id, false)
       self.insert_event(Event::at(gid, EventType::Disconnected, ne.time_ms))
     }
@@ -498,9 +660,46 @@ pub fn Gilrs::poll(self : Gilrs) -> Unit {
 }
 
 ///|
+fn clamp_blocking_timeout(timeout_ms : Int64?) -> Int {
+  match timeout_ms {
+    None => -1
+    Some(ms) =>
+      if ms <= 0L {
+        0
+      } else if ms >= 0x7FFF_FFFFL {
+        0x7FFF_FFFF
+      } else {
+        ms.to_int()
+      }
+  }
+}
+
+///|
+fn min_timeout(lhs : Int, rhs : Int) -> Int {
+  if lhs < 0 {
+    rhs
+  } else if rhs < 0 {
+    lhs
+  } else if lhs < rhs {
+    lhs
+  } else {
+    rhs
+  }
+}
+
+///|
 pub fn Gilrs::next_event(self : Gilrs) -> Event? {
   let jitter_filter = Jitter::new()
   while true {
+    match self.take_due_ff_completion(runtime_now_ms()) {
+      None => ()
+      Some(ev) => {
+        if self.update_state {
+          self.update(ev)
+        }
+        return Some(ev)
+      }
+    }
     if self.events_head >= self.events.length() {
       self.poll()
     }
@@ -542,25 +741,44 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
 pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
   let jitter_filter = Jitter::new()
   while true {
+    let now = runtime_now_ms()
+    match self.take_due_ff_completion(now) {
+      None => ()
+      Some(ev) => {
+        if self.update_state {
+          self.update(ev)
+        }
+        return Some(ev)
+      }
+    }
     if self.events_head >= self.events.length() {
       match self.backend {
         None => ()
         Some(b) => {
-          let t : Int = match timeout_ms {
-            None => -1
-            Some(ms) =>
-              if ms <= 0L {
+          let base_timeout = clamp_blocking_timeout(timeout_ms)
+          let t = match self.next_due_ff_completion_time() {
+            None => base_timeout
+            Some(due_time) =>
+              if due_time <= now {
                 0
-              } else if ms >= 0x7FFF_FFFFL {
-                0x7FFF_FFFF
               } else {
-                ms.to_int()
+                let wait_ff = clamp_blocking_timeout(Some(due_time - now))
+                min_timeout(base_timeout, wait_ff)
               }
           }
           b.poll_timeout(t)
           match b.next_event() {
             None => ()
             Some(ne) => self.push_native_event(ne)
+          }
+          match self.take_due_ff_completion(runtime_now_ms()) {
+            None => ()
+            Some(ev) => {
+              if self.update_state {
+                self.update(ev)
+              }
+              return Some(ev)
+            }
           }
         }
       }
@@ -961,6 +1179,7 @@ pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs raise GilrsError {
   }
   gilrs.axis_to_btn_pressed = self.axis_to_btn_pressed
   gilrs.axis_to_btn_released = self.axis_to_btn_released
+  gilrs.finish_gamepads_creation()
   gilrs
 }
 
@@ -1168,11 +1387,7 @@ pub fn Gamepad::is_pressed(self : Gamepad, btn : Button) -> Bool {
 
 ///|
 pub fn Gamepad::value(self : Gamepad, axis : Axis) -> Double {
-  let code = match self.axis_code(axis) {
-    Some(code) => Some(code)
-    None => default_axis_code(axis)
-  }
-  match code {
+  match self.axis_code(axis) {
     None => 0.0
     Some(code) => self.state().value(code)
   }
@@ -1180,11 +1395,7 @@ pub fn Gamepad::value(self : Gamepad, axis : Axis) -> Double {
 
 ///|
 pub fn Gamepad::button_data(self : Gamepad, btn : Button) -> ButtonData? {
-  let code = match self.button_code(btn) {
-    Some(code) => Some(code)
-    None => default_button_code(btn)
-  }
-  match code {
+  match self.button_code(btn) {
     None => None
     Some(code) => self.state().button_data(code)
   }
@@ -1192,11 +1403,7 @@ pub fn Gamepad::button_data(self : Gamepad, btn : Button) -> ButtonData? {
 
 ///|
 pub fn Gamepad::axis_data(self : Gamepad, axis : Axis) -> AxisData? {
-  let code = match self.axis_code(axis) {
-    Some(code) => Some(code)
-    None => default_axis_code(axis)
-  }
-  match code {
+  match self.axis_code(axis) {
     None => None
     Some(code) => self.state().axis_data(code)
   }

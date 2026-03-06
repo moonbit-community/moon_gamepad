@@ -236,6 +236,7 @@ pub fn Replay::at(self : Replay, ticks : Int) -> Double {
 ///|
 pub struct Effect {
   gilrs : Gilrs
+  effect_token : Int
   mut gamepads : Array[GamepadId]
   strong : Double
   weak : Double
@@ -245,6 +246,7 @@ pub struct Effect {
   mut distance_model : DistanceModel
   mut position : (Double, Double, Double)
   mut gain : Double
+  mut playing_since_ms : Int64?
 }
 
 ///|
@@ -427,6 +429,7 @@ pub fn EffectBuilder::finish(
   }
   {
     gilrs,
+    effect_token: gilrs.new_effect_token(),
     gamepads: self.gamepads,
     strong: self.strong,
     weak: self.weak,
@@ -436,6 +439,27 @@ pub fn EffectBuilder::finish(
     distance_model: self.distance_model,
     position: self.position,
     gain: self.gain,
+    playing_since_ms: None,
+  }
+}
+
+///|
+fn Effect::refresh_completion_schedule(self : Effect) -> Unit {
+  match self.playing_since_ms {
+    None => self.gilrs.cancel_ff_effect_completion(self.effect_token)
+    Some(started_at_ms) =>
+      match self.repeat_mode {
+        FfRepeat::Infinitely =>
+          self.gilrs.cancel_ff_effect_completion(self.effect_token)
+        FfRepeat::For(ms) => {
+          let due = if ms <= 0L { started_at_ms } else { started_at_ms + ms }
+          self.gilrs.schedule_ff_effect_completion(
+            self.effect_token,
+            self.gamepads,
+            due,
+          )
+        }
+      }
   }
 }
 
@@ -458,6 +482,7 @@ pub fn Effect::set_gamepads(
     }
   }
   self.gamepads = out
+  self.refresh_completion_schedule()
 }
 
 ///|
@@ -475,6 +500,7 @@ pub fn Effect::add_gamepad(
   if !contains_gamepad_id(self.gamepads, id) {
     self.gamepads.push(id)
   }
+  self.refresh_completion_schedule()
 }
 
 ///|
@@ -485,6 +511,7 @@ pub fn Effect::set_gain(self : Effect, gain : Double) -> Unit {
 ///|
 pub fn Effect::set_repeat(self : Effect, repeat_mode : FfRepeat) -> Unit {
   self.repeat_mode = repeat_mode
+  self.refresh_completion_schedule()
 }
 
 ///|
@@ -543,12 +570,16 @@ pub fn Effect::play(self : Effect) -> Unit raise FfError {
           raise FfError::NotSupported
         }
       }
+      self.playing_since_ms = Some(runtime_now_ms())
+      self.refresh_completion_schedule()
     }
   }
 }
 
 ///|
 pub fn Effect::stop(self : Effect) -> Unit raise FfError {
+  self.playing_since_ms = None
+  self.gilrs.cancel_ff_effect_completion(self.effect_token)
   match self.gilrs.backend {
     None => raise FfError::NotSupported
     Some(b) =>

@@ -37,11 +37,15 @@ pub fn jitter(ev : Event?, gilrs : Gilrs, threshold : Double) -> Event? {
     Some(e) =>
       match e.event() {
         EventType::AxisChanged(_, val, axis_code) => {
-          let old_val = match gilrs.state(e.id()) {
+          let old_data = match gilrs.state(e.id()) {
             None => 0.0
-            Some(s) => s.value(axis_code)
+            Some(s) =>
+              match s.axis_data(axis_code) {
+                None => return ev
+                Some(d) => d.value()
+              }
           }
-          if val != 0.0 && Double::abs(val - old_val) < threshold {
+          if val != 0.0 && Double::abs(val - old_data) < threshold {
             Some(e.drop())
           } else {
             ev

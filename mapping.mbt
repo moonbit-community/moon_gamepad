@@ -687,9 +687,22 @@ fn upsert_mapping(db : MappingDb, uuid : Uuid, line : String) -> Unit {
 }
 
 ///|
+fn trim_trailing_cr(line : String) -> String {
+  if line.length() == 0 {
+    return line
+  }
+  let last = line.code_unit_at(line.length() - 1).to_int()
+  if last == '\r'.to_int() {
+    (try! line[0:line.length() - 1]).to_string()
+  } else {
+    line
+  }
+}
+
+///|
 pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
   for line_view in s.split("\n") {
-    let line = line_view.to_string()
+    let line = trim_trailing_cr(line_view.to_string())
     if line.length() == 0 {
       continue
     }
@@ -713,9 +726,15 @@ pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
 
 ///|
 pub fn MappingDb::add_included_mappings(self : MappingDb) -> Unit {
-  self.insert(INCLUDED_MAPPINGS_FALLBACK)
-  if runtime_sdl_platform_name() == "Mac OS X" {
+  let platform = runtime_sdl_platform_name()
+  if platform == "Mac OS X" {
     self.insert(included_mappings_macos_blob())
+  } else if platform == "Linux" {
+    self.insert(included_mappings_linux_blob())
+  } else if platform == "Windows" {
+    self.insert(included_mappings_windows_blob())
+  } else {
+    self.insert(INCLUDED_MAPPINGS_FALLBACK)
   }
 }
 

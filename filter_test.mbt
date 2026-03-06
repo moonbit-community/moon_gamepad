@@ -38,6 +38,19 @@ test "jitter drops small delta" {
 }
 
 ///|
+test "jitter keeps first axis event without prior axis_data" {
+  let g = Gilrs::new_mock(1, update_state=true)
+  let id = GamepadId::new(0)
+  let ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::LeftStickX, 0.005, AXIS_LSTICKX),
+    1L,
+  )
+  let out = Jitter::new().filter(Some(ev), g)
+  inspect(out.map(filter_event_sig), content="Some((0, 0, 0.005, 65584))")
+}
+
+///|
 test "filter_ev passes through filter output" {
   let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)

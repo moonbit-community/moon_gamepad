@@ -248,6 +248,20 @@ test "mapping_db insert works after preloading included mappings" {
 }
 
 ///|
+test "mapping_db insert accepts CRLF-separated mappings" {
+  let db = MappingDb::new()
+  let platform = runtime_sdl_platform_name()
+  let line = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,CRLF Pad,a:b0,platform:" +
+    platform +
+    ","
+  db.insert(line + "\r\n")
+  inspect(
+    db.get(Uuid::parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")) == Some(line),
+    content="true",
+  )
+}
+
+///|
 test "parse_sdl_mapping hat unknown direction" {
   let map_str = "03000000341a00003608000000010000,Test,platform:Linux,dpup:h0.16,"
   let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
@@ -261,6 +275,24 @@ test "parse_sdl_mapping hat unknown direction" {
     res2,
     content="Err(Milky2018/gamepad.ParseSdlMappingError.UnknownHatDirection)",
   )
+}
+
+///|
+test "parse_sdl_mapping rejects out-of-range u16 numbers" {
+  let map_str = "03000000341a00003608000000010000,Test,platform:Linux,a:h70000.1,"
+  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+    map_str, buttons, axes,
+  )
+  inspect(res is Err(_), content="true")
+}
+
+///|
+test "parse_sdl_mapping accepts xinput pseudo-guid" {
+  let map_str = "xinput,Test,a:b0,"
+  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
+    map_str, buttons, axes,
+  )
+  inspect(res is Ok(_), content="true")
 }
 
 ///|
@@ -307,17 +339,29 @@ test "mapping_db add_env_mappings reads SDL_GAMECONTROLLERCONFIG" {
 test "mapping_db add_included_mappings loads bundled mapping" {
   let db = MappingDb::new()
   db.add_included_mappings()
-  inspect(
-    db.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
-    content="true",
-  )
-  if runtime_sdl_platform_name() == "Mac OS X" {
+  let platform = runtime_sdl_platform_name()
+  if platform == "Mac OS X" {
     inspect(db.len() >= 200, content="true")
     inspect(
       db.get(Uuid::parse("03000000c82d00001930000000000000")) is Some(_),
       content="true",
     )
+  } else if platform == "Linux" {
+    inspect(db.len() >= 500, content="true")
+    inspect(
+      db.get(Uuid::parse("03000000c82d00001930000011010000")) is Some(_),
+      content="true",
+    )
+  } else if platform == "Windows" {
+    inspect(db.len() >= 500, content="true")
+    inspect(
+      db.get(Uuid::parse("03000000300f00000a01000000000000")) is Some(_),
+      content="true",
+    )
   } else {
-    inspect(db.len() >= 1, content="true")
+    inspect(
+      db.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
+      content="true",
+    )
   }
 }

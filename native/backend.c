@@ -296,6 +296,14 @@ static void queue_wait_nonempty(moon_gamepad_queue_t *q, int32_t timeout_ms) {
 // Backend
 // -----------------------------------------------------------------------------
 
+#if defined(__linux__)
+typedef struct linux_disconnected_entry_t {
+  uint32_t id;
+  char uuid[33];
+  struct linux_disconnected_entry_t *next;
+} linux_disconnected_entry_t;
+#endif
+
 typedef struct moon_gamepad_backend_t {
   moon_gamepad_queue_t q;
   int32_t gamepad_count;
@@ -359,6 +367,7 @@ typedef struct moon_gamepad_backend_t {
   uint8_t rw[64];
   int32_t ff_id[64];
   int64_t ff_until_ms[64];
+  linux_disconnected_entry_t *disconnected_head;
   uint32_t fds_len;
   uint32_t next_id;
 #endif
@@ -1360,7 +1369,7 @@ static void linux_resync_device_state(moon_gamepad_backend_t *b, uint32_t idx, i
   memset(keybit, 0, sizeof(keybit));
   (void)ioctl(b->fds[idx], EVIOCGKEY(sizeof(keybit)), keybit);
 
-  int64_t t = now_ms();
+  int64_t t = emit_events ? 0 : now_ms();
   uint8_t btn_len = b->buttons_len[idx];
   for (uint8_t i = 0; i < btn_len; i++) {
     int32_t src_i32 = b->buttons_src[idx][i];
@@ -1521,6 +1530,180 @@ static int linux_has_path(moon_gamepad_backend_t *b, const char *path) {
   return 0;
 }
 
+static int64_t linux_input_event_time_ms(const struct input_event *ev) {
+  if (ev == NULL) {
+    return 0;
+  }
+  int64_t sec = (int64_t)ev->time.tv_sec;
+  int64_t usec = (int64_t)ev->time.tv_usec;
+  if (sec < 0 || usec < 0) {
+    return 0;
+  }
+  return sec * 1000LL + (usec / 1000LL);
+}
+
+static void linux_disconnected_cache_clear(moon_gamepad_backend_t *b) {
+  if (b == NULL) {
+    return;
+  }
+  linux_disconnected_entry_t *entry = b->disconnected_head;
+  while (entry != NULL) {
+    linux_disconnected_entry_t *next = entry->next;
+    free(entry);
+    entry = next;
+  }
+  b->disconnected_head = NULL;
+}
+
+static void linux_disconnected_cache_set(moon_gamepad_backend_t *b, uint32_t id, const char *uuid) {
+  if (b == NULL || uuid == NULL || uuid[0] == '\0') {
+    return;
+  }
+  for (linux_disconnected_entry_t *entry = b->disconnected_head; entry != NULL; entry = entry->next) {
+    if (entry->id == id) {
+      memset(entry->uuid, 0, sizeof(entry->uuid));
+      strncpy(entry->uuid, uuid, sizeof(entry->uuid) - 1);
+      return;
+    }
+  }
+  linux_disconnected_entry_t *entry = (linux_disconnected_entry_t *)calloc(1, sizeof(linux_disconnected_entry_t));
+  if (entry == NULL) {
+    return;
+  }
+  entry->id = id;
+  strncpy(entry->uuid, uuid, sizeof(entry->uuid) - 1);
+  entry->next = b->disconnected_head;
+  b->disconnected_head = entry;
+}
+
+static int linux_disconnected_cache_take_id(moon_gamepad_backend_t *b, const char *uuid, uint32_t *id_out) {
+  if (b == NULL || uuid == NULL || uuid[0] == '\0' || id_out == NULL) {
+    return 0;
+  }
+  linux_disconnected_entry_t *prev = NULL;
+  linux_disconnected_entry_t *entry = b->disconnected_head;
+  linux_disconnected_entry_t *best_prev = NULL;
+  linux_disconnected_entry_t *best_entry = NULL;
+  while (entry != NULL) {
+    if (strncmp(entry->uuid, uuid, sizeof(entry->uuid)) == 0) {
+      if (best_entry == NULL || entry->id < best_entry->id) {
+        best_entry = entry;
+        best_prev = prev;
+      }
+    }
+    prev = entry;
+    entry = entry->next;
+  }
+  if (best_entry == NULL) {
+    return 0;
+  }
+  *id_out = best_entry->id;
+  if (best_prev == NULL) {
+    b->disconnected_head = best_entry->next;
+  } else {
+    best_prev->next = best_entry->next;
+  }
+  free(best_entry);
+  return 1;
+}
+
+static int linux_read_first_line(const char *path, char *out, size_t out_cap) {
+  if (path == NULL || out == NULL || out_cap == 0) {
+    return 0;
+  }
+  out[0] = '\0';
+  FILE *fp = fopen(path, "r");
+  if (fp == NULL) {
+    return 0;
+  }
+  if (fgets(out, (int)out_cap, fp) == NULL) {
+    fclose(fp);
+    out[0] = '\0';
+    return 0;
+  }
+  fclose(fp);
+  size_t n = strlen(out);
+  while (n > 0 && (out[n - 1] == '\n' || out[n - 1] == '\r' || out[n - 1] == '\t' || out[n - 1] == ' ')) {
+    out[n - 1] = '\0';
+    n--;
+  }
+  return (n > 0) ? 1 : 0;
+}
+
+static void linux_power_info_from_event_path(const char *event_path, int32_t *tag_out, int32_t *value_out) {
+  if (tag_out == NULL || value_out == NULL) {
+    return;
+  }
+  *tag_out = MOON_GAMEPAD_POWER_WIRED;
+  *value_out = 0;
+  if (event_path == NULL || event_path[0] == '\0') {
+    return;
+  }
+  const char *base = strrchr(event_path, '/');
+  const char *event_name = (base == NULL) ? event_path : (base + 1);
+  if (event_name[0] == '\0') {
+    return;
+  }
+
+  char power_dir[512];
+  snprintf(power_dir, sizeof(power_dir), "/sys/class/input/%s/device/device/power_supply", event_name);
+  DIR *dir = opendir(power_dir);
+  if (dir == NULL) {
+    return;
+  }
+  char battery_name[256];
+  battery_name[0] = '\0';
+  struct dirent *ent;
+  while ((ent = readdir(dir)) != NULL) {
+    if (ent->d_name[0] == '.') {
+      continue;
+    }
+    strncpy(battery_name, ent->d_name, sizeof(battery_name) - 1);
+    battery_name[sizeof(battery_name) - 1] = '\0';
+    break;
+  }
+  closedir(dir);
+  if (battery_name[0] == '\0') {
+    return;
+  }
+
+  char capacity_path[768];
+  char status_path[768];
+  snprintf(capacity_path, sizeof(capacity_path), "%s/%s/capacity", power_dir, battery_name);
+  snprintf(status_path, sizeof(status_path), "%s/%s/status", power_dir, battery_name);
+
+  char cap_buf[32];
+  char status_buf[64];
+  if (!linux_read_first_line(capacity_path, cap_buf, sizeof(cap_buf)) ||
+      !linux_read_first_line(status_path, status_buf, sizeof(status_buf))) {
+    *tag_out = MOON_GAMEPAD_POWER_WIRED;
+    *value_out = 0;
+    return;
+  }
+
+  char *end = NULL;
+  long cap_l = strtol(cap_buf, &end, 10);
+  if (end == cap_buf || cap_l < 0 || cap_l > 100) {
+    *tag_out = MOON_GAMEPAD_POWER_UNKNOWN;
+    *value_out = 0;
+    return;
+  }
+  int32_t cap = (int32_t)cap_l;
+  if (strcmp(status_buf, "Charging") == 0) {
+    *tag_out = MOON_GAMEPAD_POWER_CHARGING;
+    *value_out = cap;
+  } else if (strcmp(status_buf, "Discharging") == 0) {
+    *tag_out = MOON_GAMEPAD_POWER_DISCHARGING;
+    *value_out = cap;
+  } else if (strcmp(status_buf, "Full") == 0 || strcmp(status_buf, "Not charging") == 0) {
+    *tag_out = MOON_GAMEPAD_POWER_CHARGED;
+    *value_out = 100;
+  } else {
+    *tag_out = MOON_GAMEPAD_POWER_UNKNOWN;
+    *value_out = 0;
+  }
+}
+
 static void linux_ff_stop_idx(moon_gamepad_backend_t *b, uint32_t idx) {
   if (b == NULL || idx >= b->fds_len) {
     return;
@@ -1655,7 +1838,7 @@ static void linux_compact(moon_gamepad_backend_t *b) {
   b->gamepad_count = (int32_t)b->fds_len;
 }
 
-static void linux_backend_scan(moon_gamepad_backend_t *b) {
+static void linux_backend_scan(moon_gamepad_backend_t *b, int emit_connected) {
   DIR *dir = opendir("/dev/input");
   if (dir == NULL) {
     return;
@@ -1686,15 +1869,34 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
       close(fd);
       continue;
     }
-    // Keep.
-    uint32_t id = b->next_id++;
+    struct input_id iid;
+    memset(&iid, 0, sizeof(iid));
+    int have_iid = (ioctl(fd, EVIOCGID, &iid) >= 0);
+    int32_t vendor = -1;
+    int32_t product = -1;
+    char uuid[33];
+    memset(uuid, 0, sizeof(uuid));
+    if (have_iid) {
+      vendor = (int32_t)iid.vendor;
+      product = (int32_t)iid.product;
+      uuid_simple_from_ids(iid.bustype, iid.vendor, iid.product, iid.version, uuid);
+    } else {
+      uuid_simple_from_ids(0, 0, 0, 0, uuid);
+    }
+    uint32_t id = 0;
+    if (!linux_disconnected_cache_take_id(b, uuid, &id)) {
+      id = b->next_id++;
+    } else if (id >= b->next_id) {
+      b->next_id = id + 1;
+    }
+
     b->fds[b->fds_len] = fd;
     b->fd_ids[b->fds_len] = id;
     memset(b->paths[b->fds_len], 0, sizeof(b->paths[b->fds_len]));
     strncpy(b->paths[b->fds_len], path, sizeof(b->paths[b->fds_len]) - 1);
     b->rw[b->fds_len] = (uint8_t)rw;
-    b->vendors[b->fds_len] = -1;
-    b->products[b->fds_len] = -1;
+    b->vendors[b->fds_len] = vendor;
+    b->products[b->fds_len] = product;
     memset(b->axes_codes[b->fds_len], 0, sizeof(b->axes_codes[b->fds_len]));
     memset(b->axes_src[b->fds_len], 0, sizeof(b->axes_src[b->fds_len]));
     memset(b->axes_value[b->fds_len], 0, sizeof(b->axes_value[b->fds_len]));
@@ -1712,18 +1914,9 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
     b->ff_supported[b->fds_len] = 0;
     memset(b->uuids[b->fds_len], 0, sizeof(b->uuids[b->fds_len]));
     memset(b->names[b->fds_len], 0, sizeof(b->names[b->fds_len]));
+    strncpy(b->uuids[b->fds_len], uuid, sizeof(b->uuids[b->fds_len]) - 1);
     b->ff_id[b->fds_len] = -1;
     b->ff_until_ms[b->fds_len] = 0;
-
-    struct input_id iid;
-    memset(&iid, 0, sizeof(iid));
-    if (ioctl(fd, EVIOCGID, &iid) >= 0) {
-      b->vendors[b->fds_len] = (int32_t)iid.vendor;
-      b->products[b->fds_len] = (int32_t)iid.product;
-      uuid_simple_from_ids(iid.bustype, iid.vendor, iid.product, iid.version, b->uuids[b->fds_len]);
-    } else {
-      uuid_simple_from_ids(0, 0, 0, 0, b->uuids[b->fds_len]);
-    }
 
     char name[256];
     memset(name, 0, sizeof(name));
@@ -1745,8 +1938,10 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
     }
     b->fds_len++;
     b->gamepad_count = (int32_t)b->fds_len;
-    moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, id, 0, 0, 0.0, now_ms()};
-    queue_push(&b->q, ev);
+    if (emit_connected) {
+      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, id, 0, 0, 0.0, now_ms()};
+      queue_push(&b->q, ev);
+    }
   }
   closedir(dir);
 }
@@ -1754,6 +1949,7 @@ static void linux_backend_scan(moon_gamepad_backend_t *b) {
 static void linux_backend_init(moon_gamepad_backend_t *b) {
   b->fds_len = 0;
   b->next_id = 0;
+  b->disconnected_head = NULL;
   memset(b->fds, -1, sizeof(b->fds));
   memset(b->fd_ids, 0, sizeof(b->fd_ids));
   memset(b->paths, 0, sizeof(b->paths));
@@ -1785,7 +1981,7 @@ static void linux_backend_init(moon_gamepad_backend_t *b) {
     b->vendors[i] = -1;
     b->products[i] = -1;
   }
-  linux_backend_scan(b);
+  linux_backend_scan(b, 0);
 }
 
 static void linux_backend_shutdown(moon_gamepad_backend_t *b) {
@@ -1825,6 +2021,7 @@ static void linux_backend_shutdown(moon_gamepad_backend_t *b) {
     b->ff_until_ms[i] = 0;
   }
   b->fds_len = 0;
+  linux_disconnected_cache_clear(b);
 }
 
 static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeout_ms);
@@ -1839,7 +2036,7 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
   }
   linux_ff_tick(b);
   // Best-effort rescan for hotplug.
-  linux_backend_scan(b);
+  linux_backend_scan(b, 1);
   linux_compact(b);
   if (b->fds_len == 0) {
     return;
@@ -1860,6 +2057,7 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
       uint32_t id = b->fd_ids[i];
       moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
       queue_push(&b->q, ev);
+      linux_disconnected_cache_set(b, id, b->uuids[i]);
       linux_ff_remove_idx(b, i);
       close(b->fds[i]);
       b->fds[i] = -1;
@@ -1895,7 +2093,7 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
     ssize_t r;
     while ((r = read(pfds[i].fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
       uint32_t id = b->fd_ids[i];
-      int64_t t = now_ms();
+      int64_t t = linux_input_event_time_ms(&ev);
       if (ev.type == EV_SYN && ev.code == SYN_DROPPED) {
         b->need_resync[i] = 1;
         continue;
@@ -1945,6 +2143,7 @@ static void linux_backend_poll_timeout(moon_gamepad_backend_t *b, int32_t timeou
       uint32_t id = b->fd_ids[i];
       moon_gamepad_event_t dv = {MOON_GAMEPAD_EV_DISCONNECTED, id, 0, 0, 0.0, now_ms()};
       queue_push(&b->q, dv);
+      linux_disconnected_cache_set(b, id, b->uuids[i]);
       linux_ff_remove_idx(b, i);
       close(b->fds[i]);
       b->fds[i] = -1;
@@ -2652,6 +2851,22 @@ int32_t moon_gamepad_backend_gamepad_count(void *owner) {
   return b->gamepad_count;
 }
 
+int32_t moon_gamepad_backend_last_gamepad_hint(void *owner) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL) {
+    return 0;
+  }
+#if defined(__APPLE__)
+  return (int32_t)b->devices_len;
+#elif defined(__linux__)
+  return (int32_t)b->next_id;
+#elif defined(_WIN32)
+  return 4;
+#else
+  return b->gamepad_count;
+#endif
+}
+
 static int idx_by_id_u32(const uint32_t *ids, uint32_t len, uint32_t id) {
   for (uint32_t i = 0; i < len; i++) {
     if (ids[i] == id) {
@@ -2659,6 +2874,30 @@ static int idx_by_id_u32(const uint32_t *ids, uint32_t len, uint32_t id) {
     }
   }
   return -1;
+}
+
+int32_t moon_gamepad_backend_is_connected(void *owner, int32_t id) {
+  moon_gamepad_backend_t *b = backend_of(owner);
+  if (b == NULL || id < 0) {
+    return 0;
+  }
+#if defined(__APPLE__)
+  int idx = idx_by_id_u32(b->device_ids, b->devices_len, (uint32_t)id);
+  if (idx < 0) {
+    return 0;
+  }
+  return b->connected[(uint32_t)idx] ? 1 : 0;
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  return (idx >= 0) ? 1 : 0;
+#elif defined(_WIN32)
+  if ((uint32_t)id >= 4) {
+    return 0;
+  }
+  return b->win_connected[(uint32_t)id] ? 1 : 0;
+#else
+  return 0;
+#endif
 }
 
 moonbit_string_t moon_gamepad_backend_name(void *owner, int32_t id) {
@@ -2799,6 +3038,11 @@ moonbit_bytes_t moon_gamepad_backend_power_info_bin(void *owner, int32_t id) {
   int32_t value = 0;
 #if defined(_WIN32)
   windows_power_info(b, (uint32_t)id, &tag, &value);
+#elif defined(__linux__)
+  int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
+  if (idx >= 0) {
+    linux_power_info_from_event_path(b->paths[(uint32_t)idx], &tag, &value);
+  }
 #else
   (void)b;
   (void)id;

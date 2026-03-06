@@ -308,6 +308,7 @@ pub fn DistanceModel::validate(Self) -> Unit raise DistanceModelError
 
 pub struct Effect {
   gilrs : Gilrs
+  effect_token : Int
   mut gamepads : Array[GamepadId]
   strong : Double
   weak : Double
@@ -384,6 +385,8 @@ pub(all) enum EventType {
   Dropped
   ForceFeedbackEffectCompleted
 }
+
+type FfPendingCompletion
 
 pub enum FfRepeat {
   Infinitely
@@ -466,6 +469,8 @@ pub struct Gilrs {
   gamepads_data : Array[GamepadData]
   mappings : MappingDb
   mut now_ms : Int64
+  mut next_effect_token : Int
+  mut ff_pending_completions : Array[FfPendingCompletion]
   backend : NativeBackend?
 }
 pub fn Gilrs::axis_code(Self, GamepadId, Axis) -> Int?
@@ -583,7 +588,9 @@ pub fn NativeBackend::axes(Self, Int) -> Array[Int]
 pub fn NativeBackend::axis_info(Self, Int, Int) -> AxisInfo?
 pub fn NativeBackend::buttons(Self, Int) -> Array[Int]
 pub fn NativeBackend::gamepad_count(Self) -> Int
+pub fn NativeBackend::is_connected(Self, Int) -> Bool
 pub fn NativeBackend::is_ff_supported(Self, Int) -> Bool
+pub fn NativeBackend::last_gamepad_hint(Self) -> Int
 pub fn NativeBackend::name(Self, Int) -> String
 pub fn NativeBackend::new() -> Self
 pub fn NativeBackend::next_event(Self) -> NativeEvent?

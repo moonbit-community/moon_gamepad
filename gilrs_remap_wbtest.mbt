@@ -583,10 +583,28 @@ test "builder loads included mappings by default" {
   let g = build_ok_remap(
     GilrsBuilder::new().with_mock_gamepad_count(0).with_native_backend(false),
   )
-  inspect(
-    g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
-    content="true",
-  )
+  let platform = runtime_sdl_platform_name()
+  if platform == "Mac OS X" {
+    inspect(
+      g.mappings.get(Uuid::parse("03000000c82d00001930000000000000")) is Some(_),
+      content="true",
+    )
+  } else if platform == "Linux" {
+    inspect(
+      g.mappings.get(Uuid::parse("03000000c82d00001930000011010000")) is Some(_),
+      content="true",
+    )
+  } else if platform == "Windows" {
+    inspect(
+      g.mappings.get(Uuid::parse("03000000300f00000a01000000000000")) is Some(_),
+      content="true",
+    )
+  } else {
+    inspect(
+      g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
+      content="true",
+    )
+  }
 }
 
 ///|
@@ -598,10 +616,28 @@ test "builder add_included_mappings false disables built-in mapping load" {
     .with_native_backend(false)
     .add_included_mappings(false),
   )
-  inspect(
-    g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is None,
-    content="true",
-  )
+  let platform = runtime_sdl_platform_name()
+  if platform == "Mac OS X" {
+    inspect(
+      g.mappings.get(Uuid::parse("03000000c82d00001930000000000000")) is None,
+      content="true",
+    )
+  } else if platform == "Linux" {
+    inspect(
+      g.mappings.get(Uuid::parse("03000000c82d00001930000011010000")) is None,
+      content="true",
+    )
+  } else if platform == "Windows" {
+    inspect(
+      g.mappings.get(Uuid::parse("03000000300f00000a01000000000000")) is None,
+      content="true",
+    )
+  } else {
+    inspect(
+      g.mappings.get(Uuid::parse("030000005e0400008e02000002010000")) is None,
+      content="true",
+    )
+  }
 }
 
 ///|
@@ -662,4 +698,110 @@ test "deadzone falls back to axis_info and user override wins" {
 
   g.set_deadzone(id, AXIS_LT2, 0.5)
   inspect((g.deadzone(id, AXIS_LT2).unwrap() * 1000.0).to_int(), content="500")
+}
+
+///|
+test "ff completed event is emitted before queued events when due" {
+  runtime_now_set_for_test(100L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let token = g.new_effect_token()
+  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
+  g.insert_event(Event::at(GamepadId::new(0), EventType::Connected, 999L))
+
+  let e1 = match g.next_event() {
+    None => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Some(e) => e
+  }
+  let e2 = match g.next_event() {
+    None => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Some(e) => e
+  }
+  inspect(
+    match e1.event() {
+      EventType::ForceFeedbackEffectCompleted => true
+      _ => false
+    },
+    content="true",
+  )
+  inspect(
+    match e2.event() {
+      EventType::Connected => true
+      _ => false
+    },
+    content="true",
+  )
+  runtime_now_clear_for_test()
+}
+
+///|
+test "ff completed event is not emitted before due time" {
+  runtime_now_set_for_test(99L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let token = g.new_effect_token()
+  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
+  inspect(g.next_event() is None, content="true")
+  runtime_now_set_for_test(100L)
+  let e = match g.next_event() {
+    None => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Some(e) => e
+  }
+  inspect(
+    match e.event() {
+      EventType::ForceFeedbackEffectCompleted => true
+      _ => false
+    },
+    content="true",
+  )
+  runtime_now_clear_for_test()
+}
+
+///|
+test "cancelled ff completion does not emit event" {
+  runtime_now_set_for_test(100L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let token = g.new_effect_token()
+  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
+  g.cancel_ff_effect_completion(token)
+  inspect(g.next_event() is None, content="true")
+  runtime_now_clear_for_test()
+}
+
+///|
+test "disconnect clears pending ff completion for gamepad" {
+  runtime_now_set_for_test(100L)
+  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let token = g.new_effect_token()
+  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
+  g.push_native_event({
+    tag: NativeEventTag::Disconnected,
+    id: 0,
+    code: 0,
+    value: 0.0,
+    time_ms: 1L,
+  })
+  let ev = match g.next_event() {
+    None => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Some(ev) => ev
+  }
+  inspect(
+    match ev.event() {
+      EventType::Disconnected => true
+      _ => false
+    },
+    content="true",
+  )
+  inspect(g.next_event() is None, content="true")
+  runtime_now_clear_for_test()
 }
