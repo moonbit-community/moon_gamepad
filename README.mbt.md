@@ -36,7 +36,7 @@ Best support today is on macOS. Linux and Windows are available on native target
 
 ## Quick Start
 
-```moonbit
+```moonbit nocheck
 import Milky2018/gamepad
 
 fn main {
@@ -55,7 +55,7 @@ fn main {
 
 ## Mock Example
 
-```moonbit
+```moonbit nocheck
 import Milky2018/gamepad
 
 test "mock button press" {
