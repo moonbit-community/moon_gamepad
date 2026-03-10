@@ -40,6 +40,44 @@ extern "C" fn runtime_now_set_for_test(ms : Int64) -> Unit = "moon_gamepad_now_m
 extern "C" fn runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_clear_for_test"
 
 ///|
+extern "C" fn remap_backend_new_null_for_test() -> BackendOwner = "moon_gamepad_backend_new_null_for_test"
+
+///|
+fn remap_native_backend_null_for_test() -> NativeBackend {
+  { owner: remap_backend_new_null_for_test() }
+}
+
+///|
+fn remap_new_ff_ready_with_null_backend(gamepad_count : Int) -> Gilrs {
+  let data : Array[GamepadData] = []
+  for _ in 0..<gamepad_count {
+    let d = GamepadData::new()
+    d.ff_supported = true
+    data.push(d)
+  }
+  {
+    counter: 0L,
+    update_state: false,
+    default_filters: false,
+    axis_to_btn_pressed: 0.75,
+    axis_to_btn_released: 0.65,
+    events: [],
+    events_head: 0,
+    gamepads_data: data,
+    mappings: MappingDb::new(),
+    now_ms: 0L,
+    next_effect_token: 1,
+    ff_tick_base_ms: 0L,
+    ff_tick: 0,
+    ff_dirty: false,
+    ff_effects: [],
+    ff_events: [],
+    ff_events_head: 0,
+    backend: Some(remap_native_backend_null_for_test()),
+  }
+}
+
+///|
 #borrow(s)
 extern "C" fn runtime_set_sdl_gamecontrollerconfig_for_test(s : String) -> Unit = "moon_gamepad_set_sdl_gamecontrollerconfig_for_test"
 
@@ -331,7 +369,7 @@ test "repeat uses runtime clock fallback when logical clock is unset" {
 }
 
 ///|
-test "repeat prefers explicit logical clock over runtime clock" {
+test "repeat uses runtime clock even when logical clock is set" {
   runtime_now_set_for_test(2000L)
   let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
@@ -344,7 +382,7 @@ test "repeat prefers explicit logical clock over runtime clock" {
   g.set_time(500L)
   let out = Repeat::new().filter(None, g)
   runtime_now_clear_for_test()
-  inspect(out is None, content="true")
+  inspect(out.map(ev_sig), content="Some((3, 0, 0, 589825))")
 }
 
 ///|
@@ -706,11 +744,22 @@ test "deadzone falls back to axis_info and user override wins" {
 
 ///|
 test "ff completed event is emitted before queued events when due" {
-  runtime_now_set_for_test(100L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
-  let token = g.new_effect_token()
-  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
+  runtime_now_set_for_test(0L)
+  let g = remap_new_ff_ready_with_null_backend(1)
+  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+    .add_gamepad_id(GamepadId::new(0))
+    .repeat(FfRepeat::For(0L))
+    .finish(g)
+  let effect = match built {
+    Err(_) => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Ok(e) => e
+  }
+  inspect((try? effect.play()) is Ok(_), content="true")
   g.insert_event(Event::at(GamepadId::new(0), EventType::Connected, 999L))
+  runtime_now_set_for_test(50L)
 
   let e1 = match g.next_event() {
     None => {
@@ -745,12 +794,23 @@ test "ff completed event is emitted before queued events when due" {
 
 ///|
 test "ff completed event is not emitted before due time" {
-  runtime_now_set_for_test(99L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
-  let token = g.new_effect_token()
-  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
+  runtime_now_set_for_test(0L)
+  let g = remap_new_ff_ready_with_null_backend(1)
+  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+    .add_gamepad_id(GamepadId::new(0))
+    .repeat(FfRepeat::For(0L))
+    .finish(g)
+  let effect = match built {
+    Err(_) => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Ok(e) => e
+  }
+  inspect((try? effect.play()) is Ok(_), content="true")
+  runtime_now_set_for_test(49L)
   inspect(g.next_event() is None, content="true")
-  runtime_now_set_for_test(100L)
+  runtime_now_set_for_test(50L)
   let e = match g.next_event() {
     None => {
       runtime_now_clear_for_test()
@@ -769,22 +829,43 @@ test "ff completed event is not emitted before due time" {
 }
 
 ///|
-test "cancelled ff completion does not emit event" {
+test "stopped effect does not emit ff completed event" {
+  runtime_now_set_for_test(0L)
+  let g = remap_new_ff_ready_with_null_backend(1)
+  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+    .add_gamepad_id(GamepadId::new(0))
+    .repeat(FfRepeat::For(0L))
+    .finish(g)
+  let effect = match built {
+    Err(_) => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Ok(e) => e
+  }
+  inspect((try? effect.play()) is Ok(_), content="true")
+  inspect((try? effect.stop()) is Ok(_), content="true")
   runtime_now_set_for_test(100L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
-  let token = g.new_effect_token()
-  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
-  g.cancel_ff_effect_completion(token)
   inspect(g.next_event() is None, content="true")
   runtime_now_clear_for_test()
 }
 
 ///|
-test "disconnect clears pending ff completion for gamepad" {
-  runtime_now_set_for_test(100L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
-  let token = g.new_effect_token()
-  g.schedule_ff_effect_completion(token, [GamepadId::new(0)], 100L)
+test "disconnect prevents ff completed event emission for single-device effect" {
+  runtime_now_set_for_test(0L)
+  let g = remap_new_ff_ready_with_null_backend(1)
+  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+    .add_gamepad_id(GamepadId::new(0))
+    .repeat(FfRepeat::For(0L))
+    .finish(g)
+  let effect = match built {
+    Err(_) => {
+      runtime_now_clear_for_test()
+      return
+    }
+    Ok(e) => e
+  }
+  inspect((try? effect.play()) is Ok(_), content="true")
   g.push_native_event({
     tag: NativeEventTag::Disconnected,
     id: 0,
@@ -806,6 +887,7 @@ test "disconnect clears pending ff completion for gamepad" {
     },
     content="true",
   )
+  runtime_now_set_for_test(100L)
   inspect(g.next_event() is None, content="true")
   runtime_now_clear_for_test()
 }

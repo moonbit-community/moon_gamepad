@@ -175,6 +175,8 @@ test "from_data roundtrip + errors" {
   data.insert_btn(buttons[7], Button::DPadDown) |> ignore
   data.insert_btn(buttons[8], Button::DPadLeft) |> ignore
   data.insert_btn(buttons[9], Button::RightThumb) |> ignore
+  data.insert_btn(buttons[2], Button::C) |> ignore
+  data.insert_btn(buttons[10], Button::Z) |> ignore
   let ok_res : Result[(Mapping, String), Error] = try? Mapping::from_data(
     data, buttons, axes, name, uuid,
   )
@@ -259,6 +261,14 @@ test "mapping_db insert accepts CRLF-separated mappings" {
     db.get(Uuid::parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")) == Some(line),
     content="true",
   )
+}
+
+///|
+test "mapping_db insert accepts UUID-only line" {
+  let db = MappingDb::new()
+  let line = "cccccccccccccccccccccccccccccccc"
+  db.insert(line)
+  inspect(db.get(Uuid::parse(line)) == Some(line), content="true")
 }
 
 ///|

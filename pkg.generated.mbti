@@ -387,7 +387,7 @@ pub(all) enum EventType {
   ForceFeedbackEffectCompleted
 }
 
-type FfPendingCompletion
+type FfEffectSource
 
 pub enum FfRepeat {
   Infinitely
@@ -433,6 +433,7 @@ pub struct GamepadData {
   mut vendor_id : Int?
   mut product_id : Int?
   mut ff_supported : Bool
+  mut listener_position : (Double, Double, Double)
   mut power_info : PowerInfo
   mut axes : Array[Int]
   mut buttons : Array[Int]
@@ -471,7 +472,12 @@ pub struct Gilrs {
   mappings : MappingDb
   mut now_ms : Int64
   mut next_effect_token : Int
-  mut ff_pending_completions : Array[FfPendingCompletion]
+  ff_tick_base_ms : Int64
+  mut ff_tick : Int
+  mut ff_dirty : Bool
+  ff_effects : Array[FfEffectSource]
+  mut ff_events : Array[Event]
+  mut ff_events_head : Int
   backend : NativeBackend?
 }
 pub fn Gilrs::axis_code(Self, GamepadId, Axis) -> Int?
@@ -653,6 +659,7 @@ pub struct Replay {
 }
 pub fn Replay::at(Self, Int) -> Double
 pub fn Replay::default() -> Self
+pub fn Replay::dur(Self) -> Int
 
 pub struct Ticks {
   ms : Int64

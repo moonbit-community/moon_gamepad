@@ -38,6 +38,12 @@ test "jitter drops small delta" {
 }
 
 ///|
+extern "C" fn runtime_now_set_for_test(ms : Int64) -> Unit = "moon_gamepad_now_ms_set_for_test"
+
+///|
+extern "C" fn runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_clear_for_test"
+
+///|
 test "jitter keeps first axis event without prior axis_data" {
   let g = Gilrs::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
@@ -60,7 +66,7 @@ test "filter_ev passes through filter output" {
     fn(_ev : Event?, _gilrs : Gilrs) -> Event? { None },
     g,
   )
-  inspect(out is None, content="true")
+  inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
 }
 
 ///|
@@ -175,6 +181,26 @@ test "axis_dpad_to_button maps dpad axis to button events" {
   // extra queued event should exist
   let extra = g.next_event()
   inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 589843))")
+}
+
+///|
+test "axis_dpad_to_button uses legacy codes when input axis code is legacy" {
+  let g = Gilrs::new_mock(1, update_state=true)
+  let id = GamepadId::new(0)
+
+  // mapping with hats mapped to allow mapping
+  let m = Mapping::new()
+  m.set_hats_mapped(0b1111)
+  g.set_mapping(id, m)
+  let ev = Event::at(
+    id,
+    EventType::AxisChanged(Axis::DPadX, 1.0, LEGACY_AXIS_DPADX),
+    1L,
+  )
+  let out = axis_dpad_to_button(Some(ev), g)
+  inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 18))")
+  let extra = g.next_event()
+  inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 18))")
 }
 
 ///|
@@ -378,13 +404,14 @@ test "repeat generates repeated events on None" {
   g.update(
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
   )
-  g.set_time(500L)
+  runtime_now_set_for_test(500L)
   let rep = Repeat::new()
   let out1 = rep.filter(None, g)
   inspect(out1.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
   // update state with repeat, then next repeat at +30ms
   g.update(out1.unwrap())
-  g.set_time(530L)
+  runtime_now_set_for_test(530L)
   let out2 = rep.filter(None, g)
   inspect(out2.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
+  runtime_now_clear_for_test()
 }

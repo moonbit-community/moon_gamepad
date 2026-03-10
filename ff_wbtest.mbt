@@ -78,7 +78,12 @@ fn new_ff_ready_with_null_backend(gamepad_count : Int) -> Gilrs {
     mappings: MappingDb::new(),
     now_ms: 0L,
     next_effect_token: 1,
-    ff_pending_completions: [],
+    ff_tick_base_ms: 0L,
+    ff_tick: 0,
+    ff_dirty: false,
+    ff_effects: [],
+    ff_events: [],
+    ff_events_head: 0,
     backend: Some(native_backend_null_for_test()),
   }
 }
@@ -119,21 +124,9 @@ test "finish succeeds with backend Some and play/stop fail path" {
     Ok(e) => e
   }
   let play_res : Result[Unit, FfError] = try? e.play()
-  inspect(
-    match play_res {
-      Err(FfError::NotSupported) => true
-      _ => false
-    },
-    content="true",
-  )
+  inspect(play_res is Ok(_), content="true")
   let stop_res : Result[Unit, FfError] = try? e.stop()
-  inspect(
-    match stop_res {
-      Err(FfError::NotSupported) => true
-      _ => false
-    },
-    content="true",
-  )
+  inspect(stop_res is Ok(_), content="true")
 }
 
 ///|
@@ -181,6 +174,17 @@ test "finish returns FfNotSupported when gamepad has no ff capability" {
     },
     content="true",
   )
+}
+
+///|
+fn to_duration_int(ms : Int64) -> Int {
+  if ms <= 0L {
+    0
+  } else if ms >= 0x7FFF_FFFFL {
+    0x7FFF_FFFF
+  } else {
+    ms.to_int()
+  }
 }
 
 ///|
@@ -232,6 +236,61 @@ test "replay matches upstream checkpoints" {
   inspect(approx(replay.at(59), 0.0, 0.000000001), content="true")
   inspect(approx(replay.at(60), 0.0, 0.000000001), content="true")
   inspect(approx(replay.at(70), 0.0, 0.000000001), content="true")
+}
+
+///|
+test "ticks from_ms quantizes to tick duration" {
+  let t1 = Ticks::from_ms(110L)
+  let t2 = Ticks::from_ms(130L)
+  inspect(t1.as_ms() == 150L, content="true")
+  inspect(t2.as_ms() == 150L, content="true")
+  inspect(t1.as_ms() == t2.as_ms(), content="true")
+}
+
+///|
+test "base effect scheduling wraps after+with_delay" {
+  let eff : BaseEffect = {
+    kind: BaseEffectType::Strong(1000),
+    scheduling: { after: 2, play_for: 2, with_delay: 1 },
+    envelope: Envelope::default(),
+  }
+  inspect(
+    match eff.magnitude_at(0) {
+      BaseEffectType::Strong(m) => m == 0
+      _ => false
+    },
+    content="true",
+  )
+  inspect(
+    match eff.magnitude_at(2) {
+      BaseEffectType::Strong(m) => m > 0
+      _ => false
+    },
+    content="true",
+  )
+  inspect(
+    match eff.magnitude_at(3) {
+      BaseEffectType::Strong(m) => m > 0
+      _ => false
+    },
+    content="true",
+  )
+  // Delay slice (wrapped >= play_for).
+  inspect(
+    match eff.magnitude_at(4) {
+      BaseEffectType::Strong(m) => m == 0
+      _ => false
+    },
+    content="true",
+  )
+  // Wraps back to the start.
+  inspect(
+    match eff.magnitude_at(5) {
+      BaseEffectType::Strong(m) => m > 0
+      _ => false
+    },
+    content="true",
+  )
 }
 
 ///|

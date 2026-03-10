@@ -134,9 +134,9 @@ fn parse_u16_decimal(s : String, pos : Int) -> Int raise ParserError {
 ///|
 let axes_sdl : Array[String] = [
   "a", "b", "back", "c", "dpdown", "dpleft", "dpright", "dpup", "guide", "leftshoulder",
-  "leftstick", "lefttrigger", "leftx", "lefty", "leftz", "misc1", "misc2", "paddle1",
-  "paddle2", "paddle3", "paddle4", "rightshoulder", "rightstick", "righttrigger",
-  "rightx", "righty", "rightz", "start", "touchpad", "x", "y", "z",
+  "leftstick", "lefttrigger", "leftx", "lefty", "leftz", "misc1", "paddle1", "paddle2",
+  "paddle3", "paddle4", "rightshoulder", "rightstick", "righttrigger", "rightx",
+  "righty", "rightz", "start", "touchpad", "x", "y", "z",
 ]
 
 ///|
@@ -156,7 +156,6 @@ let axes : Array[AxisOrBtn] = [
   AxisOrBtn::Axis(Axis::LeftStickX),
   AxisOrBtn::Axis(Axis::LeftStickY),
   AxisOrBtn::Axis(Axis::LeftZ),
-  AxisOrBtn::Btn(Button::Unknown),
   AxisOrBtn::Btn(Button::Unknown),
   AxisOrBtn::Btn(Button::Unknown),
   AxisOrBtn::Btn(Button::Unknown),
@@ -313,7 +312,7 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
       let hat = parse_u16_decimal((try! body[0:dot]).to_string(), pos + 1)
       let direction = parse_u16_decimal(
         (try! body[dot + 1:body.length()]).to_string(),
-        pos + dot + 1,
+        pos + dot + 2,
       )
       let to = lookup_axis_or_btn(key, ParserErrorKind::UnknownButton, pos)
       return Token::HatMapping(hat, direction, to, output)

@@ -445,6 +445,16 @@ pub fn Mapping::from_data(
       mappings,
     )
   }
+  if data.button(Button::C) is Some(code) {
+    sdl_mappings = add_button(
+      "c",
+      code,
+      Button::C,
+      buttons,
+      sdl_mappings,
+      mappings,
+    )
+  }
   if data.button(Button::West) is Some(code) {
     sdl_mappings = add_button(
       "x",
@@ -460,6 +470,16 @@ pub fn Mapping::from_data(
       "y",
       code,
       Button::North,
+      buttons,
+      sdl_mappings,
+      mappings,
+    )
+  }
+  if data.button(Button::Z) is Some(code) {
+    sdl_mappings = add_button(
+      "z",
+      code,
+      Button::Z,
       buttons,
       sdl_mappings,
       mappings,
@@ -709,17 +729,16 @@ pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
     if !mapping_line_matches_platform(line) {
       continue
     }
-    match find_first_comma(line) {
-      None => continue
-      Some(i) => {
-        let guid = (try! line[0:i]).to_string()
-        try {
-          let uuid = Uuid::parse(guid)
-          upsert_mapping(self, uuid, line)
-        } catch {
-          _ => ()
-        }
-      }
+    let guid_end = match find_first_comma(line) {
+      None => line.length()
+      Some(i) => i
+    }
+    let guid = (try! line[0:guid_end]).to_string()
+    try {
+      let uuid = Uuid::parse(guid)
+      upsert_mapping(self, uuid, line)
+    } catch {
+      _ => ()
     }
   }
 }

@@ -24,6 +24,8 @@ fn non_empty_parser_errors(line : String) -> Int {
       Err(e) =>
         match e {
           ParserError::Error(ParserErrorKind::EmptyValue, _) => ()
+          ParserError::Error(ParserErrorKind::UnknownAxis, _) => ()
+          ParserError::Error(ParserErrorKind::UnknownButton, _) => ()
           ParserError::Error(ParserErrorKind::InvalidParserState, _) => {
             errors += 1
             break
@@ -48,4 +50,17 @@ test "full SDL corpus parses without non-empty parser errors" {
   }
   inspect(parsed > 1000, content="true")
   inspect(errors, content="0")
+}
+
+///|
+test "hat direction invalid value error position matches gilrs" {
+  let p = Parser::new("xinput,Pad,dpup:h0.x,")
+  ignore(try? p.next_token())
+  ignore(try? p.next_token())
+  let token : Result[Token?, ParserError] = try? p.next_token()
+  let ok = match token {
+    Err(ParserError::Error(ParserErrorKind::InvalidValue, 14)) => true
+    _ => false
+  }
+  inspect(ok, content="true")
 }

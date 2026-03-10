@@ -39,6 +39,7 @@ pub struct GamepadData {
   mut vendor_id : Int?
   mut product_id : Int?
   mut ff_supported : Bool
+  mut listener_position : (Double, Double, Double)
   mut power_info : PowerInfo
   mut axes : Array[Code]
   mut buttons : Array[Code]
@@ -58,6 +59,7 @@ fn GamepadData::new() -> GamepadData {
     vendor_id: None,
     product_id: None,
     ff_supported: false,
+    listener_position: (0.0, 0.0, 0.0),
     power_info: PowerInfo::Unknown,
     axes: [],
     buttons: [],
@@ -68,10 +70,32 @@ fn GamepadData::new() -> GamepadData {
 }
 
 ///|
-struct FfPendingCompletion {
+const FF_TICK_DURATION_MS : Int64 = 50L
+
+///|
+priv struct FfMagnitude {
+  strong : Int
+  weak : Int
+}
+
+///|
+priv enum FfEffectState {
+  Playing(Int)
+  Stopped
+}
+
+///|
+struct FfEffectSource {
   token : Int
-  id : Int
-  due_time_ms : Int64
+  base_effects : Array[BaseEffect]
+  mut devices : Array[Int]
+  mut repeat_mode : FfRepeat
+  mut distance_model : DistanceModel
+  mut position : (Double, Double, Double)
+  mut gain : Double
+  mut state : FfEffectState
+  strong : Int
+  weak : Int
 }
 
 ///|
@@ -87,7 +111,12 @@ pub struct Gilrs {
   mappings : MappingDb
   mut now_ms : Int64
   mut next_effect_token : Int
-  mut ff_pending_completions : Array[FfPendingCompletion]
+  ff_tick_base_ms : Int64
+  mut ff_tick : Int
+  mut ff_dirty : Bool
+  ff_effects : Array[FfEffectSource]
+  mut ff_events : Array[Event]
+  mut ff_events_head : Int
   backend : NativeBackend?
 }
 
@@ -113,7 +142,12 @@ pub fn Gilrs::new_mock(
     mappings: MappingDb::new(),
     now_ms: 0L,
     next_effect_token: 1,
-    ff_pending_completions: [],
+    ff_tick_base_ms: runtime_now_ms(),
+    ff_tick: 0,
+    ff_dirty: false,
+    ff_effects: [],
+    ff_events: [],
+    ff_events_head: 0,
     backend: None,
   }
 }
@@ -135,7 +169,12 @@ pub fn Gilrs::new_native(
     mappings: MappingDb::new(),
     now_ms: 0L,
     next_effect_token: 1,
-    ff_pending_completions: [],
+    ff_tick_base_ms: runtime_now_ms(),
+    ff_tick: 0,
+    ff_dirty: false,
+    ff_effects: [],
+    ff_events: [],
+    ff_events_head: 0,
     backend: Some(NativeBackend::new()),
   }
 }
@@ -210,113 +249,379 @@ fn Gilrs::new_effect_token(self : Gilrs) -> Int {
 }
 
 ///|
-fn Gilrs::schedule_ff_effect_completion(
-  self : Gilrs,
-  token : Int,
-  ids : Array[GamepadId],
-  due_time_ms : Int64,
-) -> Unit {
-  self.cancel_ff_effect_completion(token)
-  let uniq : Array[Int] = []
-  for gid in ids {
-    let id = gid.value()
-    if id < 0 {
-      continue
-    }
-    if !contains_id(uniq, id) {
-      uniq.push(id)
-    }
-  }
-  for id in uniq {
-    self.ff_pending_completions.push({ token, id, due_time_ms })
+fn u16_saturating_add(lhs : Int, rhs : Int) -> Int {
+  let sum = lhs + rhs
+  if sum >= 65535 {
+    65535
+  } else if sum <= 0 {
+    0
+  } else {
+    sum
   }
 }
 
 ///|
-fn Gilrs::cancel_ff_effect_completion(self : Gilrs, token : Int) -> Unit {
-  let pending : Array[FfPendingCompletion] = []
-  for item in self.ff_pending_completions {
-    if item.token != token {
-      pending.push(item)
-    }
+fn u16_scale(magnitude : Int, factor : Double) -> Int {
+  if factor <= 0.0 || Double::is_nan(factor) {
+    return 0
   }
-  self.ff_pending_completions = pending
+  let x = magnitude.to_double() * factor
+  if x <= 0.0 || Double::is_nan(x) {
+    0
+  } else if x >= 65535.0 {
+    65535
+  } else {
+    x.to_int()
+  }
 }
 
 ///|
-fn Gilrs::cancel_ff_effect_completion_for_gamepad(
-  self : Gilrs,
-  id : Int,
-) -> Unit {
-  let pending : Array[FfPendingCompletion] = []
-  for item in self.ff_pending_completions {
-    if item.id != id {
-      pending.push(item)
-    }
+fn u16_from_amp(amp : Double) -> Int {
+  if amp <= 0.0 || Double::is_nan(amp) {
+    0
+  } else if amp >= 1.0 {
+    65535
+  } else {
+    (amp * 65535.0).to_int()
   }
-  self.ff_pending_completions = pending
 }
 
 ///|
-fn Gilrs::next_due_ff_completion_time(self : Gilrs) -> Int64? {
-  if self.ff_pending_completions.length() == 0 {
+fn amp_from_u16(magnitude : Int) -> Double {
+  clamp(magnitude.to_double() / 65535.0, 0.0, 1.0)
+}
+
+///|
+fn Gilrs::ff_find_effect_idx(self : Gilrs, token : Int) -> Int? {
+  for i in 0..<self.ff_effects.length() {
+    if self.ff_effects[i].token == token {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+fn ff_devices_contains(devices : Array[Int], id : Int) -> Bool {
+  for x in devices {
+    if x == id {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn ff_repeat_max_ticks(repeat : FfRepeat) -> Int? {
+  match repeat {
+    FfRepeat::Infinitely => None
+    FfRepeat::For(ms) => {
+      let q = Ticks::from_ms(ms)
+      let ticks = (q.as_ms() / FF_TICK_DURATION_MS).to_int()
+      Some(ticks)
+    }
+  }
+}
+
+///|
+fn Gilrs::ff_take_next_event(self : Gilrs) -> Event? {
+  if self.ff_events_head >= self.ff_events.length() {
+    self.ff_events = []
+    self.ff_events_head = 0
     return None
   }
-  let mut next_due = self.ff_pending_completions[0].due_time_ms
-  for item in self.ff_pending_completions {
-    if item.due_time_ms < next_due {
-      next_due = item.due_time_ms
-    }
-  }
-  Some(next_due)
+  let ev = self.ff_events[self.ff_events_head]
+  self.ff_events_head = self.ff_events_head + 1
+  Some(ev)
 }
 
 ///|
-fn Gilrs::take_due_ff_completion(self : Gilrs, now_ms : Int64) -> Event? {
-  while true {
-    let mut chosen_idx : Int? = None
-    let mut chosen_due = 0L
-    for i in 0..<self.ff_pending_completions.length() {
-      let item = self.ff_pending_completions[i]
-      if item.due_time_ms > now_ms {
-        continue
+fn Gilrs::ff_push_event(self : Gilrs, ev : Event) -> Unit {
+  self.ff_events.push(ev)
+}
+
+///|
+fn Gilrs::ff_now_tick(self : Gilrs, now_ms : Int64) -> Int {
+  let elapsed = now_ms - self.ff_tick_base_ms
+  if elapsed <= 0L {
+    0
+  } else {
+    (elapsed / FF_TICK_DURATION_MS).to_int()
+  }
+}
+
+///|
+fn Gilrs::ff_has_active_effect(self : Gilrs) -> Bool {
+  for eff in self.ff_effects {
+    match eff.state {
+      FfEffectState::Playing(_) => return true
+      FfEffectState::Stopped => ()
+    }
+  }
+  false
+}
+
+///|
+fn Gilrs::ff_next_tick_wait_ms(self : Gilrs, now_ms : Int64) -> Int {
+  let tick = self.ff_now_tick(now_ms)
+  let next_tick_at = self.ff_tick_base_ms +
+    (tick.to_int64() + 1L) * FF_TICK_DURATION_MS
+  let wait = next_tick_at - now_ms
+  if wait <= 0L {
+    0
+  } else if wait >= 0x7FFF_FFFFL {
+    0x7FFF_FFFF
+  } else {
+    wait.to_int()
+  }
+}
+
+///|
+fn Gilrs::ff_upsert_effect_from_handle(self : Gilrs, effect : Effect) -> Unit {
+  let token = effect.effect_token
+  let devices : Array[Int] = []
+  for gid in effect.gamepads {
+    let id = gid.value()
+    if id >= 0 && !contains_id(devices, id) {
+      devices.push(id)
+    }
+  }
+  let base_effects = effect.base_effects.copy()
+  let strong_u16 = u16_from_amp(effect.strong)
+  let weak_u16 = u16_from_amp(effect.weak)
+  let mut state = FfEffectState::Stopped
+  match effect.playing_since_ms {
+    None => ()
+    Some(_) => state = FfEffectState::Playing(self.ff_tick)
+  }
+  match self.ff_find_effect_idx(token) {
+    None =>
+      self.ff_effects.push({
+        token,
+        base_effects,
+        devices,
+        repeat_mode: effect.repeat_mode,
+        distance_model: effect.distance_model,
+        position: effect.position,
+        gain: effect.gain,
+        state,
+        strong: strong_u16,
+        weak: weak_u16,
+      })
+    Some(idx) =>
+      self.ff_effects[idx] = {
+        token,
+        base_effects,
+        devices,
+        repeat_mode: effect.repeat_mode,
+        distance_model: effect.distance_model,
+        position: effect.position,
+        gain: effect.gain,
+        state,
+        strong: strong_u16,
+        weak: weak_u16,
       }
-      match chosen_idx {
-        None => {
-          chosen_idx = Some(i)
-          chosen_due = item.due_time_ms
+  }
+}
+
+///|
+fn Gilrs::ff_set_effect_gamepads(
+  self : Gilrs,
+  token : Int,
+  gamepads : Array[GamepadId],
+) -> Unit {
+  match self.ff_find_effect_idx(token) {
+    None => ()
+    Some(idx) => {
+      let devices : Array[Int] = []
+      for gid in gamepads {
+        let id = gid.value()
+        if id >= 0 && !contains_id(devices, id) {
+          devices.push(id)
         }
-        Some(_) =>
-          if item.due_time_ms < chosen_due {
-            chosen_idx = Some(i)
-            chosen_due = item.due_time_ms
-          }
+      }
+      self.ff_effects[idx].devices = devices
+    }
+  }
+  self.ff_dirty = true
+}
+
+///|
+fn Gilrs::ff_set_effect_repeat(
+  self : Gilrs,
+  token : Int,
+  repeat : FfRepeat,
+) -> Unit {
+  match self.ff_find_effect_idx(token) {
+    None => ()
+    Some(idx) => self.ff_effects[idx].repeat_mode = repeat
+  }
+  self.ff_dirty = true
+}
+
+///|
+fn Gilrs::ff_set_effect_distance_model(
+  self : Gilrs,
+  token : Int,
+  model : DistanceModel,
+) -> Unit {
+  match self.ff_find_effect_idx(token) {
+    None => ()
+    Some(idx) => self.ff_effects[idx].distance_model = model
+  }
+  self.ff_dirty = true
+}
+
+///|
+fn Gilrs::ff_set_effect_position(
+  self : Gilrs,
+  token : Int,
+  position : (Double, Double, Double),
+) -> Unit {
+  match self.ff_find_effect_idx(token) {
+    None => ()
+    Some(idx) => self.ff_effects[idx].position = position
+  }
+  self.ff_dirty = true
+}
+
+///|
+fn Gilrs::ff_set_effect_gain(self : Gilrs, token : Int, gain : Double) -> Unit {
+  match self.ff_find_effect_idx(token) {
+    None => ()
+    Some(idx) => self.ff_effects[idx].gain = gain
+  }
+  self.ff_dirty = true
+}
+
+///|
+fn Gilrs::ff_play_effect(self : Gilrs, token : Int, tick : Int) -> Unit {
+  match self.ff_find_effect_idx(token) {
+    None => ()
+    Some(idx) => self.ff_effects[idx].state = FfEffectState::Playing(tick)
+  }
+  self.ff_dirty = true
+}
+
+///|
+fn Gilrs::ff_stop_effect(self : Gilrs, token : Int) -> Unit {
+  match self.ff_find_effect_idx(token) {
+    None => ()
+    Some(idx) => self.ff_effects[idx].state = FfEffectState::Stopped
+  }
+  self.ff_dirty = true
+}
+
+///|
+fn distance(
+  a : (Double, Double, Double),
+  b : (Double, Double, Double),
+) -> Double {
+  let (ax, ay, az) = a
+  let (bx, by, bz) = b
+  let dx = bx - ax
+  let dy = by - ay
+  let dz = bz - az
+  Double::sqrt(dx * dx + dy * dy + dz * dz)
+}
+
+///|
+fn Gilrs::ff_combine_base_effects(
+  self : Gilrs,
+  idx : Int,
+  tick : Int,
+  actor_pos : (Double, Double, Double),
+  now_ms : Int64,
+) -> FfMagnitude {
+  let mut rel_ticks = 0
+  match self.ff_effects[idx].state {
+    FfEffectState::Stopped => return { strong: 0, weak: 0 }
+    FfEffectState::Playing(since_tick) => {
+      rel_ticks = tick - since_tick
+      if rel_ticks < 0 {
+        rel_ticks = 0
       }
     }
-    match chosen_idx {
-      None => return None
-      Some(idx) => {
-        let chosen = self.ff_pending_completions[idx]
-        let pending : Array[FfPendingCompletion] = []
-        for i in 0..<self.ff_pending_completions.length() {
-          if i != idx {
-            pending.push(self.ff_pending_completions[i])
-          }
-        }
-        self.ff_pending_completions = pending
-        if chosen.id >= 0 && self.is_connected(GamepadId::new(chosen.id)) {
-          return Some(
+  }
+
+  match ff_repeat_max_ticks(self.ff_effects[idx].repeat_mode) {
+    None => ()
+    Some(max_dur) =>
+      if rel_ticks > max_dur {
+        self.ff_effects[idx].state = FfEffectState::Stopped
+        for id in self.ff_effects[idx].devices {
+          self.ff_push_event(
             Event::at(
-              GamepadId::new(chosen.id),
+              GamepadId::new(id),
               EventType::ForceFeedbackEffectCompleted,
               now_ms,
             ),
           )
         }
+        return { strong: 0, weak: 0 }
+      }
+  }
+
+  let dist = distance(self.ff_effects[idx].position, actor_pos)
+  let attenuation = self.ff_effects[idx].distance_model.attenuation(dist) *
+    self.ff_effects[idx].gain
+  if attenuation < 0.05 {
+    return { strong: 0, weak: 0 }
+  }
+
+  let mut strong = self.ff_effects[idx].strong
+  let mut weak = self.ff_effects[idx].weak
+  for effect in self.ff_effects[idx].base_effects {
+    match effect.magnitude_at(rel_ticks) {
+      BaseEffectType::Strong(magnitude) =>
+        strong = u16_saturating_add(strong, magnitude)
+      BaseEffectType::Weak(magnitude) =>
+        weak = u16_saturating_add(weak, magnitude)
+    }
+  }
+  { strong: u16_scale(strong, attenuation), weak: u16_scale(weak, attenuation) }
+}
+
+///|
+fn Gilrs::ff_tick_update(self : Gilrs, now_ms : Int64, force : Bool) -> Unit {
+  match self.backend {
+    None => ()
+    Some(b) => {
+      let tick = self.ff_now_tick(now_ms)
+      let should_tick = force || self.ff_dirty || tick != self.ff_tick
+      if !should_tick {
+        return
+      }
+      self.ff_tick = tick
+      self.ff_dirty = false
+
+      for dev_id in 0..<self.gamepads_data.length() {
+        let data = self.gamepads_data[dev_id]
+        if !data.connected || !data.ff_supported {
+          continue
+        }
+        let mut strong = 0
+        let mut weak = 0
+        for eff_idx in 0..<self.ff_effects.length() {
+          if ff_devices_contains(self.ff_effects[eff_idx].devices, dev_id) {
+            let mag = self.ff_combine_base_effects(
+              eff_idx,
+              tick,
+              data.listener_position,
+              now_ms,
+            )
+            strong = u16_saturating_add(strong, mag.strong)
+            weak = u16_saturating_add(weak, mag.weak)
+          }
+        }
+        let _ = b.set_rumble(
+          dev_id,
+          amp_from_u16(strong),
+          amp_from_u16(weak),
+          100,
+        )
       }
     }
-  } nobreak {
-    None
   }
 }
 
@@ -484,7 +789,12 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
       self.insert_event(Event::at(gid, EventType::Connected, ne.time_ms))
     }
     NativeEventTag::Disconnected => {
-      self.cancel_ff_effect_completion_for_gamepad(id)
+      match self.backend {
+        None => ()
+        Some(b) => {
+          let _ = b.set_rumble(id, 0.0, 0.0, 0)
+        }
+      }
       self.set_connected(id, false)
       self.insert_event(Event::at(gid, EventType::Disconnected, ne.time_ms))
     }
@@ -691,7 +1001,9 @@ fn min_timeout(lhs : Int, rhs : Int) -> Int {
 pub fn Gilrs::next_event(self : Gilrs) -> Event? {
   let jitter_filter = Jitter::new()
   while true {
-    match self.take_due_ff_completion(runtime_now_ms()) {
+    let now = runtime_now_ms()
+    self.ff_tick_update(now, false)
+    match self.ff_take_next_event() {
       None => ()
       Some(ev) => {
         if self.update_state {
@@ -742,7 +1054,8 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
   let jitter_filter = Jitter::new()
   while true {
     let now = runtime_now_ms()
-    match self.take_due_ff_completion(now) {
+    self.ff_tick_update(now, false)
+    match self.ff_take_next_event() {
       None => ()
       Some(ev) => {
         if self.update_state {
@@ -756,29 +1069,15 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
         None => ()
         Some(b) => {
           let base_timeout = clamp_blocking_timeout(timeout_ms)
-          let t = match self.next_due_ff_completion_time() {
-            None => base_timeout
-            Some(due_time) =>
-              if due_time <= now {
-                0
-              } else {
-                let wait_ff = clamp_blocking_timeout(Some(due_time - now))
-                min_timeout(base_timeout, wait_ff)
-              }
+          let t = if self.ff_has_active_effect() {
+            min_timeout(base_timeout, self.ff_next_tick_wait_ms(now))
+          } else {
+            base_timeout
           }
           b.poll_timeout(t)
           match b.next_event() {
             None => ()
             Some(ne) => self.push_native_event(ne)
-          }
-          match self.take_due_ff_completion(runtime_now_ms()) {
-            None => ()
-            Some(ev) => {
-              if self.update_state {
-                self.update(ev)
-              }
-              return Some(ev)
-            }
           }
         }
       }
@@ -1449,12 +1748,15 @@ pub fn Gamepad::set_listener_position(
   self : Gamepad,
   position : (Double, Double, Double),
 ) -> Unit raise FfError {
-  ignore(position)
   if !self.is_connected() {
     raise FfError::Disconnected(self.id)
   } else if !self.is_ff_supported() {
     raise FfError::FfNotSupported(self.id)
   } else {
-    ()
+    let i = self.id.value()
+    if i >= 0 && i < self.gilrs.gamepads_data.length() {
+      self.gilrs.gamepads_data[i].listener_position = position
+      self.gilrs.ff_tick_update(runtime_now_ms(), true)
+    }
   }
 }

@@ -36,7 +36,13 @@ pub struct Ticks {
 
 ///|
 pub fn Ticks::from_ms(ms : Int64) -> Ticks {
-  { ms, }
+  if ms <= 0L {
+    { ms: 0L }
+  } else {
+    let tick = 50L
+    let q = (ms + tick - 1L) / tick
+    { ms: q * tick }
+  }
 }
 
 ///|
@@ -234,6 +240,115 @@ pub fn Replay::at(self : Replay, ticks : Int) -> Double {
 }
 
 ///|
+pub fn Replay::dur(self : Replay) -> Int {
+  self.play_for + self.with_delay
+}
+
+///|
+fn Replay::wrap(self : Replay, ticks : Int) -> Int? {
+  if ticks < self.after {
+    None
+  } else {
+    let d = self.dur()
+    if d <= 0 {
+      None
+    } else {
+      Some((ticks - self.after) % d)
+    }
+  }
+}
+
+///|
+fn clamp_u16(x : Double) -> Int {
+  if x <= 0.0 || x != x {
+    0
+  } else if x >= 65535.0 {
+    65535
+  } else {
+    x.to_int()
+  }
+}
+
+///|
+fn BaseEffectType::scaled(
+  self : BaseEffectType,
+  rhs : Double,
+) -> BaseEffectType {
+  let mg = match self {
+    BaseEffectType::Weak(m) => m
+    BaseEffectType::Strong(m) => m
+  }
+  let mg2 = clamp_u16(mg.to_double() * rhs)
+  match self {
+    BaseEffectType::Weak(_) => BaseEffectType::Weak(mg2)
+    BaseEffectType::Strong(_) => BaseEffectType::Strong(mg2)
+  }
+}
+
+///|
+fn BaseEffect::magnitude_at(self : BaseEffect, ticks : Int) -> BaseEffectType {
+  match self.scheduling.wrap(ticks) {
+    None => self.kind.scaled(0.0)
+    Some(wrapped) => {
+      let gate = self.scheduling.at(wrapped)
+      if gate == 0.0 {
+        self.kind.scaled(0.0)
+      } else {
+        let att = gate * self.envelope.at(wrapped, self.scheduling.play_for)
+        self.kind.scaled(att)
+      }
+    }
+  }
+}
+
+///|
+fn clamp_distance(x : Double, lo : Double, hi : Double) -> Double {
+  let y = if x < lo { lo } else { x }
+  if y > hi {
+    hi
+  } else {
+    y
+  }
+}
+
+///|
+fn DistanceModel::attenuation(
+  self : DistanceModel,
+  distance : Double,
+) -> Double {
+  let mut distance = distance
+  match self {
+    DistanceModel::Linear(ref_distance~, rolloff_factor~, max_distance~) => {
+      distance = if distance > max_distance { max_distance } else { distance }
+      1.0 -
+      rolloff_factor * (distance - ref_distance) / (max_distance - ref_distance)
+    }
+    DistanceModel::LinearClamped(ref_distance~, rolloff_factor~, max_distance~) => {
+      distance = clamp_distance(distance, ref_distance, max_distance)
+      1.0 -
+      rolloff_factor * (distance - ref_distance) / (max_distance - ref_distance)
+    }
+    DistanceModel::Inverse(ref_distance~, rolloff_factor~) =>
+      ref_distance / (ref_distance + rolloff_factor * (distance - ref_distance))
+    DistanceModel::InverseClamped(ref_distance~, rolloff_factor~, max_distance~) => {
+      distance = clamp_distance(distance, ref_distance, max_distance)
+      ref_distance / (ref_distance + rolloff_factor * (distance - ref_distance))
+    }
+    DistanceModel::Exponential(ref_distance~, rolloff_factor~) =>
+      @math.pow(distance / ref_distance, -rolloff_factor)
+    DistanceModel::ExponentialClamped(
+      ref_distance~,
+      rolloff_factor~,
+      max_distance~
+    ) => {
+      distance = clamp_distance(distance, ref_distance, max_distance)
+      @math.pow(distance / ref_distance, -rolloff_factor)
+    }
+    DistanceModel::None => 1.0
+  }
+}
+
+///|
 pub struct Effect {
   gilrs : Gilrs
   effect_token : Int
@@ -389,15 +504,6 @@ pub fn EffectBuilder::gain(
 }
 
 ///|
-fn to_duration_int(ms : Int64) -> Int {
-  if ms <= 0L {
-    0
-  } else if ms >= 0x7FFF_FFFFL {
-    0x7FFF_FFFF
-  } else {
-    ms.to_int()
-  }
-}
 
 ///|
 pub fn EffectBuilder::finish(
@@ -427,7 +533,7 @@ pub fn EffectBuilder::finish(
   self.distance_model.validate() catch {
     err => raise FfError::InvalidDistanceModel(err)
   }
-  {
+  let effect : Effect = {
     gilrs,
     effect_token: gilrs.new_effect_token(),
     gamepads: self.gamepads,
@@ -441,26 +547,8 @@ pub fn EffectBuilder::finish(
     gain: self.gain,
     playing_since_ms: None,
   }
-}
-
-///|
-fn Effect::refresh_completion_schedule(self : Effect) -> Unit {
-  match self.playing_since_ms {
-    None => self.gilrs.cancel_ff_effect_completion(self.effect_token)
-    Some(started_at_ms) =>
-      match self.repeat_mode {
-        FfRepeat::Infinitely =>
-          self.gilrs.cancel_ff_effect_completion(self.effect_token)
-        FfRepeat::For(ms) => {
-          let due = if ms <= 0L { started_at_ms } else { started_at_ms + ms }
-          self.gilrs.schedule_ff_effect_completion(
-            self.effect_token,
-            self.gamepads,
-            due,
-          )
-        }
-      }
-  }
+  gilrs.ff_upsert_effect_from_handle(effect)
+  effect
 }
 
 ///|
@@ -482,7 +570,7 @@ pub fn Effect::set_gamepads(
     }
   }
   self.gamepads = out
-  self.refresh_completion_schedule()
+  self.gilrs.ff_set_effect_gamepads(self.effect_token, out)
 }
 
 ///|
@@ -500,18 +588,19 @@ pub fn Effect::add_gamepad(
   if !contains_gamepad_id(self.gamepads, id) {
     self.gamepads.push(id)
   }
-  self.refresh_completion_schedule()
+  self.gilrs.ff_set_effect_gamepads(self.effect_token, self.gamepads)
 }
 
 ///|
 pub fn Effect::set_gain(self : Effect, gain : Double) -> Unit {
   self.gain = if gain < 0.0 { 0.0 } else { gain }
+  self.gilrs.ff_set_effect_gain(self.effect_token, self.gain)
 }
 
 ///|
 pub fn Effect::set_repeat(self : Effect, repeat_mode : FfRepeat) -> Unit {
   self.repeat_mode = repeat_mode
-  self.refresh_completion_schedule()
+  self.gilrs.ff_set_effect_repeat(self.effect_token, repeat_mode)
 }
 
 ///|
@@ -523,6 +612,7 @@ pub fn Effect::set_distance_model(
     err => raise FfError::InvalidDistanceModel(err)
   }
   self.distance_model = model
+  self.gilrs.ff_set_effect_distance_model(self.effect_token, model)
 }
 
 ///|
@@ -531,63 +621,30 @@ pub fn Effect::set_position(
   position : (Double, Double, Double),
 ) -> Unit {
   self.position = position
-}
-
-///|
-fn magnitude_to_amp(magnitude : Int) -> Double {
-  clamp(magnitude.to_double() / 65535.0, 0.0, 1.0)
-}
-
-///|
-fn base_effect_motor_amplitudes(effect : BaseEffect) -> (Double, Double) {
-  match effect.kind {
-    BaseEffectType::Weak(magnitude) => (0.0, magnitude_to_amp(magnitude))
-    BaseEffectType::Strong(magnitude) => (magnitude_to_amp(magnitude), 0.0)
-  }
+  self.gilrs.ff_set_effect_position(self.effect_token, position)
 }
 
 ///|
 pub fn Effect::play(self : Effect) -> Unit raise FfError {
-  match self.gilrs.backend {
-    None => raise FfError::NotSupported
-    Some(b) => {
-      let dur = to_duration_int(self.duration_ms)
-      let mut base_strong = 0.0
-      let mut base_weak = 0.0
-      for effect in self.base_effects {
-        let (s, w) = base_effect_motor_amplitudes(effect)
-        base_strong = base_strong + s
-        base_weak = base_weak + w
-      }
-      ignore(self.repeat_mode)
-      ignore(self.distance_model)
-      ignore(self.position)
-      let strong = clamp((self.strong + base_strong) * self.gain, 0.0, 1.0)
-      let weak = clamp((self.weak + base_weak) * self.gain, 0.0, 1.0)
-      for id in self.gamepads {
-        let ok = b.set_rumble(id.value(), strong, weak, dur)
-        if !ok {
-          raise FfError::NotSupported
-        }
-      }
-      self.playing_since_ms = Some(runtime_now_ms())
-      self.refresh_completion_schedule()
-    }
+  if self.gilrs.backend is None {
+    raise FfError::NotSupported
   }
+  self.gilrs.ff_upsert_effect_from_handle(self)
+  let now = runtime_now_ms()
+  let tick = self.gilrs.ff_now_tick(now)
+  self.playing_since_ms = Some(now)
+  self.gilrs.ff_play_effect(self.effect_token, tick)
+  self.gilrs.ff_tick_update(now, true)
 }
 
 ///|
 pub fn Effect::stop(self : Effect) -> Unit raise FfError {
-  self.playing_since_ms = None
-  self.gilrs.cancel_ff_effect_completion(self.effect_token)
-  match self.gilrs.backend {
-    None => raise FfError::NotSupported
-    Some(b) =>
-      for id in self.gamepads {
-        let ok = b.set_rumble(id.value(), 0.0, 0.0, 0)
-        if !ok {
-          raise FfError::NotSupported
-        }
-      }
+  if self.gilrs.backend is None {
+    raise FfError::NotSupported
   }
+  self.gilrs.ff_upsert_effect_from_handle(self)
+  self.playing_since_ms = None
+  self.gilrs.ff_stop_effect(self.effect_token)
+  let now = runtime_now_ms()
+  self.gilrs.ff_tick_update(now, true)
 }

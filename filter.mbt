@@ -18,7 +18,15 @@ pub fn filter_ev(
   filter : (Event?, Gilrs) -> Event?,
   gilrs : Gilrs,
 ) -> Event? {
-  filter(ev, gilrs)
+  let out = filter(ev, gilrs)
+  match ev {
+    None => out
+    Some(e) =>
+      match out {
+        None => Some(e.drop())
+        _ => out
+      }
+  }
 }
 
 ///|
@@ -228,10 +236,10 @@ pub fn axis_dpad_to_button(ev : Event?, gilrs : Gilrs) -> Event? {
     None => None
     Some(e) =>
       match e.event() {
-        EventType::AxisChanged(axis, val, _) =>
+        EventType::AxisChanged(axis, val, axis_code) =>
           match axis {
-            Axis::DPadX => axis_dpad_x_to_buttons(e, val, gilrs)
-            Axis::DPadY => axis_dpad_y_to_buttons(e, val, gilrs)
+            Axis::DPadX => axis_dpad_x_to_buttons(e, val, axis_code, gilrs)
+            Axis::DPadY => axis_dpad_y_to_buttons(e, val, axis_code, gilrs)
             _ => ev
           }
         _ => ev
@@ -240,18 +248,39 @@ pub fn axis_dpad_to_button(ev : Event?, gilrs : Gilrs) -> Event? {
 }
 
 ///|
-fn can_map_axis_dpad_to_button(id : GamepadId, gilrs : Gilrs) -> Bool {
+fn dpad_btn_codes_for_axis_code(axis_code : Code) -> (Code, Code, Code, Code) {
+  if hid_page(axis_code) == 0 {
+    (
+      LEGACY_BTN_DPAD_UP,
+      LEGACY_BTN_DPAD_DOWN,
+      LEGACY_BTN_DPAD_LEFT,
+      LEGACY_BTN_DPAD_RIGHT,
+    )
+  } else {
+    (BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT)
+  }
+}
+
+///|
+fn can_map_axis_dpad_to_button(
+  id : GamepadId,
+  axis_code : Code,
+  gilrs : Gilrs,
+) -> Bool {
   match gilrs.mapping(id) {
     None => false
     Some(m) => {
+      let (btn_up, btn_down, btn_left, btn_right) = dpad_btn_codes_for_axis_code(
+        axis_code,
+      )
       let hats = m.hats_mapped()
       if hats == 0b1111 {
         true
       } else if hats == 0 {
-        gilrs.axis_or_btn_name(id, BTN_DPAD_RIGHT) is None &&
-        gilrs.axis_or_btn_name(id, BTN_DPAD_LEFT) is None &&
-        gilrs.axis_or_btn_name(id, BTN_DPAD_DOWN) is None &&
-        gilrs.axis_or_btn_name(id, BTN_DPAD_UP) is None &&
+        gilrs.axis_or_btn_name(id, btn_right) is None &&
+        gilrs.axis_or_btn_name(id, btn_left) is None &&
+        gilrs.axis_or_btn_name(id, btn_down) is None &&
+        gilrs.axis_or_btn_name(id, btn_up) is None &&
         gilrs.button_code(id, Button::DPadRight) is None
       } else {
         false
@@ -261,10 +290,16 @@ fn can_map_axis_dpad_to_button(id : GamepadId, gilrs : Gilrs) -> Bool {
 }
 
 ///|
-fn axis_dpad_x_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
-  if !can_map_axis_dpad_to_button(e.id(), gilrs) {
+fn axis_dpad_x_to_buttons(
+  e : Event,
+  val : Double,
+  axis_code : Code,
+  gilrs : Gilrs,
+) -> Event? {
+  if !can_map_axis_dpad_to_button(e.id(), axis_code, gilrs) {
     return Some(e)
   }
+  let (_, _, btn_left, btn_right) = dpad_btn_codes_for_axis_code(axis_code)
   let id = e.id()
   let time = e.time()
   let mut out = e.drop()
@@ -272,24 +307,24 @@ fn axis_dpad_x_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
   let mut release_right = false
   let pressed_left = match gilrs.state(id) {
     None => false
-    Some(s) => s.is_pressed(BTN_DPAD_LEFT)
+    Some(s) => s.is_pressed(btn_left)
   }
   let pressed_right = match gilrs.state(id) {
     None => false
-    Some(s) => s.is_pressed(BTN_DPAD_RIGHT)
+    Some(s) => s.is_pressed(btn_right)
   }
   if val == 1.0 {
     release_left = pressed_left
     gilrs.insert_event(
       Event::at(
         id,
-        EventType::ButtonChanged(Button::DPadRight, 1.0, BTN_DPAD_RIGHT),
+        EventType::ButtonChanged(Button::DPadRight, 1.0, btn_right),
         time,
       ),
     )
     out = Event::at(
       id,
-      EventType::ButtonPressed(Button::DPadRight, BTN_DPAD_RIGHT),
+      EventType::ButtonPressed(Button::DPadRight, btn_right),
       time,
     )
   } else if val == -1.0 {
@@ -297,13 +332,13 @@ fn axis_dpad_x_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
     gilrs.insert_event(
       Event::at(
         id,
-        EventType::ButtonChanged(Button::DPadLeft, 1.0, BTN_DPAD_LEFT),
+        EventType::ButtonChanged(Button::DPadLeft, 1.0, btn_left),
         time,
       ),
     )
     out = Event::at(
       id,
-      EventType::ButtonPressed(Button::DPadLeft, BTN_DPAD_LEFT),
+      EventType::ButtonPressed(Button::DPadLeft, btn_left),
       time,
     )
   } else {
@@ -317,13 +352,13 @@ fn axis_dpad_x_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
     gilrs.insert_event(
       Event::at(
         id,
-        EventType::ButtonChanged(Button::DPadRight, 0.0, BTN_DPAD_RIGHT),
+        EventType::ButtonChanged(Button::DPadRight, 0.0, btn_right),
         time,
       ),
     )
     out = Event::at(
       id,
-      EventType::ButtonReleased(Button::DPadRight, BTN_DPAD_RIGHT),
+      EventType::ButtonReleased(Button::DPadRight, btn_right),
       time,
     )
   }
@@ -334,13 +369,13 @@ fn axis_dpad_x_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
     gilrs.insert_event(
       Event::at(
         id,
-        EventType::ButtonChanged(Button::DPadLeft, 0.0, BTN_DPAD_LEFT),
+        EventType::ButtonChanged(Button::DPadLeft, 0.0, btn_left),
         time,
       ),
     )
     out = Event::at(
       id,
-      EventType::ButtonReleased(Button::DPadLeft, BTN_DPAD_LEFT),
+      EventType::ButtonReleased(Button::DPadLeft, btn_left),
       time,
     )
   }
@@ -348,10 +383,16 @@ fn axis_dpad_x_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
 }
 
 ///|
-fn axis_dpad_y_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
-  if !can_map_axis_dpad_to_button(e.id(), gilrs) {
+fn axis_dpad_y_to_buttons(
+  e : Event,
+  val : Double,
+  axis_code : Code,
+  gilrs : Gilrs,
+) -> Event? {
+  if !can_map_axis_dpad_to_button(e.id(), axis_code, gilrs) {
     return Some(e)
   }
+  let (btn_up, btn_down, _, _) = dpad_btn_codes_for_axis_code(axis_code)
   let id = e.id()
   let time = e.time()
   let mut out = e.drop()
@@ -359,38 +400,30 @@ fn axis_dpad_y_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
   let mut release_down = false
   let pressed_up = match gilrs.state(id) {
     None => false
-    Some(s) => s.is_pressed(BTN_DPAD_UP)
+    Some(s) => s.is_pressed(btn_up)
   }
   let pressed_down = match gilrs.state(id) {
     None => false
-    Some(s) => s.is_pressed(BTN_DPAD_DOWN)
+    Some(s) => s.is_pressed(btn_down)
   }
   if val == 1.0 {
     release_down = pressed_down
     gilrs.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadUp, 1.0, BTN_DPAD_UP),
-        time,
-      ),
+      Event::at(id, EventType::ButtonChanged(Button::DPadUp, 1.0, btn_up), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonPressed(Button::DPadUp, BTN_DPAD_UP),
-      time,
-    )
+    out = Event::at(id, EventType::ButtonPressed(Button::DPadUp, btn_up), time)
   } else if val == -1.0 {
     release_up = pressed_up
     gilrs.insert_event(
       Event::at(
         id,
-        EventType::ButtonChanged(Button::DPadDown, 1.0, BTN_DPAD_DOWN),
+        EventType::ButtonChanged(Button::DPadDown, 1.0, btn_down),
         time,
       ),
     )
     out = Event::at(
       id,
-      EventType::ButtonPressed(Button::DPadDown, BTN_DPAD_DOWN),
+      EventType::ButtonPressed(Button::DPadDown, btn_down),
       time,
     )
   } else {
@@ -402,17 +435,9 @@ fn axis_dpad_y_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
       gilrs.insert_event(out)
     }
     gilrs.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadUp, 0.0, BTN_DPAD_UP),
-        time,
-      ),
+      Event::at(id, EventType::ButtonChanged(Button::DPadUp, 0.0, btn_up), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonReleased(Button::DPadUp, BTN_DPAD_UP),
-      time,
-    )
+    out = Event::at(id, EventType::ButtonReleased(Button::DPadUp, btn_up), time)
   }
   if release_down {
     if !out.is_dropped() {
@@ -421,13 +446,13 @@ fn axis_dpad_y_to_buttons(e : Event, val : Double, gilrs : Gilrs) -> Event? {
     gilrs.insert_event(
       Event::at(
         id,
-        EventType::ButtonChanged(Button::DPadDown, 0.0, BTN_DPAD_DOWN),
+        EventType::ButtonChanged(Button::DPadDown, 0.0, btn_down),
         time,
       ),
     )
     out = Event::at(
       id,
-      EventType::ButtonReleased(Button::DPadDown, BTN_DPAD_DOWN),
+      EventType::ButtonReleased(Button::DPadDown, btn_down),
       time,
     )
   }
@@ -458,8 +483,7 @@ pub fn Repeat::filter(self : Repeat, ev : Event?, gilrs : Gilrs) -> Event? {
   match ev {
     Some(_) => ev
     None => {
-      let now0 = gilrs.time()
-      let now = if now0 != 0L { now0 } else { runtime_now_ms() }
+      let now = runtime_now_ms()
       for i in 0..<gilrs.gamepads_data.length() {
         if !gilrs.gamepads_data[i].connected {
           continue

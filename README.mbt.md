@@ -34,6 +34,18 @@ Best support today is on macOS. Linux and Windows are available on native target
 - Force-feedback APIs with platform-specific backend support
 - Mock backend for deterministic tests
 
+## API Notes
+
+- **Errors**: `Gilrs::new()` does not raise. `GilrsBuilder::build()` may raise `GilrsError`.
+- **Event time**: `Event::time()` is a millisecond timestamp. On native backends this comes from the OS clock; on the mock backend it is whatever you set in `Event::at(...)`.
+- **Mappings (gilrs naming)**: Rust `gilrs` re-exports `MappingData` as `Mapping`. In this MoonBit port, the user-editable type is `MappingData`; `Mapping` is the parsed SDL mapping used by `Gilrs`.
+- **Filters**: Compose filters with `filter_ev`. If you write a custom filter, it must not turn `Some(event)` into `None`; to drop an event return `Some(event.drop())`.
+
+## Force Feedback
+
+- macOS: not supported (will report `is_ff_supported = false`).
+- Linux/Windows: supported when the backend/device supports rumble.
+
 ## Quick Start
 
 ```moonbit nocheck
