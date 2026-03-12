@@ -102,14 +102,8 @@ fn find_char(data : String, pos : Int, end : Int, needle : Char) -> Int? {
 }
 
 ///|
-fn slice_to_string(
-  data : String,
-  start : Int,
-  end : Int,
-) -> String raise ParserError {
-  data.sub(start~, end~).to_string() catch {
-    _ => raise ParserError::Error(ParserErrorKind::InvalidParserState, start)
-  }
+fn slice_to_string(data : String, start : Int, end : Int) -> String {
+  data.sub(start~, end~).to_string()
 }
 
 ///|
@@ -237,7 +231,7 @@ fn Parser::parse_uuid(self : Parser) -> Token raise ParserError {
 }
 
 ///|
-fn Parser::parse_name(self : Parser) -> Token raise ParserError {
+fn Parser::parse_name(self : Parser) -> Token {
   let next_comma = next_comma_or_end(self.data, self.pos)
   let name = slice_to_string(self.data, self.pos, next_comma)
   self.state = State::KeyVal
@@ -278,7 +272,7 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
       if body.length() > 0 &&
         body.code_unit_at(body.length() - 1).to_int() == '~'.to_int() {
         inv = true
-        body = (try! body[0:body.length() - 1]).to_string()
+        body = body[0:body.length() - 1].to_string()
       }
       (body, AxisRange::UpperHalf, inv, true)
     }
@@ -288,7 +282,7 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
       if body.length() > 0 &&
         body.code_unit_at(body.length() - 1).to_int() == '~'.to_int() {
         inv = true
-        body = (try! body[0:body.length() - 1]).to_string()
+        body = body[0:body.length() - 1].to_string()
       }
       (body, AxisRange::LowerHalf, inv, true)
     }
@@ -298,7 +292,7 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
       if body.length() > 0 &&
         body.code_unit_at(body.length() - 1).to_int() == '~'.to_int() {
         inv = true
-        body = (try! body[0:body.length() - 1]).to_string()
+        body = body[0:body.length() - 1].to_string()
       }
       (body, AxisRange::Full, inv, true)
     }
@@ -309,9 +303,9 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
         Some(i) => i
         None => raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
       }
-      let hat = parse_u16_decimal((try! body[0:dot]).to_string(), pos + 1)
+      let hat = parse_u16_decimal(body[0:dot].to_string(), pos + 1)
       let direction = parse_u16_decimal(
-        (try! body[dot + 1:body.length()]).to_string(),
+        body[dot + 1:body.length()].to_string(),
         pos + dot + 2,
       )
       let to = lookup_axis_or_btn(key, ParserErrorKind::UnknownButton, pos)

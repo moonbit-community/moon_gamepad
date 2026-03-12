@@ -675,12 +675,12 @@ fn mapping_line_platform(line : String) -> String? {
       if start >= line.length() {
         return Some("")
       }
-      let tail = (try! line[start:line.length()]).to_string()
+      let tail = line[start:line.length()].to_string()
       let end = match find_first_comma(tail) {
         None => tail.length()
         Some(i) => i
       }
-      Some((try! tail[0:end]).to_string())
+      Some(tail[0:end].to_string())
     }
   }
 }
@@ -713,7 +713,7 @@ fn trim_trailing_cr(line : String) -> String {
   }
   let last = line.code_unit_at(line.length() - 1).to_int()
   if last == '\r'.to_int() {
-    (try! line[0:line.length() - 1]).to_string()
+    line[0:line.length() - 1].to_string()
   } else {
     line
   }
@@ -733,7 +733,7 @@ pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
       None => line.length()
       Some(i) => i
     }
-    let guid = (try! line[0:guid_end]).to_string()
+    let guid = line[0:guid_end].to_string()
     try {
       let uuid = Uuid::parse(guid)
       upsert_mapping(self, uuid, line)
