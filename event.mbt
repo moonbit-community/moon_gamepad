@@ -15,6 +15,8 @@
 ///|
 pub struct GamepadId {
   value : Int
+
+  fn new(value : Int) -> GamepadId
 }
 
 ///|

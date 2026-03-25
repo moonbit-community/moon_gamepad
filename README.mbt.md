@@ -48,18 +48,15 @@ Best support today is on macOS. Linux and Windows are available on native target
 
 ## Quick Start
 
-```moonbit nocheck
-import Milky2018/gamepad
-
-fn main {
+```mbt nocheck
+///|
+test "quick start" {
   let gilrs = Gilrs::new()
 
   while true {
     match gilrs.next_event() {
       None => break
-      Some(ev) => {
-        println(ev)
-      }
+      Some(ev) => ...
     }
   }
 }
@@ -67,22 +64,18 @@ fn main {
 
 ## Mock Example
 
-```moonbit nocheck
-import Milky2018/gamepad
-
+```mbt check
+///|
 test "mock button press" {
-  let gilrs =
-    GilrsBuilder::new()
+  let gilrs = GilrsBuilder::new()
     .with_mock_gamepad_count(1)
     .with_default_filters(false)
     .build()
 
-  let id = GamepadId::new(0)
-  gilrs.insert_event(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
-  )
+  let id = @gamepad.GamepadId(0)
+  gilrs.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
 
-  inspect(gilrs.next_event(), content="Some(...)")
+  assert_true(gilrs.next_event() is Some(_))
 }
 ```
 
