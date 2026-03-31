@@ -20,8 +20,8 @@ test "axis_value documented case" {
 
 ///|
 test "axis_value overflow behavior" {
-  let minv = @moonbitlang/core/int.min_value
-  let maxv = @moonbitlang/core/int.max_value
+  let minv = @moonbitlang/core/int.MIN_VALUE
+  let maxv = @moonbitlang/core/int.MAX_VALUE
   let info = AxisInfo::new(minv, maxv, None)
   let axis = Axis::LeftStickY
   inspect(axis_value(info, -1, axis), content="0")
@@ -33,8 +33,8 @@ test "axis_value overflow behavior" {
 
 ///|
 test "btn_value overflow behavior" {
-  let minv = @moonbitlang/core/int.min_value
-  let maxv = @moonbitlang/core/int.max_value
+  let minv = @moonbitlang/core/int.MIN_VALUE
+  let maxv = @moonbitlang/core/int.MAX_VALUE
   let info = AxisInfo::new(minv, maxv, None)
   inspect(btn_value(info, -1), content="0.5")
   inspect(btn_value(info, 0), content="0.5")

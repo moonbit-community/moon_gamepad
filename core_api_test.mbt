@@ -25,17 +25,17 @@ fn core_event_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
-fn build_ok_core(builder : GilrsBuilder) -> Gilrs {
-  let res : Result[Gilrs, GilrsError] = try? builder.build()
+fn build_ok_core(builder : GilBuilder) -> Gil {
+  let res : Result[Gil, GilError] = try? builder.build()
   match res {
     Ok(g) => g
-    Err(_) => Gilrs::new_mock(0, update_state=false, default_filters=false)
+    Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
   }
 }
 
 ///|
-test "gilrs next_event default filters skip dropped" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=true)
+test "gil next_event default filters skip dropped" {
+  let g = Gil::new_mock(1, update_state=true, default_filters=true)
   let id = GamepadId::new(0)
   g.insert_event(
     Event::at(
@@ -69,7 +69,7 @@ test "gilrs next_event default filters skip dropped" {
 
 ///|
 test "builder build_mock wires flags" {
-  let b = GilrsBuilder::new()
+  let b = GilBuilder::new()
     .with_default_filters(true)
     .set_update_state(false)
     .with_mock_gamepad_count(1)
@@ -80,7 +80,7 @@ test "builder build_mock wires flags" {
 
 ///|
 test "builder rejects invalid axis_to_btn thresholds" {
-  let bad : Result[Gilrs, GilrsError] = try? GilrsBuilder::new()
+  let bad : Result[Gil, GilError] = try? GilBuilder::new()
     .set_axis_to_btn(0.4, 0.5)
     .build()
   let is_invalid = match bad {
@@ -93,7 +93,7 @@ test "builder rejects invalid axis_to_btn thresholds" {
 ///|
 test "gamepad handle delegates mapping/state" {
   let g = build_ok_core(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_default_filters(false)
     .set_update_state(false)
     .with_mock_gamepad_count(1),
@@ -134,7 +134,7 @@ test "gamepad handle delegates mapping/state" {
 
 ///|
 test "gamepad name/map_name/os_name semantics" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let gp0 = g.gamepad(id).unwrap()
   let os_name = gp0.os_name()
@@ -150,8 +150,8 @@ test "gamepad name/map_name/os_name semantics" {
 }
 
 ///|
-test "gamepad semantic accessors follow gilrs mapping rules" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+test "gamepad semantic accessors follow gil mapping rules" {
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.update(
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),

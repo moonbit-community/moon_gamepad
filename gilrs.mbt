@@ -13,18 +13,18 @@
 // limitations under the License.
 
 ///|
-suberror GilrsError {
+suberror GilError {
   NotImplemented
   InvalidAxisToBtn
 }
 
 ///|
-let _gilrs_error_keepalive : Array[GilrsError] = [GilrsError::NotImplemented]
+let _gilrs_error_keepalive : Array[GilError] = [GilError::NotImplemented]
 
 ///|
-pub fn GilrsError::is_invalid_axis_to_btn(self : GilrsError) -> Bool {
+pub fn GilError::is_invalid_axis_to_btn(self : GilError) -> Bool {
   match self {
-    GilrsError::InvalidAxisToBtn => true
+    GilError::InvalidAxisToBtn => true
     _ => false
   }
 }
@@ -99,7 +99,7 @@ struct FfEffectSource {
 }
 
 ///|
-pub struct Gilrs {
+pub struct Gil {
   mut counter : Int64
   update_state : Bool
   mut default_filters : Bool
@@ -121,11 +121,11 @@ pub struct Gilrs {
 }
 
 ///|
-pub fn Gilrs::new_mock(
+pub fn Gil::new_mock(
   gamepad_count : Int,
   update_state? : Bool = true,
   default_filters? : Bool = true,
-) -> Gilrs {
+) -> Gil {
   let data : Array[GamepadData] = []
   for _ in 0..<gamepad_count {
     data.push(GamepadData::new())
@@ -153,10 +153,10 @@ pub fn Gilrs::new_mock(
 }
 
 ///|
-pub fn Gilrs::new_native(
+pub fn Gil::new_native(
   update_state? : Bool = true,
   default_filters? : Bool = true,
-) -> Gilrs {
+) -> Gil {
   {
     counter: 0L,
     update_state,
@@ -180,50 +180,50 @@ pub fn Gilrs::new_native(
 }
 
 ///|
-pub fn Gilrs::load_mappings(self : Gilrs, s : String) -> Unit {
+pub fn Gil::load_mappings(self : Gil, s : String) -> Unit {
   self.mappings.insert(s)
 }
 
 ///|
-pub fn Gilrs::set_axis_to_btn(
-  self : Gilrs,
+pub fn Gil::set_axis_to_btn(
+  self : Gil,
   pressed : Double,
   released : Double,
-) -> Unit raise GilrsError {
+) -> Unit raise GilError {
   if pressed <= released ||
     pressed < 0.0 ||
     pressed > 1.0 ||
     released < 0.0 ||
     released > 1.0 {
-    raise GilrsError::InvalidAxisToBtn
+    raise GilError::InvalidAxisToBtn
   }
   self.axis_to_btn_pressed = pressed
   self.axis_to_btn_released = released
 }
 
 ///|
-pub fn Gilrs::with_default_filters(self : Gilrs, enabled : Bool) -> Gilrs {
+pub fn Gil::with_default_filters(self : Gil, enabled : Bool) -> Gil {
   self.default_filters = enabled
   self
 }
 
 ///|
-pub fn Gilrs::default_filters_enabled(self : Gilrs) -> Bool {
+pub fn Gil::default_filters_enabled(self : Gil) -> Bool {
   self.default_filters
 }
 
 ///|
-pub fn Gilrs::update_state_enabled(self : Gilrs) -> Bool {
+pub fn Gil::update_state_enabled(self : Gil) -> Bool {
   self.update_state
 }
 
 ///|
-pub fn Gilrs::set_time(self : Gilrs, now_ms : Int64) -> Unit {
+pub fn Gil::set_time(self : Gil, now_ms : Int64) -> Unit {
   self.now_ms = now_ms
 }
 
 ///|
-pub fn Gilrs::time(self : Gilrs) -> Int64 {
+pub fn Gil::time(self : Gil) -> Int64 {
   self.now_ms
 }
 
@@ -238,7 +238,7 @@ fn contains_id(ids : Array[Int], id : Int) -> Bool {
 }
 
 ///|
-fn Gilrs::new_effect_token(self : Gilrs) -> Int {
+fn Gil::new_effect_token(self : Gil) -> Int {
   let token = self.next_effect_token
   if token >= 0x7FFF_FFFF {
     self.next_effect_token = 1
@@ -292,7 +292,7 @@ fn amp_from_u16(magnitude : Int) -> Double {
 }
 
 ///|
-fn Gilrs::ff_find_effect_idx(self : Gilrs, token : Int) -> Int? {
+fn Gil::ff_find_effect_idx(self : Gil, token : Int) -> Int? {
   for i in 0..<self.ff_effects.length() {
     if self.ff_effects[i].token == token {
       return Some(i)
@@ -324,7 +324,7 @@ fn ff_repeat_max_ticks(repeat : FfRepeat) -> Int? {
 }
 
 ///|
-fn Gilrs::ff_take_next_event(self : Gilrs) -> Event? {
+fn Gil::ff_take_next_event(self : Gil) -> Event? {
   if self.ff_events_head >= self.ff_events.length() {
     self.ff_events = []
     self.ff_events_head = 0
@@ -336,12 +336,12 @@ fn Gilrs::ff_take_next_event(self : Gilrs) -> Event? {
 }
 
 ///|
-fn Gilrs::ff_push_event(self : Gilrs, ev : Event) -> Unit {
+fn Gil::ff_push_event(self : Gil, ev : Event) -> Unit {
   self.ff_events.push(ev)
 }
 
 ///|
-fn Gilrs::ff_now_tick(self : Gilrs, now_ms : Int64) -> Int {
+fn Gil::ff_now_tick(self : Gil, now_ms : Int64) -> Int {
   let elapsed = now_ms - self.ff_tick_base_ms
   if elapsed <= 0L {
     0
@@ -351,7 +351,7 @@ fn Gilrs::ff_now_tick(self : Gilrs, now_ms : Int64) -> Int {
 }
 
 ///|
-fn Gilrs::ff_has_active_effect(self : Gilrs) -> Bool {
+fn Gil::ff_has_active_effect(self : Gil) -> Bool {
   for eff in self.ff_effects {
     match eff.state {
       FfEffectState::Playing(_) => return true
@@ -362,7 +362,7 @@ fn Gilrs::ff_has_active_effect(self : Gilrs) -> Bool {
 }
 
 ///|
-fn Gilrs::ff_next_tick_wait_ms(self : Gilrs, now_ms : Int64) -> Int {
+fn Gil::ff_next_tick_wait_ms(self : Gil, now_ms : Int64) -> Int {
   let tick = self.ff_now_tick(now_ms)
   let next_tick_at = self.ff_tick_base_ms +
     (tick.to_int64() + 1L) * FF_TICK_DURATION_MS
@@ -377,7 +377,7 @@ fn Gilrs::ff_next_tick_wait_ms(self : Gilrs, now_ms : Int64) -> Int {
 }
 
 ///|
-fn Gilrs::ff_upsert_effect_from_handle(self : Gilrs, effect : Effect) -> Unit {
+fn Gil::ff_upsert_effect_from_handle(self : Gil, effect : Effect) -> Unit {
   let token = effect.effect_token
   let devices : Array[Int] = []
   for gid in effect.gamepads {
@@ -425,8 +425,8 @@ fn Gilrs::ff_upsert_effect_from_handle(self : Gilrs, effect : Effect) -> Unit {
 }
 
 ///|
-fn Gilrs::ff_set_effect_gamepads(
-  self : Gilrs,
+fn Gil::ff_set_effect_gamepads(
+  self : Gil,
   token : Int,
   gamepads : Array[GamepadId],
 ) -> Unit {
@@ -447,8 +447,8 @@ fn Gilrs::ff_set_effect_gamepads(
 }
 
 ///|
-fn Gilrs::ff_set_effect_repeat(
-  self : Gilrs,
+fn Gil::ff_set_effect_repeat(
+  self : Gil,
   token : Int,
   repeat : FfRepeat,
 ) -> Unit {
@@ -460,8 +460,8 @@ fn Gilrs::ff_set_effect_repeat(
 }
 
 ///|
-fn Gilrs::ff_set_effect_distance_model(
-  self : Gilrs,
+fn Gil::ff_set_effect_distance_model(
+  self : Gil,
   token : Int,
   model : DistanceModel,
 ) -> Unit {
@@ -473,8 +473,8 @@ fn Gilrs::ff_set_effect_distance_model(
 }
 
 ///|
-fn Gilrs::ff_set_effect_position(
-  self : Gilrs,
+fn Gil::ff_set_effect_position(
+  self : Gil,
   token : Int,
   position : (Double, Double, Double),
 ) -> Unit {
@@ -486,7 +486,7 @@ fn Gilrs::ff_set_effect_position(
 }
 
 ///|
-fn Gilrs::ff_set_effect_gain(self : Gilrs, token : Int, gain : Double) -> Unit {
+fn Gil::ff_set_effect_gain(self : Gil, token : Int, gain : Double) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
     Some(idx) => self.ff_effects[idx].gain = gain
@@ -495,7 +495,7 @@ fn Gilrs::ff_set_effect_gain(self : Gilrs, token : Int, gain : Double) -> Unit {
 }
 
 ///|
-fn Gilrs::ff_play_effect(self : Gilrs, token : Int, tick : Int) -> Unit {
+fn Gil::ff_play_effect(self : Gil, token : Int, tick : Int) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
     Some(idx) => self.ff_effects[idx].state = FfEffectState::Playing(tick)
@@ -504,7 +504,7 @@ fn Gilrs::ff_play_effect(self : Gilrs, token : Int, tick : Int) -> Unit {
 }
 
 ///|
-fn Gilrs::ff_stop_effect(self : Gilrs, token : Int) -> Unit {
+fn Gil::ff_stop_effect(self : Gil, token : Int) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
     Some(idx) => self.ff_effects[idx].state = FfEffectState::Stopped
@@ -526,8 +526,8 @@ fn distance(
 }
 
 ///|
-fn Gilrs::ff_combine_base_effects(
-  self : Gilrs,
+fn Gil::ff_combine_base_effects(
+  self : Gil,
   idx : Int,
   tick : Int,
   actor_pos : (Double, Double, Double),
@@ -583,7 +583,7 @@ fn Gilrs::ff_combine_base_effects(
 }
 
 ///|
-fn Gilrs::ff_tick_update(self : Gilrs, now_ms : Int64, force : Bool) -> Unit {
+fn Gil::ff_tick_update(self : Gil, now_ms : Int64, force : Bool) -> Unit {
   match self.backend {
     None => ()
     Some(b) => {
@@ -626,12 +626,12 @@ fn Gilrs::ff_tick_update(self : Gilrs, now_ms : Int64, force : Bool) -> Unit {
 }
 
 ///|
-pub fn Gilrs::insert_event(self : Gilrs, ev : Event) -> Unit {
+pub fn Gil::insert_event(self : Gil, ev : Event) -> Unit {
   self.events.push(ev)
 }
 
 ///|
-fn Gilrs::apply_connection_event(self : Gilrs, ev : Event) -> Unit {
+fn Gil::apply_connection_event(self : Gil, ev : Event) -> Unit {
   let id = ev.id().value()
   match ev.event() {
     EventType::Connected => self.set_connected(id, true)
@@ -641,7 +641,7 @@ fn Gilrs::apply_connection_event(self : Gilrs, ev : Event) -> Unit {
 }
 
 ///|
-fn Gilrs::ensure_gamepad_data(self : Gilrs, id : Int) -> Unit {
+fn Gil::ensure_gamepad_data(self : Gil, id : Int) -> Unit {
   if id < 0 {
     return
   }
@@ -651,7 +651,7 @@ fn Gilrs::ensure_gamepad_data(self : Gilrs, id : Int) -> Unit {
 }
 
 ///|
-fn Gilrs::set_connected(self : Gilrs, id : Int, connected : Bool) -> Unit {
+fn Gil::set_connected(self : Gil, id : Int, connected : Bool) -> Unit {
   self.ensure_gamepad_data(id)
   if id < 0 || id >= self.gamepads_data.length() {
     return
@@ -660,7 +660,7 @@ fn Gilrs::set_connected(self : Gilrs, id : Int, connected : Bool) -> Unit {
 }
 
 ///|
-fn Gilrs::apply_identity_mapping(self : Gilrs, id : Int) -> Unit {
+fn Gil::apply_identity_mapping(self : Gil, id : Int) -> Unit {
   self.ensure_gamepad_data(id)
   if id < 0 || id >= self.gamepads_data.length() {
     return
@@ -694,8 +694,8 @@ fn find_axis_info(infos : Array[(Code, AxisInfo)], code : Code) -> AxisInfo? {
 }
 
 ///|
-fn Gilrs::refresh_gamepad_data_on_connected(
-  self : Gilrs,
+fn Gil::refresh_gamepad_data_on_connected(
+  self : Gil,
   id : Int,
   existed_before : Bool,
 ) -> Unit {
@@ -762,7 +762,7 @@ fn Gilrs::refresh_gamepad_data_on_connected(
 }
 
 ///|
-fn Gilrs::finish_gamepads_creation(self : Gilrs) -> Unit {
+fn Gil::finish_gamepads_creation(self : Gil) -> Unit {
   match self.backend {
     None => ()
     Some(b) => {
@@ -778,7 +778,7 @@ fn Gilrs::finish_gamepads_creation(self : Gilrs) -> Unit {
 }
 
 ///|
-fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
+fn Gil::push_native_event(self : Gil, ne : NativeEvent) -> Unit {
   let id = ne.id
   let existed_before = id >= 0 && id < self.gamepads_data.length()
   self.ensure_gamepad_data(id)
@@ -956,7 +956,7 @@ fn Gilrs::push_native_event(self : Gilrs, ne : NativeEvent) -> Unit {
 }
 
 ///|
-pub fn Gilrs::poll(self : Gilrs) -> Unit {
+pub fn Gil::poll(self : Gil) -> Unit {
   match self.backend {
     None => ()
     Some(b) => {
@@ -998,7 +998,7 @@ fn min_timeout(lhs : Int, rhs : Int) -> Int {
 }
 
 ///|
-pub fn Gilrs::next_event(self : Gilrs) -> Event? {
+pub fn Gil::next_event(self : Gil) -> Event? {
   let jitter_filter = Jitter::new()
   while true {
     let now = runtime_now_ms()
@@ -1050,7 +1050,7 @@ pub fn Gilrs::next_event(self : Gilrs) -> Event? {
 }
 
 ///|
-pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
+pub fn Gil::next_event_blocking(self : Gil, timeout_ms : Int64?) -> Event? {
   let jitter_filter = Jitter::new()
   while true {
     let now = runtime_now_ms()
@@ -1117,7 +1117,7 @@ pub fn Gilrs::next_event_blocking(self : Gilrs, timeout_ms : Int64?) -> Event? {
 }
 
 ///|
-pub fn Gilrs::update(self : Gilrs, event : Event) -> Unit {
+pub fn Gil::update(self : Gil, event : Event) -> Unit {
   let id = event.id().value()
   if id < 0 || id >= self.gamepads_data.length() {
     return
@@ -1144,7 +1144,7 @@ pub fn Gilrs::update(self : Gilrs, event : Event) -> Unit {
 }
 
 ///|
-pub fn Gilrs::inc(self : Gilrs) -> Unit {
+pub fn Gil::inc(self : Gil) -> Unit {
   if self.counter == 0x3FFF_FFFF_FFFF_FFFFL {
     self.counter = 0L
   } else {
@@ -1153,17 +1153,17 @@ pub fn Gilrs::inc(self : Gilrs) -> Unit {
 }
 
 ///|
-pub fn Gilrs::counter(self : Gilrs) -> Int64 {
+pub fn Gil::counter(self : Gil) -> Int64 {
   self.counter
 }
 
 ///|
-pub fn Gilrs::reset_counter(self : Gilrs) -> Unit {
+pub fn Gil::reset_counter(self : Gil) -> Unit {
   self.counter = 0L
 }
 
 ///|
-pub fn Gilrs::state(self : Gilrs, id : GamepadId) -> GamepadState? {
+pub fn Gil::state(self : Gil, id : GamepadId) -> GamepadState? {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
     None
@@ -1173,7 +1173,7 @@ pub fn Gilrs::state(self : Gilrs, id : GamepadId) -> GamepadState? {
 }
 
 ///|
-pub fn Gilrs::is_connected(self : Gilrs, id : GamepadId) -> Bool {
+pub fn Gil::is_connected(self : Gil, id : GamepadId) -> Bool {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
     false
@@ -1183,8 +1183,8 @@ pub fn Gilrs::is_connected(self : Gilrs, id : GamepadId) -> Bool {
 }
 
 ///|
-pub fn Gilrs::set_mapping_data(
-  self : Gilrs,
+pub fn Gil::set_mapping_data(
+  self : Gil,
   id : GamepadId,
   mapping_data : MappingData,
   name? : String? = None,
@@ -1212,8 +1212,8 @@ pub fn Gilrs::set_mapping_data(
 }
 
 ///|
-pub fn Gilrs::set_mapping_data_strict(
-  self : Gilrs,
+pub fn Gil::set_mapping_data_strict(
+  self : Gil,
   id : GamepadId,
   mapping_data : MappingData,
   name? : String? = None,
@@ -1228,11 +1228,7 @@ pub fn Gilrs::set_mapping_data_strict(
 }
 
 ///|
-pub fn Gilrs::set_mapping(
-  self : Gilrs,
-  id : GamepadId,
-  mapping : Mapping,
-) -> Unit {
+pub fn Gil::set_mapping(self : Gil, id : GamepadId, mapping : Mapping) -> Unit {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
     return
@@ -1241,7 +1237,7 @@ pub fn Gilrs::set_mapping(
 }
 
 ///|
-pub fn Gilrs::mapping(self : Gilrs, id : GamepadId) -> Mapping? {
+pub fn Gil::mapping(self : Gil, id : GamepadId) -> Mapping? {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
     None
@@ -1251,8 +1247,8 @@ pub fn Gilrs::mapping(self : Gilrs, id : GamepadId) -> Mapping? {
 }
 
 ///|
-pub fn Gilrs::axis_or_btn_name(
-  self : Gilrs,
+pub fn Gil::axis_or_btn_name(
+  self : Gil,
   id : GamepadId,
   code : Code,
 ) -> AxisOrBtn? {
@@ -1263,7 +1259,7 @@ pub fn Gilrs::axis_or_btn_name(
 }
 
 ///|
-pub fn Gilrs::axis_code(self : Gilrs, id : GamepadId, axis : Axis) -> Code? {
+pub fn Gil::axis_code(self : Gil, id : GamepadId, axis : Axis) -> Code? {
   match self.mapping(id) {
     None => None
     Some(m) => m.map_rev(AxisOrBtn::Axis(axis))
@@ -1271,7 +1267,7 @@ pub fn Gilrs::axis_code(self : Gilrs, id : GamepadId, axis : Axis) -> Code? {
 }
 
 ///|
-pub fn Gilrs::button_code(self : Gilrs, id : GamepadId, btn : Button) -> Code? {
+pub fn Gil::button_code(self : Gil, id : GamepadId, btn : Button) -> Code? {
   match self.mapping(id) {
     None => None
     Some(m) => m.map_rev(AxisOrBtn::Btn(btn))
@@ -1290,8 +1286,8 @@ fn find_deadzone_idx(deadzones : Array[(Code, Double)], code : Code) -> Int? {
 }
 
 ///|
-pub fn Gilrs::set_deadzone(
-  self : Gilrs,
+pub fn Gil::set_deadzone(
+  self : Gil,
   id : GamepadId,
   code : Code,
   threshold : Double,
@@ -1308,7 +1304,7 @@ pub fn Gilrs::set_deadzone(
 }
 
 ///|
-pub fn Gilrs::deadzone(self : Gilrs, id : GamepadId, code : Code) -> Double? {
+pub fn Gil::deadzone(self : Gil, id : GamepadId, code : Code) -> Double? {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
     return None
@@ -1343,7 +1339,7 @@ pub fn Gilrs::deadzone(self : Gilrs, id : GamepadId, code : Code) -> Double? {
 }
 
 ///|
-pub struct GilrsBuilder {
+pub struct GilBuilder {
   mut update_state : Bool
   mut default_filters : Bool
   mut axis_to_btn_pressed : Double
@@ -1356,7 +1352,7 @@ pub struct GilrsBuilder {
 }
 
 ///|
-pub fn GilrsBuilder::new() -> GilrsBuilder {
+pub fn GilBuilder::new() -> GilBuilder {
   {
     update_state: true,
     default_filters: true,
@@ -1371,131 +1367,128 @@ pub fn GilrsBuilder::new() -> GilrsBuilder {
 }
 
 ///|
-pub fn GilrsBuilder::set_update_state(
-  self : GilrsBuilder,
-  v : Bool,
-) -> GilrsBuilder {
+pub fn GilBuilder::set_update_state(self : GilBuilder, v : Bool) -> GilBuilder {
   self.update_state = v
   self
 }
 
 ///|
-pub fn GilrsBuilder::with_default_filters(
-  self : GilrsBuilder,
+pub fn GilBuilder::with_default_filters(
+  self : GilBuilder,
   v : Bool,
-) -> GilrsBuilder {
+) -> GilBuilder {
   self.default_filters = v
   self
 }
 
 ///|
-pub fn GilrsBuilder::with_mock_gamepad_count(
-  self : GilrsBuilder,
+pub fn GilBuilder::with_mock_gamepad_count(
+  self : GilBuilder,
   n : Int,
-) -> GilrsBuilder {
+) -> GilBuilder {
   self.mock_gamepad_count = n
   self
 }
 
 ///|
-pub fn GilrsBuilder::with_native_backend(
-  self : GilrsBuilder,
+pub fn GilBuilder::with_native_backend(
+  self : GilBuilder,
   v : Bool,
-) -> GilrsBuilder {
+) -> GilBuilder {
   self.use_native_backend = v
   self
 }
 
 ///|
-pub fn GilrsBuilder::add_mappings(
-  self : GilrsBuilder,
+pub fn GilBuilder::add_mappings(
+  self : GilBuilder,
   mappings : String,
-) -> GilrsBuilder {
+) -> GilBuilder {
   self.mapping_inputs.push(mappings)
   self
 }
 
 ///|
-pub fn GilrsBuilder::set_axis_to_btn(
-  self : GilrsBuilder,
+pub fn GilBuilder::set_axis_to_btn(
+  self : GilBuilder,
   pressed : Double,
   released : Double,
-) -> GilrsBuilder {
+) -> GilBuilder {
   self.axis_to_btn_pressed = pressed
   self.axis_to_btn_released = released
   self
 }
 
 ///|
-pub fn GilrsBuilder::add_env_mappings(
-  self : GilrsBuilder,
+pub fn GilBuilder::add_env_mappings(
+  self : GilBuilder,
   env_mappings : Bool,
-) -> GilrsBuilder {
+) -> GilBuilder {
   self.env_mappings = env_mappings
   self
 }
 
 ///|
-pub fn GilrsBuilder::add_included_mappings(
-  self : GilrsBuilder,
+pub fn GilBuilder::add_included_mappings(
+  self : GilBuilder,
   included_mappings : Bool,
-) -> GilrsBuilder {
+) -> GilBuilder {
   self.included_mappings = included_mappings
   self
 }
 
 ///|
-pub fn GilrsBuilder::build(self : GilrsBuilder) -> Gilrs raise GilrsError {
+pub fn GilBuilder::build(self : GilBuilder) -> Gil raise GilError {
   if self.axis_to_btn_pressed <= self.axis_to_btn_released ||
     self.axis_to_btn_pressed < 0.0 ||
     self.axis_to_btn_pressed > 1.0 ||
     self.axis_to_btn_released < 0.0 ||
     self.axis_to_btn_released > 1.0 {
-    raise GilrsError::InvalidAxisToBtn
+    raise GilError::InvalidAxisToBtn
   }
   let use_native_backend = self.use_native_backend &&
     self.mock_gamepad_count <= 0
-  let gilrs = if use_native_backend {
-    Gilrs::new_native(
+  let gil = if use_native_backend {
+    Gil::new_native(
       update_state=self.update_state,
       default_filters=self.default_filters,
     )
   } else {
-    Gilrs::new_mock(
+    Gil::new_mock(
       self.mock_gamepad_count,
       update_state=self.update_state,
       default_filters=self.default_filters,
     )
   }
   for s in self.mapping_inputs {
-    gilrs.load_mappings(s)
+    gil.load_mappings(s)
   }
   if self.included_mappings {
-    gilrs.mappings.add_included_mappings()
+    gil.mappings.add_included_mappings()
   }
   if self.env_mappings {
-    gilrs.mappings.add_env_mappings()
+    gil.mappings.add_env_mappings()
   }
-  gilrs.axis_to_btn_pressed = self.axis_to_btn_pressed
-  gilrs.axis_to_btn_released = self.axis_to_btn_released
-  gilrs.finish_gamepads_creation()
-  gilrs
+  gil.axis_to_btn_pressed = self.axis_to_btn_pressed
+  gil.axis_to_btn_released = self.axis_to_btn_released
+  gil.finish_gamepads_creation()
+  gil
 }
 
 ///|
-pub fn Gilrs::new() -> Gilrs {
-  let built : Result[Gilrs, GilrsError] = try? GilrsBuilder::new()
+pub fn Gil::new() -> Gil {
+  let built : Result[Gil, GilError] = try? GilBuilder::new()
     .with_native_backend(true)
     .build()
   match built {
     Ok(g) => g
-    Err(_) => Gilrs::new_native()
+    Err(_) => Gil::new_native()
   }
 }
 
 ///|
 pub struct Gamepad {
-  gilrs : Gilrs
+  gil : Gil
   id : GamepadId
 }
 
@@ -1510,17 +1503,17 @@ pub enum MappingSource {
 let _mapping_source_keepalive : Array[MappingSource] = [MappingSource::None]
 
 ///|
-pub fn Gilrs::gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
+pub fn Gil::gamepad(self : Gil, id : GamepadId) -> Gamepad? {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
     None
   } else {
-    Some({ gilrs: self, id })
+    Some({ gil: self, id })
   }
 }
 
 ///|
-pub fn Gilrs::connected_gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
+pub fn Gil::connected_gamepad(self : Gil, id : GamepadId) -> Gamepad? {
   match self.gamepad(id) {
     None => None
     Some(gp) => if gp.is_connected() { Some(gp) } else { None }
@@ -1528,14 +1521,14 @@ pub fn Gilrs::connected_gamepad(self : Gilrs, id : GamepadId) -> Gamepad? {
 }
 
 ///|
-pub fn Gilrs::gamepads(self : Gilrs) -> Array[(GamepadId, Gamepad)] {
+pub fn Gil::gamepads(self : Gil) -> Array[(GamepadId, Gamepad)] {
   let out : Array[(GamepadId, Gamepad)] = []
   for i in 0..<self.gamepads_data.length() {
     if !self.gamepads_data[i].connected {
       continue
     }
     let id = GamepadId::new(i)
-    out.push((id, { gilrs: self, id }))
+    out.push((id, { gil: self, id }))
   }
   out
 }
@@ -1547,7 +1540,7 @@ pub fn Gamepad::id(self : Gamepad) -> GamepadId {
 
 ///|
 pub fn Gamepad::is_connected(self : Gamepad) -> Bool {
-  self.gilrs.is_connected(self.id)
+  self.gil.is_connected(self.id)
 }
 
 ///|
@@ -1569,10 +1562,10 @@ pub fn Gamepad::map_name(self : Gamepad) -> String? {
 ///|
 pub fn Gamepad::os_name(self : Gamepad) -> String {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     ""
   } else {
-    self.gilrs.gamepads_data[i].name
+    self.gil.gamepads_data[i].name
   }
 }
 
@@ -1592,70 +1585,70 @@ pub fn Gamepad::mapping_source(self : Gamepad) -> MappingSource {
 ///|
 pub fn Gamepad::uuid(self : Gamepad) -> Uuid {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     Uuid::nil()
   } else {
-    self.gilrs.gamepads_data[i].uuid
+    self.gil.gamepads_data[i].uuid
   }
 }
 
 ///|
 pub fn Gamepad::vendor_id(self : Gamepad) -> Int? {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     None
   } else {
-    self.gilrs.gamepads_data[i].vendor_id
+    self.gil.gamepads_data[i].vendor_id
   }
 }
 
 ///|
 pub fn Gamepad::product_id(self : Gamepad) -> Int? {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     None
   } else {
-    self.gilrs.gamepads_data[i].product_id
+    self.gil.gamepads_data[i].product_id
   }
 }
 
 ///|
 pub fn Gamepad::power_info(self : Gamepad) -> PowerInfo {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     PowerInfo::Unknown
   } else {
-    self.gilrs.gamepads_data[i].power_info
+    self.gil.gamepads_data[i].power_info
   }
 }
 
 ///|
 pub fn Gamepad::axes(self : Gamepad) -> Array[Code] {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     []
   } else {
-    self.gilrs.gamepads_data[i].axes.copy()
+    self.gil.gamepads_data[i].axes.copy()
   }
 }
 
 ///|
 pub fn Gamepad::buttons(self : Gamepad) -> Array[Code] {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     []
   } else {
-    self.gilrs.gamepads_data[i].buttons.copy()
+    self.gil.gamepads_data[i].buttons.copy()
   }
 }
 
 ///|
 pub fn Gamepad::axis_info(self : Gamepad, code : Code) -> AxisInfo? {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     return None
   }
-  for pair in self.gilrs.gamepads_data[i].axis_info {
+  for pair in self.gil.gamepads_data[i].axis_info {
     let (c, info) = pair
     if c == code {
       return Some(info)
@@ -1666,7 +1659,7 @@ pub fn Gamepad::axis_info(self : Gamepad, code : Code) -> AxisInfo? {
 
 ///|
 pub fn Gamepad::state(self : Gamepad) -> GamepadState {
-  match self.gilrs.state(self.id) {
+  match self.gil.state(self.id) {
     None => GamepadState::new()
     Some(s) => s
   }
@@ -1710,36 +1703,36 @@ pub fn Gamepad::axis_data(self : Gamepad, axis : Axis) -> AxisData? {
 
 ///|
 pub fn Gamepad::axis_code(self : Gamepad, axis : Axis) -> Code? {
-  self.gilrs.axis_code(self.id, axis)
+  self.gil.axis_code(self.id, axis)
 }
 
 ///|
 pub fn Gamepad::button_code(self : Gamepad, btn : Button) -> Code? {
-  self.gilrs.button_code(self.id, btn)
+  self.gil.button_code(self.id, btn)
 }
 
 ///|
 pub fn Gamepad::axis_or_btn_name(self : Gamepad, code : Code) -> AxisOrBtn? {
-  self.gilrs.axis_or_btn_name(self.id, code)
+  self.gil.axis_or_btn_name(self.id, code)
 }
 
 ///|
 pub fn Gamepad::mapping(self : Gamepad) -> Mapping? {
-  self.gilrs.mapping(self.id)
+  self.gil.mapping(self.id)
 }
 
 ///|
 pub fn Gamepad::deadzone(self : Gamepad, code : Code) -> Double? {
-  self.gilrs.deadzone(self.id, code)
+  self.gil.deadzone(self.id, code)
 }
 
 ///|
 pub fn Gamepad::is_ff_supported(self : Gamepad) -> Bool {
   let i = self.id.value()
-  if i < 0 || i >= self.gilrs.gamepads_data.length() {
+  if i < 0 || i >= self.gil.gamepads_data.length() {
     false
   } else {
-    self.gilrs.gamepads_data[i].ff_supported
+    self.gil.gamepads_data[i].ff_supported
   }
 }
 
@@ -1754,9 +1747,9 @@ pub fn Gamepad::set_listener_position(
     raise FfError::FfNotSupported(self.id)
   } else {
     let i = self.id.value()
-    if i >= 0 && i < self.gilrs.gamepads_data.length() {
-      self.gilrs.gamepads_data[i].listener_position = position
-      self.gilrs.ff_tick_update(runtime_now_ms(), true)
+    if i >= 0 && i < self.gil.gamepads_data.length() {
+      self.gil.gamepads_data[i].listener_position = position
+      self.gil.ff_tick_update(runtime_now_ms(), true)
     }
   }
 }

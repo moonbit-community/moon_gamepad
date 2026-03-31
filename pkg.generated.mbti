@@ -136,7 +136,7 @@ pub const PAGE_GENERIC_DESKTOP : Int = 0x01
 
 pub const PAGE_SIMULATION : Int = 0x02
 
-pub fn axis_dpad_to_button(Event?, Gilrs) -> Event?
+pub fn axis_dpad_to_button(Event?, Gil) -> Event?
 
 pub fn axis_from_code(Int) -> Axis?
 
@@ -152,7 +152,7 @@ pub fn ceil_div(UInt, UInt) -> UInt
 
 pub fn clamp(Double, Double, Double) -> Double
 
-pub fn deadzone(Event?, Gilrs) -> Event?
+pub fn deadzone(Event?, Gil) -> Event?
 
 pub fn decode_native_event(Bytes) -> NativeEvent?
 
@@ -160,7 +160,7 @@ pub fn default_axis_code(Axis) -> Int?
 
 pub fn default_button_code(Button) -> Int?
 
-pub fn filter_ev(Event?, (Event?, Gilrs) -> Event?, Gilrs) -> Event?
+pub fn filter_ev(Event?, (Event?, Gil) -> Event?, Gil) -> Event?
 
 pub fn hid_code(Int, Int) -> Int
 
@@ -168,7 +168,7 @@ pub fn hid_page(Int) -> Int
 
 pub fn hid_usage(Int) -> Int
 
-pub fn jitter(Event?, Gilrs, Double) -> Event?
+pub fn jitter(Event?, Gil, Double) -> Event?
 
 pub fn runtime_env_sdl_gamecontrollerconfig() -> String
 
@@ -181,8 +181,8 @@ type DistanceModelError
 
 type FfError
 
-type GilrsError
-pub fn GilrsError::is_invalid_axis_to_btn(Self) -> Bool
+type GilError
+pub fn GilError::is_invalid_axis_to_btn(Self) -> Bool
 
 type MappingError
 pub fn MappingError::invalid_code(Self) -> Int?
@@ -307,7 +307,7 @@ pub enum DistanceModel {
 pub fn DistanceModel::validate(Self) -> Unit raise DistanceModelError
 
 pub struct Effect {
-  gilrs : Gilrs
+  gil : Gil
   effect_token : Int
   mut gamepads : Array[GamepadId]
   strong : Double
@@ -324,7 +324,7 @@ pub fn Effect::add_gamepad(Self, Gamepad) -> Unit raise FfError
 pub fn Effect::play(Self) -> Unit raise FfError
 pub fn Effect::set_distance_model(Self, DistanceModel) -> Unit raise FfError
 pub fn Effect::set_gain(Self, Double) -> Unit
-pub fn Effect::set_gamepads(Self, Array[GamepadId], Gilrs) -> Unit raise FfError
+pub fn Effect::set_gamepads(Self, Array[GamepadId], Gil) -> Unit raise FfError
 pub fn Effect::set_position(Self, (Double, Double, Double)) -> Unit
 pub fn Effect::set_repeat(Self, FfRepeat) -> Unit
 pub fn Effect::stop(Self) -> Unit raise FfError
@@ -345,7 +345,7 @@ pub fn EffectBuilder::add_gamepad(Self, Gamepad) -> Self
 pub fn EffectBuilder::add_gamepad_id(Self, GamepadId) -> Self
 pub fn EffectBuilder::distance_model(Self, DistanceModel) -> Self
 pub fn EffectBuilder::duration(Self, Int64) -> Self
-pub fn EffectBuilder::finish(Self, Gilrs) -> Effect raise FfError
+pub fn EffectBuilder::finish(Self, Gil) -> Effect raise FfError
 pub fn EffectBuilder::gain(Self, Double) -> Self
 pub fn EffectBuilder::gamepads(Self, Array[GamepadId]) -> Self
 pub fn EffectBuilder::new() -> Self
@@ -395,7 +395,7 @@ pub enum FfRepeat {
 }
 
 pub struct Gamepad {
-  gilrs : Gilrs
+  gil : Gil
   id : GamepadId
 }
 pub fn Gamepad::axes(Self) -> Array[Int]
@@ -462,7 +462,7 @@ pub fn GamepadState::is_pressed(Self, Int) -> Bool
 pub fn GamepadState::new() -> Self
 pub fn GamepadState::value(Self, Int) -> Double
 
-pub struct Gilrs {
+pub struct Gil {
   mut counter : Int64
   update_state : Bool
   mut default_filters : Bool
@@ -482,40 +482,40 @@ pub struct Gilrs {
   mut ff_events_head : Int
   backend : NativeBackend?
 }
-pub fn Gilrs::axis_code(Self, GamepadId, Axis) -> Int?
-pub fn Gilrs::axis_or_btn_name(Self, GamepadId, Int) -> AxisOrBtn?
-pub fn Gilrs::button_code(Self, GamepadId, Button) -> Int?
-pub fn Gilrs::connected_gamepad(Self, GamepadId) -> Gamepad?
-pub fn Gilrs::counter(Self) -> Int64
-pub fn Gilrs::deadzone(Self, GamepadId, Int) -> Double?
-pub fn Gilrs::default_filters_enabled(Self) -> Bool
-pub fn Gilrs::gamepad(Self, GamepadId) -> Gamepad?
-pub fn Gilrs::gamepads(Self) -> Array[(GamepadId, Gamepad)]
-pub fn Gilrs::inc(Self) -> Unit
-pub fn Gilrs::insert_event(Self, Event) -> Unit
-pub fn Gilrs::is_connected(Self, GamepadId) -> Bool
-pub fn Gilrs::load_mappings(Self, String) -> Unit
-pub fn Gilrs::mapping(Self, GamepadId) -> Mapping?
-pub fn Gilrs::new() -> Self
-pub fn Gilrs::new_mock(Int, update_state? : Bool, default_filters? : Bool) -> Self
-pub fn Gilrs::new_native(update_state? : Bool, default_filters? : Bool) -> Self
-pub fn Gilrs::next_event(Self) -> Event?
-pub fn Gilrs::next_event_blocking(Self, Int64?) -> Event?
-pub fn Gilrs::poll(Self) -> Unit
-pub fn Gilrs::reset_counter(Self) -> Unit
-pub fn Gilrs::set_axis_to_btn(Self, Double, Double) -> Unit raise GilrsError
-pub fn Gilrs::set_deadzone(Self, GamepadId, Int, Double) -> Unit
-pub fn Gilrs::set_mapping(Self, GamepadId, Mapping) -> Unit
-pub fn Gilrs::set_mapping_data(Self, GamepadId, MappingData, name? : String?) -> String raise MappingError
-pub fn Gilrs::set_mapping_data_strict(Self, GamepadId, MappingData, name? : String?) -> String raise MappingError
-pub fn Gilrs::set_time(Self, Int64) -> Unit
-pub fn Gilrs::state(Self, GamepadId) -> GamepadState?
-pub fn Gilrs::time(Self) -> Int64
-pub fn Gilrs::update(Self, Event) -> Unit
-pub fn Gilrs::update_state_enabled(Self) -> Bool
-pub fn Gilrs::with_default_filters(Self, Bool) -> Self
+pub fn Gil::axis_code(Self, GamepadId, Axis) -> Int?
+pub fn Gil::axis_or_btn_name(Self, GamepadId, Int) -> AxisOrBtn?
+pub fn Gil::button_code(Self, GamepadId, Button) -> Int?
+pub fn Gil::connected_gamepad(Self, GamepadId) -> Gamepad?
+pub fn Gil::counter(Self) -> Int64
+pub fn Gil::deadzone(Self, GamepadId, Int) -> Double?
+pub fn Gil::default_filters_enabled(Self) -> Bool
+pub fn Gil::gamepad(Self, GamepadId) -> Gamepad?
+pub fn Gil::gamepads(Self) -> Array[(GamepadId, Gamepad)]
+pub fn Gil::inc(Self) -> Unit
+pub fn Gil::insert_event(Self, Event) -> Unit
+pub fn Gil::is_connected(Self, GamepadId) -> Bool
+pub fn Gil::load_mappings(Self, String) -> Unit
+pub fn Gil::mapping(Self, GamepadId) -> Mapping?
+pub fn Gil::new() -> Self
+pub fn Gil::new_mock(Int, update_state? : Bool, default_filters? : Bool) -> Self
+pub fn Gil::new_native(update_state? : Bool, default_filters? : Bool) -> Self
+pub fn Gil::next_event(Self) -> Event?
+pub fn Gil::next_event_blocking(Self, Int64?) -> Event?
+pub fn Gil::poll(Self) -> Unit
+pub fn Gil::reset_counter(Self) -> Unit
+pub fn Gil::set_axis_to_btn(Self, Double, Double) -> Unit raise GilError
+pub fn Gil::set_deadzone(Self, GamepadId, Int, Double) -> Unit
+pub fn Gil::set_mapping(Self, GamepadId, Mapping) -> Unit
+pub fn Gil::set_mapping_data(Self, GamepadId, MappingData, name? : String?) -> String raise MappingError
+pub fn Gil::set_mapping_data_strict(Self, GamepadId, MappingData, name? : String?) -> String raise MappingError
+pub fn Gil::set_time(Self, Int64) -> Unit
+pub fn Gil::state(Self, GamepadId) -> GamepadState?
+pub fn Gil::time(Self) -> Int64
+pub fn Gil::update(Self, Event) -> Unit
+pub fn Gil::update_state_enabled(Self) -> Bool
+pub fn Gil::with_default_filters(Self, Bool) -> Self
 
-pub struct GilrsBuilder {
+pub struct GilBuilder {
   mut update_state : Bool
   mut default_filters : Bool
   mut axis_to_btn_pressed : Double
@@ -526,21 +526,21 @@ pub struct GilrsBuilder {
   mut use_native_backend : Bool
   mapping_inputs : Array[String]
 }
-pub fn GilrsBuilder::add_env_mappings(Self, Bool) -> Self
-pub fn GilrsBuilder::add_included_mappings(Self, Bool) -> Self
-pub fn GilrsBuilder::add_mappings(Self, String) -> Self
-pub fn GilrsBuilder::build(Self) -> Gilrs raise GilrsError
-pub fn GilrsBuilder::new() -> Self
-pub fn GilrsBuilder::set_axis_to_btn(Self, Double, Double) -> Self
-pub fn GilrsBuilder::set_update_state(Self, Bool) -> Self
-pub fn GilrsBuilder::with_default_filters(Self, Bool) -> Self
-pub fn GilrsBuilder::with_mock_gamepad_count(Self, Int) -> Self
-pub fn GilrsBuilder::with_native_backend(Self, Bool) -> Self
+pub fn GilBuilder::add_env_mappings(Self, Bool) -> Self
+pub fn GilBuilder::add_included_mappings(Self, Bool) -> Self
+pub fn GilBuilder::add_mappings(Self, String) -> Self
+pub fn GilBuilder::build(Self) -> Gil raise GilError
+pub fn GilBuilder::new() -> Self
+pub fn GilBuilder::set_axis_to_btn(Self, Double, Double) -> Self
+pub fn GilBuilder::set_update_state(Self, Bool) -> Self
+pub fn GilBuilder::with_default_filters(Self, Bool) -> Self
+pub fn GilBuilder::with_mock_gamepad_count(Self, Int) -> Self
+pub fn GilBuilder::with_native_backend(Self, Bool) -> Self
 
 pub struct Jitter {
   threshold : Double
 }
-pub fn Jitter::filter(Self, Event?, Gilrs) -> Event?
+pub fn Jitter::filter(Self, Event?, Gil) -> Event?
 pub fn Jitter::new() -> Self
 
 pub struct Mapping {
@@ -651,7 +651,7 @@ pub struct Repeat {
   after_ms : Int64
   every_ms : Int64
 }
-pub fn Repeat::filter(Self, Event?, Gilrs) -> Event?
+pub fn Repeat::filter(Self, Event?, Gil) -> Event?
 pub fn Repeat::new() -> Self
 
 pub struct Replay {

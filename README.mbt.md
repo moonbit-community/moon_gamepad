@@ -1,6 +1,6 @@
 # Milky2018/gamepad
 
-`Milky2018/gamepad` is a MoonBit gamepad input library for native targets. It provides `gilrs`-style events, state tracking, SDL controller mappings, input filters, force-feedback APIs, and a mock backend for tests.
+`Milky2018/gamepad` is a MoonBit gamepad input library for native targets. It provides `gil`-style events, state tracking, SDL controller mappings, input filters, force-feedback APIs, and a mock backend for tests.
 
 ## Install
 
@@ -27,7 +27,7 @@ Best support today is on macOS. Linux and Windows are available on native target
 ## Features
 
 - Native gamepad discovery and hotplug events
-- `Gilrs` event polling and blocking waits
+- `Gil` event polling and blocking waits
 - Per-device state tracking through `Gamepad` and `GamepadState`
 - SDL controller mapping database support, including bundled mappings
 - Input filters: `jitter`, `deadzone`, `axis_dpad_to_button`, `Repeat`
@@ -36,9 +36,9 @@ Best support today is on macOS. Linux and Windows are available on native target
 
 ## API Notes
 
-- **Errors**: `Gilrs::new()` does not raise. `GilrsBuilder::build()` may raise `GilrsError`.
+- **Errors**: `Gil::new()` does not raise. `GilBuilder::build()` may raise `GilError`.
 - **Event time**: `Event::time()` is a millisecond timestamp. On native backends this comes from the OS clock; on the mock backend it is whatever you set in `Event::at(...)`.
-- **Mappings (gilrs naming)**: Rust `gilrs` re-exports `MappingData` as `Mapping`. In this MoonBit port, the user-editable type is `MappingData`; `Mapping` is the parsed SDL mapping used by `Gilrs`.
+- **Mappings (gil naming)**: Rust `gil` re-exports `MappingData` as `Mapping`. In this MoonBit port, the user-editable type is `MappingData`; `Mapping` is the parsed SDL mapping used by `Gil`.
 - **Filters**: Compose filters with `filter_ev`. If you write a custom filter, it must not turn `Some(event)` into `None`; to drop an event return `Some(event.drop())`.
 
 ## Force Feedback
@@ -51,10 +51,10 @@ Best support today is on macOS. Linux and Windows are available on native target
 ```mbt nocheck
 ///|
 test "quick start" {
-  let gilrs = Gilrs::new()
+  let gil = Gil::new()
 
   while true {
-    match gilrs.next_event() {
+    match gil.next_event() {
       None => break
       Some(ev) => ...
     }
@@ -67,15 +67,15 @@ test "quick start" {
 ```mbt check
 ///|
 test "mock button press" {
-  let gilrs = GilrsBuilder::new()
+  let gil = GilBuilder::new()
     .with_mock_gamepad_count(1)
     .with_default_filters(false)
     .build()
 
   let id = @gamepad.GamepadId(0)
-  gilrs.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
+  gil.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
 
-  assert_true(gilrs.next_event() is Some(_))
+  assert_true(gil.next_event() is Some(_))
 }
 ```
 

@@ -6,6 +6,8 @@ import {
   "moonbitlang/core/int",
 } for "test"
 
+supported_targets = "native"
+
 options(
   link: { "native": { "stub-cc-flags": "${build.GAMEPAD_STUB_CC_FLAGS}" } },
   "native-stub": [ "native/backend.c" ],

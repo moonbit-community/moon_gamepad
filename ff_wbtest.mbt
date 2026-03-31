@@ -14,9 +14,9 @@
 
 ///|
 test "effect play/stop without backend errors" {
-  let g = Gilrs::new_mock(1)
+  let g = Gil::new_mock(1)
   let e : Effect = {
-    gilrs: g,
+    gil: g,
     effect_token: 1,
     gamepads: [GamepadId::new(0)],
     strong: 1.0,
@@ -50,8 +50,8 @@ fn native_backend_null_for_test() -> NativeBackend {
 }
 
 ///|
-fn new_ff_ready_mock(gamepad_count : Int) -> Gilrs {
-  let g = Gilrs::new_mock(gamepad_count)
+fn new_ff_ready_mock(gamepad_count : Int) -> Gil {
+  let g = Gil::new_mock(gamepad_count)
   for i in 0..<gamepad_count {
     g.gamepads_data[i].ff_supported = true
   }
@@ -59,7 +59,7 @@ fn new_ff_ready_mock(gamepad_count : Int) -> Gilrs {
 }
 
 ///|
-fn new_ff_ready_with_null_backend(gamepad_count : Int) -> Gilrs {
+fn new_ff_ready_with_null_backend(gamepad_count : Int) -> Gil {
   let data : Array[GamepadData] = []
   for _ in 0..<gamepad_count {
     let d = GamepadData::new()
@@ -313,7 +313,7 @@ test "set_listener_position returns Disconnected for disconnected gamepad" {
 
 ///|
 test "set_listener_position returns FfNotSupported for unsupported gamepad" {
-  let g = Gilrs::new_mock(1)
+  let g = Gil::new_mock(1)
   let gp = match g.gamepad(GamepadId::new(0)) {
     None => return
     Some(gp) => gp
@@ -599,9 +599,9 @@ test "effect set_repeat/set_position/set_distance_model update state" {
 ///|
 test "set_repeat schedules completion for running effect" {
   ff_runtime_now_set_for_test(149L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let effect : Effect = {
-    gilrs: g,
+    gil: g,
     effect_token: 101,
     gamepads: [GamepadId::new(0)],
     strong: 0.0,
@@ -637,9 +637,9 @@ test "set_repeat schedules completion for running effect" {
 ///|
 test "set_repeat infinitely cancels completion for running effect" {
   ff_runtime_now_set_for_test(100L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let effect : Effect = {
-    gilrs: g,
+    gil: g,
     effect_token: 102,
     gamepads: [GamepadId::new(0)],
     strong: 0.0,
@@ -664,7 +664,7 @@ test "set_gamepads reschedules completion targets for running effect" {
   ff_runtime_now_set_for_test(100L)
   let g = new_ff_ready_mock(2)
   let effect : Effect = {
-    gilrs: g,
+    gil: g,
     effect_token: 103,
     gamepads: [GamepadId::new(0)],
     strong: 0.0,

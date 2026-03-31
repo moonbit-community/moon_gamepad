@@ -15,10 +15,10 @@
 ///|
 pub fn filter_ev(
   ev : Event?,
-  filter : (Event?, Gilrs) -> Event?,
-  gilrs : Gilrs,
+  filter : (Event?, Gil) -> Event?,
+  gil : Gil,
 ) -> Event? {
-  let out = filter(ev, gilrs)
+  let out = filter(ev, gil)
   match ev {
     None => out
     Some(e) =>
@@ -40,12 +40,12 @@ pub fn Jitter::new() -> Jitter {
 }
 
 ///|
-pub fn jitter(ev : Event?, gilrs : Gilrs, threshold : Double) -> Event? {
+pub fn jitter(ev : Event?, gil : Gil, threshold : Double) -> Event? {
   match ev {
     Some(e) =>
       match e.event() {
         EventType::AxisChanged(_, val, axis_code) => {
-          let old_data = match gilrs.state(e.id()) {
+          let old_data = match gil.state(e.id()) {
             None => 0.0
             Some(s) =>
               match s.axis_data(axis_code) {
@@ -66,8 +66,8 @@ pub fn jitter(ev : Event?, gilrs : Gilrs, threshold : Double) -> Event? {
 }
 
 ///|
-pub fn Jitter::filter(self : Jitter, ev : Event?, gilrs : Gilrs) -> Event? {
-  jitter(ev, gilrs, self.threshold)
+pub fn Jitter::filter(self : Jitter, ev : Event?, gil : Gil) -> Event? {
+  jitter(ev, gil, self.threshold)
 }
 
 ///|
@@ -101,14 +101,14 @@ fn deadzone_nonzero_axis_idx(axis : Axis) -> Int? {
 }
 
 ///|
-pub fn deadzone(ev : Event?, gilrs : Gilrs) -> Event? {
+pub fn deadzone(ev : Event?, gil : Gil) -> Event? {
   match ev {
     Some(e) =>
       match e.event() {
         EventType::AxisChanged(axis, val, code) =>
-          deadzone_axis(e, axis, val, code, gilrs)
+          deadzone_axis(e, axis, val, code, gil)
         EventType::ButtonChanged(btn, val, code) =>
-          deadzone_button(e, btn, val, code, gilrs)
+          deadzone_button(e, btn, val, code, gil)
         _ => ev
       }
     None => None
@@ -121,9 +121,9 @@ fn deadzone_axis(
   axis : Axis,
   val : Double,
   code : Code,
-  gilrs : Gilrs,
+  gil : Gil,
 ) -> Event? {
-  let threshold = match gilrs.deadzone(e.id(), code) {
+  let threshold = match gil.deadzone(e.id(), code) {
     None => return Some(e)
     Some(t) => t
   }
@@ -132,7 +132,7 @@ fn deadzone_axis(
   let other_axis_code : (Axis, Code)? = match axis.second_axis() {
     None => None
     Some(other_axis) =>
-      match gilrs.axis_code(id, other_axis) {
+      match gil.axis_code(id, other_axis) {
         None => None
         Some(other_code) => Some((other_axis, other_code))
       }
@@ -140,7 +140,7 @@ fn deadzone_axis(
   match other_axis_code {
     None => {
       let new_val = apply_deadzone(val, 0.0, threshold).0
-      let cur = match gilrs.state(id) {
+      let cur = match gil.state(id) {
         None => 0.0
         Some(s) => s.value(code)
       }
@@ -150,14 +150,14 @@ fn deadzone_axis(
         match deadzone_nonzero_axis_idx(axis) {
           None => ()
           Some(axis_idx) =>
-            gilrs.gamepads_data[id.value()].have_sent_nonzero_for_axis[axis_idx] = new_val !=
+            gil.gamepads_data[id.value()].have_sent_nonzero_for_axis[axis_idx] = new_val !=
               0.0
         }
         Some(Event::at(id, EventType::AxisChanged(axis, new_val, code), time))
       }
     }
     Some((other_axis, other_code)) => {
-      let other_val = match gilrs.state(id) {
+      let other_val = match gil.state(id) {
         None => 0.0
         Some(s) => s.value(other_code)
       }
@@ -165,8 +165,8 @@ fn deadzone_axis(
       match deadzone_nonzero_axis_idx(other_axis) {
         None => ()
         Some(other_axis_idx) => {
-          let sent_nonzero = gilrs.gamepads_data[id.value()].have_sent_nonzero_for_axis[other_axis_idx]
-          let other_state_val = match gilrs.state(id) {
+          let sent_nonzero = gil.gamepads_data[id.value()].have_sent_nonzero_for_axis[other_axis_idx]
+          let other_state_val = match gil.state(id) {
             None => 0.0
             Some(s) => s.value(other_code)
           }
@@ -174,18 +174,18 @@ fn deadzone_axis(
             new_other_val == 0.0 &&
             sent_nonzero &&
             other_state_val != 0.0 {
-            gilrs.insert_event(
+            gil.insert_event(
               Event::at(
                 id,
                 EventType::AxisChanged(other_axis, 0.0, other_code),
                 time,
               ),
             )
-            gilrs.gamepads_data[id.value()].have_sent_nonzero_for_axis[other_axis_idx] = false
+            gil.gamepads_data[id.value()].have_sent_nonzero_for_axis[other_axis_idx] = false
           }
         }
       }
-      let cur = match gilrs.state(id) {
+      let cur = match gil.state(id) {
         None => 0.0
         Some(s) => s.value(code)
       }
@@ -195,7 +195,7 @@ fn deadzone_axis(
         match deadzone_nonzero_axis_idx(axis) {
           None => ()
           Some(axis_idx) =>
-            gilrs.gamepads_data[id.value()].have_sent_nonzero_for_axis[axis_idx] = new_val !=
+            gil.gamepads_data[id.value()].have_sent_nonzero_for_axis[axis_idx] = new_val !=
               0.0
         }
         Some(Event::at(id, EventType::AxisChanged(axis, new_val, code), time))
@@ -210,14 +210,14 @@ fn deadzone_button(
   btn : Button,
   val : Double,
   code : Code,
-  gilrs : Gilrs,
+  gil : Gil,
 ) -> Event? {
-  let threshold = match gilrs.deadzone(e.id(), code) {
+  let threshold = match gil.deadzone(e.id(), code) {
     None => return Some(e)
     Some(t) => t
   }
   let new_val = apply_deadzone(val, 0.0, threshold).0
-  let cur = match gilrs.state(e.id()) {
+  let cur = match gil.state(e.id()) {
     None => 0.0
     Some(s) => s.value(code)
   }
@@ -231,15 +231,15 @@ fn deadzone_button(
 }
 
 ///|
-pub fn axis_dpad_to_button(ev : Event?, gilrs : Gilrs) -> Event? {
+pub fn axis_dpad_to_button(ev : Event?, gil : Gil) -> Event? {
   match ev {
     None => None
     Some(e) =>
       match e.event() {
         EventType::AxisChanged(axis, val, axis_code) =>
           match axis {
-            Axis::DPadX => axis_dpad_x_to_buttons(e, val, axis_code, gilrs)
-            Axis::DPadY => axis_dpad_y_to_buttons(e, val, axis_code, gilrs)
+            Axis::DPadX => axis_dpad_x_to_buttons(e, val, axis_code, gil)
+            Axis::DPadY => axis_dpad_y_to_buttons(e, val, axis_code, gil)
             _ => ev
           }
         _ => ev
@@ -265,9 +265,9 @@ fn dpad_btn_codes_for_axis_code(axis_code : Code) -> (Code, Code, Code, Code) {
 fn can_map_axis_dpad_to_button(
   id : GamepadId,
   axis_code : Code,
-  gilrs : Gilrs,
+  gil : Gil,
 ) -> Bool {
-  match gilrs.mapping(id) {
+  match gil.mapping(id) {
     None => false
     Some(m) => {
       let (btn_up, btn_down, btn_left, btn_right) = dpad_btn_codes_for_axis_code(
@@ -277,11 +277,11 @@ fn can_map_axis_dpad_to_button(
       if hats == 0b1111 {
         true
       } else if hats == 0 {
-        gilrs.axis_or_btn_name(id, btn_right) is None &&
-        gilrs.axis_or_btn_name(id, btn_left) is None &&
-        gilrs.axis_or_btn_name(id, btn_down) is None &&
-        gilrs.axis_or_btn_name(id, btn_up) is None &&
-        gilrs.button_code(id, Button::DPadRight) is None
+        gil.axis_or_btn_name(id, btn_right) is None &&
+        gil.axis_or_btn_name(id, btn_left) is None &&
+        gil.axis_or_btn_name(id, btn_down) is None &&
+        gil.axis_or_btn_name(id, btn_up) is None &&
+        gil.button_code(id, Button::DPadRight) is None
       } else {
         false
       }
@@ -294,9 +294,9 @@ fn axis_dpad_x_to_buttons(
   e : Event,
   val : Double,
   axis_code : Code,
-  gilrs : Gilrs,
+  gil : Gil,
 ) -> Event? {
-  if !can_map_axis_dpad_to_button(e.id(), axis_code, gilrs) {
+  if !can_map_axis_dpad_to_button(e.id(), axis_code, gil) {
     return Some(e)
   }
   let (_, _, btn_left, btn_right) = dpad_btn_codes_for_axis_code(axis_code)
@@ -305,17 +305,17 @@ fn axis_dpad_x_to_buttons(
   let mut out = e.drop()
   let mut release_left = false
   let mut release_right = false
-  let pressed_left = match gilrs.state(id) {
+  let pressed_left = match gil.state(id) {
     None => false
     Some(s) => s.is_pressed(btn_left)
   }
-  let pressed_right = match gilrs.state(id) {
+  let pressed_right = match gil.state(id) {
     None => false
     Some(s) => s.is_pressed(btn_right)
   }
   if val == 1.0 {
     release_left = pressed_left
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(
         id,
         EventType::ButtonChanged(Button::DPadRight, 1.0, btn_right),
@@ -329,7 +329,7 @@ fn axis_dpad_x_to_buttons(
     )
   } else if val == -1.0 {
     release_right = pressed_right
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(
         id,
         EventType::ButtonChanged(Button::DPadLeft, 1.0, btn_left),
@@ -347,9 +347,9 @@ fn axis_dpad_x_to_buttons(
   }
   if release_right {
     if !out.is_dropped() {
-      gilrs.insert_event(out)
+      gil.insert_event(out)
     }
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(
         id,
         EventType::ButtonChanged(Button::DPadRight, 0.0, btn_right),
@@ -364,9 +364,9 @@ fn axis_dpad_x_to_buttons(
   }
   if release_left {
     if !out.is_dropped() {
-      gilrs.insert_event(out)
+      gil.insert_event(out)
     }
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(
         id,
         EventType::ButtonChanged(Button::DPadLeft, 0.0, btn_left),
@@ -387,9 +387,9 @@ fn axis_dpad_y_to_buttons(
   e : Event,
   val : Double,
   axis_code : Code,
-  gilrs : Gilrs,
+  gil : Gil,
 ) -> Event? {
-  if !can_map_axis_dpad_to_button(e.id(), axis_code, gilrs) {
+  if !can_map_axis_dpad_to_button(e.id(), axis_code, gil) {
     return Some(e)
   }
   let (btn_up, btn_down, _, _) = dpad_btn_codes_for_axis_code(axis_code)
@@ -398,23 +398,23 @@ fn axis_dpad_y_to_buttons(
   let mut out = e.drop()
   let mut release_up = false
   let mut release_down = false
-  let pressed_up = match gilrs.state(id) {
+  let pressed_up = match gil.state(id) {
     None => false
     Some(s) => s.is_pressed(btn_up)
   }
-  let pressed_down = match gilrs.state(id) {
+  let pressed_down = match gil.state(id) {
     None => false
     Some(s) => s.is_pressed(btn_down)
   }
   if val == 1.0 {
     release_down = pressed_down
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(id, EventType::ButtonChanged(Button::DPadUp, 1.0, btn_up), time),
     )
     out = Event::at(id, EventType::ButtonPressed(Button::DPadUp, btn_up), time)
   } else if val == -1.0 {
     release_up = pressed_up
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(
         id,
         EventType::ButtonChanged(Button::DPadDown, 1.0, btn_down),
@@ -432,18 +432,18 @@ fn axis_dpad_y_to_buttons(
   }
   if release_up {
     if !out.is_dropped() {
-      gilrs.insert_event(out)
+      gil.insert_event(out)
     }
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(id, EventType::ButtonChanged(Button::DPadUp, 0.0, btn_up), time),
     )
     out = Event::at(id, EventType::ButtonReleased(Button::DPadUp, btn_up), time)
   }
   if release_down {
     if !out.is_dropped() {
-      gilrs.insert_event(out)
+      gil.insert_event(out)
     }
-    gilrs.insert_event(
+    gil.insert_event(
       Event::at(
         id,
         EventType::ButtonChanged(Button::DPadDown, 0.0, btn_down),
@@ -471,25 +471,25 @@ pub fn Repeat::new() -> Repeat {
 }
 
 ///|
-fn code_to_button_name(id : GamepadId, code : Code, gilrs : Gilrs) -> Button {
-  match gilrs.axis_or_btn_name(id, code) {
+fn code_to_button_name(id : GamepadId, code : Code, gil : Gil) -> Button {
+  match gil.axis_or_btn_name(id, code) {
     Some(AxisOrBtn::Btn(b)) => b
     _ => Button::Unknown
   }
 }
 
 ///|
-pub fn Repeat::filter(self : Repeat, ev : Event?, gilrs : Gilrs) -> Event? {
+pub fn Repeat::filter(self : Repeat, ev : Event?, gil : Gil) -> Event? {
   match ev {
     Some(_) => ev
     None => {
       let now = runtime_now_ms()
-      for i in 0..<gilrs.gamepads_data.length() {
-        if !gilrs.gamepads_data[i].connected {
+      for i in 0..<gil.gamepads_data.length() {
+        if !gil.gamepads_data[i].connected {
           continue
         }
         let id = GamepadId::new(i)
-        match gilrs.state(id) {
+        match gil.state(id) {
           None => ()
           Some(state) =>
             for pair in state.buttons_entries() {
@@ -498,7 +498,7 @@ pub fn Repeat::filter(self : Repeat, ev : Event?, gilrs : Gilrs) -> Event? {
               let repeating = data.is_repeating()
               let dur = now - data.timestamp()
               if pressed && !repeating && dur >= self.after_ms {
-                let btn = code_to_button_name(id, code, gilrs)
+                let btn = code_to_button_name(id, code, gil)
                 return Some(
                   Event::at(
                     id,
@@ -508,7 +508,7 @@ pub fn Repeat::filter(self : Repeat, ev : Event?, gilrs : Gilrs) -> Event? {
                 )
               }
               if pressed && repeating && dur >= self.every_ms {
-                let btn = code_to_button_name(id, code, gilrs)
+                let btn = code_to_button_name(id, code, gil)
                 return Some(
                   Event::at(
                     id,

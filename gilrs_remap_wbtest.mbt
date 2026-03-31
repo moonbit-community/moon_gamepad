@@ -25,11 +25,11 @@ fn ev_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
-fn build_ok_remap(builder : GilrsBuilder) -> Gilrs {
-  let res : Result[Gilrs, GilrsError] = try? builder.build()
+fn build_ok_remap(builder : GilBuilder) -> Gil {
+  let res : Result[Gil, GilError] = try? builder.build()
   match res {
     Ok(g) => g
-    Err(_) => Gilrs::new_mock(0, update_state=false, default_filters=false)
+    Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
   }
 }
 
@@ -48,7 +48,7 @@ fn remap_native_backend_null_for_test() -> NativeBackend {
 }
 
 ///|
-fn remap_new_ff_ready_with_null_backend(gamepad_count : Int) -> Gilrs {
+fn remap_new_ff_ready_with_null_backend(gamepad_count : Int) -> Gil {
   let data : Array[GamepadData] = []
   for _ in 0..<gamepad_count {
     let d = GamepadData::new()
@@ -86,7 +86,7 @@ extern "C" fn runtime_clear_sdl_gamecontrollerconfig_for_test() -> Unit = "moon_
 
 ///|
 test "native remap: digital button emits edge then value" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
   g.apply_identity_mapping(0)
@@ -113,7 +113,7 @@ test "native remap: digital button emits edge then value" {
 
 ///|
 test "native remap: button mapped to axis produces axis change" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let m = Mapping::new_default()
   m.insert(BTN_DPAD_UP, AxisOrBtn::Axis(Axis::DPadY))
   g.gamepads_data[0].mapping = m
@@ -133,7 +133,7 @@ test "native remap: button mapped to axis produces axis change" {
 
 ///|
 test "native remap: axis mapped to button uses thresholds" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   g.gamepads_data[0].buttons = []
   g.gamepads_data[0].axes = [AXIS_LT2]
   g.gamepads_data[0].axis_info = [(AXIS_LT2, AxisInfo::new(0, 4, None))]
@@ -212,7 +212,7 @@ test "native remap: axis mapped to button uses thresholds" {
 
 ///|
 test "native remap: axis-to-button threshold edges are inclusive" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   g.gamepads_data[0].buttons = []
   g.gamepads_data[0].axes = [AXIS_LT2]
   g.gamepads_data[0].axis_info = [(AXIS_LT2, AxisInfo::new(0, 100, None))]
@@ -263,7 +263,7 @@ test "native remap: axis-to-button threshold edges are inclusive" {
 
 ///|
 test "native connected on existing id resets state and rebuilds mapping" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
@@ -298,7 +298,7 @@ test "native connected on existing id resets state and rebuilds mapping" {
 
 ///|
 test "repeat filter ignores disconnected gamepads" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
@@ -321,7 +321,7 @@ test "repeat filter ignores disconnected gamepads" {
 
 ///|
 test "repeat filter scans connected ids only" {
-  let g = Gilrs::new_mock(2, update_state=false, default_filters=false)
+  let g = Gil::new_mock(2, update_state=false, default_filters=false)
   let id0 = GamepadId::new(0)
   let id1 = GamepadId::new(1)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
@@ -354,7 +354,7 @@ test "repeat filter scans connected ids only" {
 ///|
 test "repeat uses runtime clock fallback when logical clock is unset" {
   runtime_now_set_for_test(650L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
@@ -371,7 +371,7 @@ test "repeat uses runtime clock fallback when logical clock is unset" {
 ///|
 test "repeat uses runtime clock even when logical clock is set" {
   runtime_now_set_for_test(2000L)
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
@@ -387,7 +387,7 @@ test "repeat uses runtime clock even when logical clock is set" {
 
 ///|
 test "set_mapping_data updates mapping and returns SDL line" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = [AXIS_LSTICKX]
@@ -407,7 +407,7 @@ test "set_mapping_data updates mapping and returns SDL line" {
 
 ///|
 test "set_mapping_data returns NotConnected for disconnected gamepad" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.push_native_event({
     tag: NativeEventTag::Disconnected,
@@ -429,7 +429,7 @@ test "set_mapping_data returns NotConnected for disconnected gamepad" {
 
 ///|
 test "set_mapping_data_strict rejects SDL-incompatible entries" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_C]
   g.gamepads_data[0].axes = []
@@ -448,7 +448,7 @@ test "set_mapping_data_strict rejects SDL-incompatible entries" {
 
 ///|
 test "connected_gamepad returns None after disconnect while gamepad still exists" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   inspect(g.connected_gamepad(id) is Some(_), content="true")
   g.push_native_event({
@@ -464,7 +464,7 @@ test "connected_gamepad returns None after disconnect while gamepad still exists
 
 ///|
 test "gamepad map_name follows mapping default/name semantics" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
 
   // Unnamed default mapping => None
@@ -486,7 +486,7 @@ test "gamepad map_name follows mapping default/name semantics" {
 ///|
 test "builder add_mappings loads mapping DB entries" {
   let g = build_ok_remap(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(1)
     .add_included_mappings(false)
     .add_env_mappings(false)
@@ -503,7 +503,7 @@ test "builder add_mappings loads mapping DB entries" {
 ///|
 test "builder add_mappings participates in connected remap" {
   let g = build_ok_remap(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(1)
     .add_included_mappings(false)
     .add_env_mappings(false)
@@ -530,7 +530,7 @@ test "builder add_mappings participates in connected remap" {
 
 ///|
 test "mapping_source reports Driver for default mapping" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
@@ -545,7 +545,7 @@ test "mapping_source reports Driver for default mapping" {
 
 ///|
 test "mapping_source reports SdlMappings for parsed SDL mapping" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
@@ -563,8 +563,8 @@ test "mapping_source reports SdlMappings for parsed SDL mapping" {
 
 ///|
 test "mapping_source reports None for invalid gamepad handle" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
-  let ghost : Gamepad = { gilrs: g, id: GamepadId::new(99) }
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
+  let ghost : Gamepad = { gil: g, id: GamepadId::new(99) }
   let source = ghost.mapping_source()
   let ok = match source {
     MappingSource::None => true
@@ -574,9 +574,9 @@ test "mapping_source reports None for invalid gamepad handle" {
 }
 
 ///|
-test "builder set_axis_to_btn wires thresholds into gilrs" {
+test "builder set_axis_to_btn wires thresholds into gil" {
   let g = build_ok_remap(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(1)
     .with_default_filters(false)
     .set_axis_to_btn(0.5, 0.4),
@@ -588,7 +588,7 @@ test "builder set_axis_to_btn wires thresholds into gilrs" {
 ///|
 test "builder set_axis_to_btn affects axis-to-button press edge" {
   let g = build_ok_remap(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(1)
     .with_default_filters(false)
     .set_axis_to_btn(0.5, 0.4),
@@ -623,7 +623,7 @@ test "builder set_axis_to_btn affects axis-to-button press edge" {
 test "builder loads included mappings by default" {
   runtime_clear_sdl_gamecontrollerconfig_for_test()
   let g = build_ok_remap(
-    GilrsBuilder::new().with_mock_gamepad_count(0).with_native_backend(false),
+    GilBuilder::new().with_mock_gamepad_count(0).with_native_backend(false),
   )
   let platform = runtime_sdl_platform_name()
   if platform == "Mac OS X" {
@@ -653,7 +653,7 @@ test "builder loads included mappings by default" {
 test "builder add_included_mappings false disables built-in mapping load" {
   runtime_clear_sdl_gamecontrollerconfig_for_test()
   let g = build_ok_remap(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(0)
     .with_native_backend(false)
     .add_included_mappings(false),
@@ -688,7 +688,7 @@ test "builder loads env mappings by default and can disable them" {
     "11111111111111111111111111111111,Env Pad,a:b0,",
   )
   let g0 = build_ok_remap(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(0)
     .with_native_backend(false)
     .add_included_mappings(false),
@@ -699,7 +699,7 @@ test "builder loads env mappings by default and can disable them" {
   )
 
   let g1 = build_ok_remap(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(0)
     .with_native_backend(false)
     .add_included_mappings(false)
@@ -714,7 +714,7 @@ test "builder loads env mappings by default and can disable them" {
 
 ///|
 test "builder defaults to native backend" {
-  let g = build_ok_remap(GilrsBuilder::new())
+  let g = build_ok_remap(GilBuilder::new())
   inspect(
     match g.backend {
       Some(_) => true
@@ -726,7 +726,7 @@ test "builder defaults to native backend" {
 
 ///|
 test "deadzone falls back to axis_info and user override wins" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let id = GamepadId::new(0)
   g.gamepads_data[0].axis_info = [
     (AXIS_LT2, AxisInfo::new(0, 255, Some(30))),

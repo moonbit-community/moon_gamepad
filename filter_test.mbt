@@ -14,7 +14,7 @@
 
 ///|
 test "jitter drops small delta" {
-  let g = Gilrs::new_mock(1, update_state=true)
+  let g = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
 
   // seed state
@@ -45,7 +45,7 @@ extern "C" fn runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_clear_
 
 ///|
 test "jitter keeps first axis event without prior axis_data" {
-  let g = Gilrs::new_mock(1, update_state=true)
+  let g = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
   let ev = Event::at(
     id,
@@ -58,12 +58,12 @@ test "jitter keeps first axis event without prior axis_data" {
 
 ///|
 test "filter_ev passes through filter output" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let ev = Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 1L)
   let out = filter_ev(
     Some(ev),
-    fn(_ev : Event?, _gilrs : Gilrs) -> Event? { None },
+    fn(_ev : Event?, _gilrs : Gil) -> Event? { None },
     g,
   )
   inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
@@ -83,7 +83,7 @@ fn filter_event_sig(e : Event) -> (Int, Int, Double, Int) {
 
 ///|
 test "deadzone clamps axis and preserves range" {
-  let g = Gilrs::new_mock(1, update_state=true)
+  let g = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
   g.set_deadzone(id, AXIS_LSTICKX, 0.2)
   let ev = Event::at(
@@ -97,7 +97,7 @@ test "deadzone clamps axis and preserves range" {
 
 ///|
 test "deadzone enqueues paired-axis zero when primary event drops" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.set_deadzone(id, AXIS_LSTICKX, 0.2)
   g.set_deadzone(id, AXIS_LSTICKY, 0.2)
@@ -130,7 +130,7 @@ test "deadzone enqueues paired-axis zero when primary event drops" {
 
 ///|
 test "deadzone button branch drops or emits changed value" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.set_deadzone(id, BTN_SOUTH, 0.2)
 
@@ -164,7 +164,7 @@ test "deadzone button branch drops or emits changed value" {
 
 ///|
 test "axis_dpad_to_button maps dpad axis to button events" {
-  let g = Gilrs::new_mock(1, update_state=true)
+  let g = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
 
   // mapping with hats mapped to allow mapping
@@ -185,7 +185,7 @@ test "axis_dpad_to_button maps dpad axis to button events" {
 
 ///|
 test "axis_dpad_to_button uses legacy codes when input axis code is legacy" {
-  let g = Gilrs::new_mock(1, update_state=true)
+  let g = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
 
   // mapping with hats mapped to allow mapping
@@ -205,7 +205,7 @@ test "axis_dpad_to_button uses legacy codes when input axis code is legacy" {
 
 ///|
 test "axis_dpad_to_button handles immediate left-to-right transition" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.set_hats_mapped(0b1111)
@@ -239,7 +239,7 @@ test "axis_dpad_to_button handles immediate left-to-right transition" {
 
 ///|
 test "axis_dpad_to_button handles immediate up-to-down transition" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.set_hats_mapped(0b1111)
@@ -273,7 +273,7 @@ test "axis_dpad_to_button handles immediate up-to-down transition" {
 
 ///|
 test "axis_dpad_to_button keeps axis event when hats mapping is partial" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.set_hats_mapped(0b0001)
@@ -290,7 +290,7 @@ test "axis_dpad_to_button keeps axis event when hats mapping is partial" {
 
 ///|
 test "axis_dpad_to_button keeps axis event when dpad button exists" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.insert(BTN_DPAD_RIGHT, AxisOrBtn::Btn(Button::DPadRight))
@@ -307,7 +307,7 @@ test "axis_dpad_to_button keeps axis event when dpad button exists" {
 
 ///|
 test "axis_dpad_to_button maps when hats_mapped is zero and no dpad bindings" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.set_hats_mapped(0)
@@ -327,7 +327,7 @@ test "axis_dpad_to_button maps when hats_mapped is zero and no dpad bindings" {
 
 ///|
 test "axis_dpad_to_button passthrough when mapping is missing" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(9)
   let ev = Event::at(
     id,
@@ -341,7 +341,7 @@ test "axis_dpad_to_button passthrough when mapping is missing" {
 
 ///|
 test "axis_dpad_to_button releases X direction on center value" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.set_hats_mapped(0b1111)
@@ -367,7 +367,7 @@ test "axis_dpad_to_button releases X direction on center value" {
 
 ///|
 test "axis_dpad_to_button releases Y direction on center value" {
-  let g = Gilrs::new_mock(1, update_state=false, default_filters=false)
+  let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.set_hats_mapped(0b1111)
@@ -393,7 +393,7 @@ test "axis_dpad_to_button releases Y direction on center value" {
 
 ///|
 test "repeat generates repeated events on None" {
-  let g = Gilrs::new_mock(1, update_state=false)
+  let g = Gil::new_mock(1, update_state=false)
   let id = GamepadId::new(0)
   // mapping so Repeat can name the button
   let m = Mapping::new()

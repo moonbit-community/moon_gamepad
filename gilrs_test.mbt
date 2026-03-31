@@ -13,34 +13,34 @@
 // limitations under the License.
 
 ///|
-test "gilrs fifo + auto update_state" {
-  let gilrs = Gilrs::new_mock(1, update_state=true)
+test "gil fifo + auto update_state" {
+  let gil = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
-  gilrs.insert_event(
+  gil.insert_event(
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
   )
-  gilrs.insert_event(
+  gil.insert_event(
     Event::at(id, EventType::ButtonReleased(Button::South, BTN_SOUTH), 11L),
   )
-  let ev1 = gilrs.next_event()
+  let ev1 = gil.next_event()
   inspect(ev1 is Some(_), content="true")
   inspect(
-    gilrs.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(true)",
   )
-  let c1 = match gilrs.state(id) {
+  let c1 = match gil.state(id) {
     None => None
     Some(s) => s.button_data(BTN_SOUTH).map(fn(d) { d.counter() })
   }
   inspect(c1, content="Some(0)")
-  gilrs.inc()
-  let ev2 = gilrs.next_event()
+  gil.inc()
+  let ev2 = gil.next_event()
   inspect(ev2 is Some(_), content="true")
   inspect(
-    gilrs.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(false)",
   )
-  let c2 = match gilrs.state(id) {
+  let c2 = match gil.state(id) {
     None => None
     Some(s) => s.button_data(BTN_SOUTH).map(fn(d) { d.counter() })
   }
@@ -48,22 +48,22 @@ test "gilrs fifo + auto update_state" {
 }
 
 ///|
-test "gilrs no auto update when disabled" {
-  let gilrs = Gilrs::new_mock(1, update_state=false)
+test "gil no auto update when disabled" {
+  let gil = Gil::new_mock(1, update_state=false)
   let id = GamepadId::new(0)
-  gilrs.insert_event(
+  gil.insert_event(
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
   )
-  let _ = gilrs.next_event()
+  let _ = gil.next_event()
   inspect(
-    gilrs.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(false)",
   )
-  gilrs.update(
+  gil.update(
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
   )
   inspect(
-    gilrs.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(true)",
   )
 }
@@ -80,17 +80,17 @@ fn gilrs_event_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
-fn build_ok_gilrs(builder : GilrsBuilder) -> Gilrs {
-  let res : Result[Gilrs, GilrsError] = try? builder.build()
+fn build_ok_gilrs(builder : GilBuilder) -> Gil {
+  let res : Result[Gil, GilError] = try? builder.build()
   match res {
     Ok(g) => g
-    Err(_) => Gilrs::new_mock(0, update_state=false, default_filters=false)
+    Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
   }
 }
 
 ///|
-test "gilrs next_event applies default filters by default" {
-  let g = Gilrs::new_mock(1, update_state=true)
+test "gil next_event applies default filters by default" {
+  let g = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
 
   // seed state so jitter can compare
@@ -115,9 +115,9 @@ test "gilrs next_event applies default filters by default" {
 }
 
 ///|
-test "gilrs builder can disable default filters" {
+test "gil builder can disable default filters" {
   let g = build_ok_gilrs(
-    GilrsBuilder::new()
+    GilBuilder::new()
     .with_mock_gamepad_count(1)
     .set_update_state(true)
     .with_default_filters(false),
@@ -145,8 +145,8 @@ test "gilrs builder can disable default filters" {
 }
 
 ///|
-test "gilrs returns dropped when default filters are disabled" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+test "gil returns dropped when default filters are disabled" {
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let id = GamepadId::new(0)
   g.insert_event(Event::at(id, EventType::Dropped, 1L))
   let got = g
@@ -161,8 +161,8 @@ test "gilrs returns dropped when default filters are disabled" {
 }
 
 ///|
-test "gilrs update ignores connection events but next_event syncs connection" {
-  let g = Gilrs::new_mock(1, update_state=true, default_filters=false)
+test "gil update ignores connection events but next_event syncs connection" {
+  let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let id = GamepadId::new(0)
   g.update(Event::at(id, EventType::Disconnected, 1L))
   inspect(g.gamepad(id).map(fn(gp) { gp.is_connected() }), content="Some(true)")
@@ -175,8 +175,8 @@ test "gilrs update ignores connection events but next_event syncs connection" {
 }
 
 ///|
-test "gilrs next_event runs axis_dpad_to_button in default pipeline" {
-  let g = Gilrs::new_mock(1, update_state=true)
+test "gil next_event runs axis_dpad_to_button in default pipeline" {
+  let g = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
   let m = Mapping::new()
   m.set_hats_mapped(0b1111)
@@ -195,8 +195,8 @@ test "gilrs next_event runs axis_dpad_to_button in default pipeline" {
 }
 
 ///|
-test "gilrs next_event_blocking timeout 0 behaves like next_event (mock)" {
-  let g = Gilrs::new_mock(1)
+test "gil next_event_blocking timeout 0 behaves like next_event (mock)" {
+  let g = Gil::new_mock(1)
   inspect(g.next_event_blocking(Some(0L)) is None, content="true")
   let id = GamepadId::new(0)
   g.insert_event(Event::at(id, EventType::Connected, 1L))
@@ -213,7 +213,7 @@ test "gilrs next_event_blocking timeout 0 behaves like next_event (mock)" {
 
 ///|
 test "gamepad power_info default is Unknown (mock)" {
-  let g = Gilrs::new_mock(1)
+  let g = Gil::new_mock(1)
   let id = GamepadId::new(0)
   let p = g
     .gamepad(id)
@@ -228,15 +228,15 @@ test "gamepad power_info default is Unknown (mock)" {
 
 ///|
 test "gamepad is_ff_supported default is false (mock)" {
-  let g = Gilrs::new_mock(1)
+  let g = Gil::new_mock(1)
   let id = GamepadId::new(0)
   let supported = g.gamepad(id).map(fn(gp) { gp.is_ff_supported() })
   inspect(supported, content="Some(false)")
 }
 
 ///|
-test "gilrs keeps historical disconnected ids after reconnect-style sequence" {
-  let g = Gilrs::new_mock(2)
+test "gil keeps historical disconnected ids after reconnect-style sequence" {
+  let g = Gil::new_mock(2)
   let id0 = GamepadId::new(0)
   let id1 = GamepadId::new(1)
   g.insert_event(Event::at(id0, EventType::Connected, 1L))

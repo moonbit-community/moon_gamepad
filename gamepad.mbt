@@ -41,7 +41,7 @@ pub fn axis_value(info : AxisInfo, val : Int, axis : Axis) -> Double {
   let mut range = Float::from_int(info.max) - minf
   let mut v = Float::from_int(val) - minf
 
-  // Mirror gilrs' overflow behavior: only do the odd-range centering adjustment
+  // Mirror gil' overflow behavior: only do the odd-range centering adjustment
   // when max - min fits into 32-bit Int.
   if range_i64 <= INT_MAX_I64 && range_i64 >= 0L {
     if range_i64 % 2L == 1L {

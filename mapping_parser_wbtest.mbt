@@ -53,7 +53,7 @@ test "full SDL corpus parses without non-empty parser errors" {
 }
 
 ///|
-test "hat direction invalid value error position matches gilrs" {
+test "hat direction invalid value error position matches gil" {
   let p = Parser::new("xinput,Pad,dpup:h0.x,")
   ignore(try? p.next_token())
   ignore(try? p.next_token())

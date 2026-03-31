@@ -44,7 +44,7 @@ pub const AXIS_LSTICKX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x30
 pub const AXIS_LSTICKY : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x31
 
 ///|
-// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+// Unconfirmed in gil-core reference on macOS (kept for parity; should not match real devices).
 pub const AXIS_LEFTZ : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
@@ -54,7 +54,7 @@ pub const AXIS_RSTICKX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x32
 pub const AXIS_RSTICKY : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x35
 
 ///|
-// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+// Unconfirmed in gil-core reference on macOS (kept for parity; should not match real devices).
 pub const AXIS_RIGHTZ : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
@@ -64,11 +64,11 @@ pub const AXIS_DPADX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x39
 pub const AXIS_DPADY : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x3A
 
 ///|
-// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+// Unconfirmed in gil-core reference on macOS (kept for parity; should not match real devices).
 pub const AXIS_RT : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
-// Unconfirmed in gilrs-core reference on macOS (kept for parity; should not match real devices).
+// Unconfirmed in gil-core reference on macOS (kept for parity; should not match real devices).
 pub const AXIS_LT : Code = (PAGE_GENERIC_DESKTOP << 16) | 0
 
 ///|
@@ -276,7 +276,7 @@ pub fn button_from_code(code : Code) -> Button? {
 ///|
 pub fn axis_or_btn_from_code(code : Code) -> AxisOrBtn? {
   match code {
-    // Analog triggers are axes on some backends, but map to Button semantics in gilrs.
+    // Analog triggers are axes on some backends, but map to Button semantics in gil.
     AXIS_LT2 | LEGACY_AXIS_LT2 =>
       return Some(AxisOrBtn::Btn(Button::LeftTrigger2))
     AXIS_RT2 | LEGACY_AXIS_RT2 =>

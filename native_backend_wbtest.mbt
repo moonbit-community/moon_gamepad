@@ -21,7 +21,7 @@ extern "C" fn uuid_simple_from_ids_for_test(
 ) -> String = "moon_gamepad_uuid_simple_from_ids"
 
 ///|
-test "uuid from ids matches gilrs SDL layout sample" {
+test "uuid from ids matches gil SDL layout sample" {
   let got = uuid_simple_from_ids_for_test(0x3, 0x045e, 0x028e, 0x2020)
   inspect(got, content="030000005e0400008e02000020200000")
 }
@@ -41,7 +41,7 @@ fn unpack_hat(pack : Int) -> (Int, Int) {
 }
 
 ///|
-test "macOS hat mapping (8 positions) matches gilrs-core directional layout" {
+test "macOS hat mapping (8 positions) matches gil-core directional layout" {
   if runtime_sdl_platform_name() != "Mac OS X" {
     inspect(true, content="true")
     return

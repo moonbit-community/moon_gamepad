@@ -350,7 +350,7 @@ fn DistanceModel::attenuation(
 
 ///|
 pub struct Effect {
-  gilrs : Gilrs
+  gil : Gil
   effect_token : Int
   mut gamepads : Array[GamepadId]
   strong : Double
@@ -508,14 +508,14 @@ pub fn EffectBuilder::gain(
 ///|
 pub fn EffectBuilder::finish(
   self : EffectBuilder,
-  gilrs : Gilrs,
+  gil : Gil,
 ) -> Effect raise FfError {
   if self.gamepads.length() == 0 {
     raise FfError::NoGamepads
   }
   // Validate: connected + ff supported.
   for id in self.gamepads {
-    match gilrs.gamepad(id) {
+    match gil.gamepad(id) {
       None => raise FfError::Disconnected(id)
       Some(gp) =>
         if !gp.is_connected() {
@@ -526,7 +526,7 @@ pub fn EffectBuilder::finish(
     }
   }
   // Must have a native backend to talk to.
-  match gilrs.backend {
+  match gil.backend {
     None => raise FfError::NotSupported
     Some(_) => ()
   }
@@ -534,8 +534,8 @@ pub fn EffectBuilder::finish(
     err => raise FfError::InvalidDistanceModel(err)
   }
   let effect : Effect = {
-    gilrs,
-    effect_token: gilrs.new_effect_token(),
+    gil,
+    effect_token: gil.new_effect_token(),
     gamepads: self.gamepads,
     strong: self.strong,
     weak: self.weak,
@@ -547,7 +547,7 @@ pub fn EffectBuilder::finish(
     gain: self.gain,
     playing_since_ms: None,
   }
-  gilrs.ff_upsert_effect_from_handle(effect)
+  gil.ff_upsert_effect_from_handle(effect)
   effect
 }
 
@@ -555,11 +555,11 @@ pub fn EffectBuilder::finish(
 pub fn Effect::set_gamepads(
   self : Effect,
   ids : Array[GamepadId],
-  gilrs : Gilrs,
+  gil : Gil,
 ) -> Unit raise FfError {
   let out : Array[GamepadId] = []
   for id in ids {
-    match gilrs.connected_gamepad(id) {
+    match gil.connected_gamepad(id) {
       None => raise FfError::Disconnected(id)
       Some(gp) =>
         if !gp.is_ff_supported() {
@@ -570,7 +570,7 @@ pub fn Effect::set_gamepads(
     }
   }
   self.gamepads = out
-  self.gilrs.ff_set_effect_gamepads(self.effect_token, out)
+  self.gil.ff_set_effect_gamepads(self.effect_token, out)
 }
 
 ///|
@@ -588,19 +588,19 @@ pub fn Effect::add_gamepad(
   if !contains_gamepad_id(self.gamepads, id) {
     self.gamepads.push(id)
   }
-  self.gilrs.ff_set_effect_gamepads(self.effect_token, self.gamepads)
+  self.gil.ff_set_effect_gamepads(self.effect_token, self.gamepads)
 }
 
 ///|
 pub fn Effect::set_gain(self : Effect, gain : Double) -> Unit {
   self.gain = if gain < 0.0 { 0.0 } else { gain }
-  self.gilrs.ff_set_effect_gain(self.effect_token, self.gain)
+  self.gil.ff_set_effect_gain(self.effect_token, self.gain)
 }
 
 ///|
 pub fn Effect::set_repeat(self : Effect, repeat_mode : FfRepeat) -> Unit {
   self.repeat_mode = repeat_mode
-  self.gilrs.ff_set_effect_repeat(self.effect_token, repeat_mode)
+  self.gil.ff_set_effect_repeat(self.effect_token, repeat_mode)
 }
 
 ///|
@@ -612,7 +612,7 @@ pub fn Effect::set_distance_model(
     err => raise FfError::InvalidDistanceModel(err)
   }
   self.distance_model = model
-  self.gilrs.ff_set_effect_distance_model(self.effect_token, model)
+  self.gil.ff_set_effect_distance_model(self.effect_token, model)
 }
 
 ///|
@@ -621,30 +621,30 @@ pub fn Effect::set_position(
   position : (Double, Double, Double),
 ) -> Unit {
   self.position = position
-  self.gilrs.ff_set_effect_position(self.effect_token, position)
+  self.gil.ff_set_effect_position(self.effect_token, position)
 }
 
 ///|
 pub fn Effect::play(self : Effect) -> Unit raise FfError {
-  if self.gilrs.backend is None {
+  if self.gil.backend is None {
     raise FfError::NotSupported
   }
-  self.gilrs.ff_upsert_effect_from_handle(self)
+  self.gil.ff_upsert_effect_from_handle(self)
   let now = runtime_now_ms()
-  let tick = self.gilrs.ff_now_tick(now)
+  let tick = self.gil.ff_now_tick(now)
   self.playing_since_ms = Some(now)
-  self.gilrs.ff_play_effect(self.effect_token, tick)
-  self.gilrs.ff_tick_update(now, true)
+  self.gil.ff_play_effect(self.effect_token, tick)
+  self.gil.ff_tick_update(now, true)
 }
 
 ///|
 pub fn Effect::stop(self : Effect) -> Unit raise FfError {
-  if self.gilrs.backend is None {
+  if self.gil.backend is None {
     raise FfError::NotSupported
   }
-  self.gilrs.ff_upsert_effect_from_handle(self)
+  self.gil.ff_upsert_effect_from_handle(self)
   self.playing_since_ms = None
-  self.gilrs.ff_stop_effect(self.effect_token)
+  self.gil.ff_stop_effect(self.effect_token)
   let now = runtime_now_ms()
-  self.gilrs.ff_tick_update(now, true)
+  self.gil.ff_tick_update(now, true)
 }
