@@ -747,17 +747,17 @@ fn Gil::refresh_gamepad_data_on_connected(
   let uuid = self.gamepads_data[id].uuid
   match self.mappings.get(uuid) {
     None => ()
-    Some(line) => {
-      let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-        line,
-        self.gamepads_data[id].buttons,
-        self.gamepads_data[id].axes,
-      )
-      match parsed {
-        Ok(m) => self.gamepads_data[id].mapping = m
-        Err(_) => ()
+    Some(line) =>
+      try {
+        let parsed = Mapping::parse_sdl_mapping(
+          line,
+          self.gamepads_data[id].buttons,
+          self.gamepads_data[id].axes,
+        )
+        self.gamepads_data[id].mapping = parsed
+      } catch {
+        _ => ()
       }
-    }
   }
 }
 
@@ -1477,12 +1477,8 @@ pub fn GilBuilder::build(self : GilBuilder) -> Gil raise GilError {
 
 ///|
 pub fn Gil::new() -> Gil {
-  let built : Result[Gil, GilError] = try? GilBuilder::new()
-    .with_native_backend(true)
-    .build()
-  match built {
-    Ok(g) => g
-    Err(_) => Gil::new_native()
+  GilBuilder::new().with_native_backend(true).build() catch {
+    _ => Gil::new_native()
   }
 }
 

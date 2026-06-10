@@ -69,15 +69,15 @@ test "axis second axis" {
 test "ev helper branches parity" {
   inspect(Axis::LeftStickX.is_stick(), content="true")
   inspect(Axis::LeftZ.is_stick(), content="false")
-  inspect(
+  debug_inspect(
     Axis::RightStickX.second_axis().map(fn(ax) { ax.to_index() }),
     content="Some(4)",
   )
-  inspect(
+  debug_inspect(
     Axis::RightStickY.second_axis().map(fn(ax) { ax.to_index() }),
     content="Some(3)",
   )
-  inspect(
+  debug_inspect(
     Axis::DPadY.second_axis().map(fn(ax) { ax.to_index() }),
     content="Some(6)",
   )

@@ -103,7 +103,7 @@ fn find_char(data : String, pos : Int, end : Int, needle : Char) -> Int? {
 
 ///|
 fn slice_to_string(data : String, start : Int, end : Int) -> String {
-  data.sub(start~, end~).to_string()
+  data.sub(start~, end~).to_owned()
 }
 
 ///|
@@ -261,51 +261,51 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
     return Token::Platform(value)
   }
   let (key, output) = match key {
-    ['+', .. rest] => (rest.to_string(), AxisRange::UpperHalf)
-    ['-', .. rest] => (rest.to_string(), AxisRange::LowerHalf)
+    ['+', .. rest] => (rest.to_owned(), AxisRange::UpperHalf)
+    ['-', .. rest] => (rest.to_owned(), AxisRange::LowerHalf)
     _ => (key, AxisRange::Full)
   }
   let (from_str, input, inverted, is_axis) = match value {
     ['+', 'a', .. rest] => {
-      let mut body = rest.to_string()
+      let mut body = rest.to_owned()
       let mut inv = false
       if body.length() > 0 &&
         body.code_unit_at(body.length() - 1).to_int() == '~'.to_int() {
         inv = true
-        body = body[0:body.length() - 1].to_string()
+        body = body[0:body.length() - 1].to_owned()
       }
       (body, AxisRange::UpperHalf, inv, true)
     }
     ['-', 'a', .. rest] => {
-      let mut body = rest.to_string()
+      let mut body = rest.to_owned()
       let mut inv = false
       if body.length() > 0 &&
         body.code_unit_at(body.length() - 1).to_int() == '~'.to_int() {
         inv = true
-        body = body[0:body.length() - 1].to_string()
+        body = body[0:body.length() - 1].to_owned()
       }
       (body, AxisRange::LowerHalf, inv, true)
     }
     ['a', .. rest] => {
-      let mut body = rest.to_string()
+      let mut body = rest.to_owned()
       let mut inv = false
       if body.length() > 0 &&
         body.code_unit_at(body.length() - 1).to_int() == '~'.to_int() {
         inv = true
-        body = body[0:body.length() - 1].to_string()
+        body = body[0:body.length() - 1].to_owned()
       }
       (body, AxisRange::Full, inv, true)
     }
-    ['b', .. rest] => (rest.to_string(), AxisRange::Full, false, false)
+    ['b', .. rest] => (rest.to_owned(), AxisRange::Full, false, false)
     ['h', .. rest] => {
-      let body = rest.to_string()
+      let body = rest.to_owned()
       let dot = match find_char(body, 0, body.length(), '.') {
         Some(i) => i
         None => raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
       }
-      let hat = parse_u16_decimal(body[0:dot].to_string(), pos + 1)
+      let hat = parse_u16_decimal(body[0:dot].to_owned(), pos + 1)
       let direction = parse_u16_decimal(
-        body[dot + 1:body.length()].to_string(),
+        body[dot + 1:body.length()].to_owned(),
         pos + dot + 2,
       )
       let to = lookup_axis_or_btn(key, ParserErrorKind::UnknownButton, pos)

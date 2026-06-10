@@ -24,7 +24,7 @@ test "gil fifo + auto update_state" {
   )
   let ev1 = gil.next_event()
   inspect(ev1 is Some(_), content="true")
-  inspect(
+  debug_inspect(
     gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(true)",
   )
@@ -32,11 +32,11 @@ test "gil fifo + auto update_state" {
     None => None
     Some(s) => s.button_data(BTN_SOUTH).map(fn(d) { d.counter() })
   }
-  inspect(c1, content="Some(0)")
+  debug_inspect(c1, content="Some(0)")
   gil.inc()
   let ev2 = gil.next_event()
   inspect(ev2 is Some(_), content="true")
-  inspect(
+  debug_inspect(
     gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(false)",
   )
@@ -44,7 +44,7 @@ test "gil fifo + auto update_state" {
     None => None
     Some(s) => s.button_data(BTN_SOUTH).map(fn(d) { d.counter() })
   }
-  inspect(c2, content="Some(1)")
+  debug_inspect(c2, content="Some(1)")
 }
 
 ///|
@@ -55,14 +55,14 @@ test "gil no auto update when disabled" {
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
   )
   let _ = gil.next_event()
-  inspect(
+  debug_inspect(
     gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(false)",
   )
   gil.update(
     Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
   )
-  inspect(
+  debug_inspect(
     gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(true)",
   )
@@ -81,7 +81,9 @@ fn gilrs_event_sig(e : Event) -> (Int, Int, Double, Int) {
 
 ///|
 fn build_ok_gilrs(builder : GilBuilder) -> Gil {
-  let res : Result[Gil, GilError] = try? builder.build()
+  let res : Result[Gil, GilError] = try builder.build() |> Ok catch {
+    e => Err(e)
+  }
   match res {
     Ok(g) => g
     Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
@@ -138,7 +140,7 @@ test "gil builder can disable default filters" {
       2L,
     ),
   )
-  inspect(
+  debug_inspect(
     g.next_event().map(gilrs_event_sig),
     content="Some((0, 0, 0.505, 65584))",
   )
@@ -157,7 +159,7 @@ test "gil returns dropped when default filters are disabled" {
         _ => 0
       }
     })
-  inspect(got, content="Some(1)")
+  debug_inspect(got, content="Some(1)")
 }
 
 ///|
@@ -165,10 +167,13 @@ test "gil update ignores connection events but next_event syncs connection" {
   let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let id = GamepadId::new(0)
   g.update(Event::at(id, EventType::Disconnected, 1L))
-  inspect(g.gamepad(id).map(fn(gp) { gp.is_connected() }), content="Some(true)")
+  debug_inspect(
+    g.gamepad(id).map(fn(gp) { gp.is_connected() }),
+    content="Some(true)",
+  )
   g.insert_event(Event::at(id, EventType::Disconnected, 2L))
   ignore(g.next_event())
-  inspect(
+  debug_inspect(
     g.gamepad(id).map(fn(gp) { gp.is_connected() }),
     content="Some(false)",
   )
@@ -184,11 +189,11 @@ test "gil next_event runs axis_dpad_to_button in default pipeline" {
   g.insert_event(
     Event::at(id, EventType::AxisChanged(Axis::DPadX, 1.0, AXIS_DPADX), 1L),
   )
-  inspect(
+  debug_inspect(
     g.next_event().map(gilrs_event_sig),
     content="Some((1, 18, 1, 589843))",
   )
-  inspect(
+  debug_inspect(
     g.next_event().map(gilrs_event_sig),
     content="Some((2, 18, 1, 589843))",
   )
@@ -208,7 +213,7 @@ test "gil next_event_blocking timeout 0 behaves like next_event (mock)" {
         _ => 0
       }
     })
-  inspect(got, content="Some(1)")
+  debug_inspect(got, content="Some(1)")
 }
 
 ///|
@@ -223,7 +228,7 @@ test "gamepad power_info default is Unknown (mock)" {
         _ => 1
       }
     })
-  inspect(p, content="Some(0)")
+  debug_inspect(p, content="Some(0)")
 }
 
 ///|
@@ -231,7 +236,7 @@ test "gamepad is_ff_supported default is false (mock)" {
   let g = Gil::new_mock(1)
   let id = GamepadId::new(0)
   let supported = g.gamepad(id).map(fn(gp) { gp.is_ff_supported() })
-  inspect(supported, content="Some(false)")
+  debug_inspect(supported, content="Some(false)")
 }
 
 ///|
@@ -269,16 +274,16 @@ test "gil keeps historical disconnected ids after reconnect-style sequence" {
         _ => 0
       }
     })
-  inspect((t1, t2, t3), content="(Some(1), Some(2), Some(1))")
-  inspect(
+  debug_inspect((t1, t2, t3), content="(Some(1), Some(2), Some(1))")
+  debug_inspect(
     g.gamepad(id0).map(fn(gp) { gp.is_connected() }),
     content="Some(false)",
   )
-  inspect(
+  debug_inspect(
     g.gamepad(id1).map(fn(gp) { gp.is_connected() }),
     content="Some(true)",
   )
-  inspect(
+  debug_inspect(
     g
     .gamepads()
     .map(fn(pair) {

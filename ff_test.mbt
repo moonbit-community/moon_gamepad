@@ -14,7 +14,9 @@
 
 ///|
 fn build_ok_ff(builder : GilBuilder) -> Gil {
-  let res : Result[Gil, GilError] = try? builder.build()
+  let res : Result[Gil, GilError] = try builder.build() |> Ok catch {
+    e => Err(e)
+  }
   match res {
     Ok(g) => g
     Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
@@ -24,16 +26,25 @@ fn build_ok_ff(builder : GilBuilder) -> Gil {
 ///|
 test "finish without gamepads returns NoGamepads" {
   let g = build_ok_ff(GilBuilder::new().with_mock_gamepad_count(1))
-  let res : Result[Effect, FfError] = try? EffectBuilder::new().finish(g)
+  let res : Result[Effect, FfError] = try
+    EffectBuilder::new().finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(res is Err(_), content="true")
 }
 
 ///|
 test "mock gamepad is not ff supported" {
   let g = build_ok_ff(GilBuilder::new().with_mock_gamepad_count(1))
-  let res : Result[Effect, FfError] = try? EffectBuilder::new()
+  let res : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .rumble(1.0, 0.0)
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(res is Err(_), content="true")
 }

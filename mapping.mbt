@@ -166,64 +166,59 @@ pub fn Mapping::parse_sdl_mapping(
   let mapping = Mapping::new()
   let parser = Parser::new(line)
   while true {
-    let res : Result[Token?, ParserError] = try? parser.next_token()
-    match res {
-      Ok(token_opt) =>
-        match token_opt {
-          None => break
-          Some(token) =>
-            match token {
-              Token::Uuid(_) => ()
-              Token::Platform(_) => ()
-              Token::Name(n) => mapping.name = n
-              Token::AxisMapping(idx, to, _, _, _) =>
-                if idx >= 0 && idx < axes.length() {
-                  insert_mapping(mapping.mappings, axes[idx], to)
-                }
-              Token::ButtonMapping(idx, to, _) =>
-                if idx >= 0 && idx < buttons.length() {
-                  insert_mapping(mapping.mappings, buttons[idx], to)
-                }
-              Token::HatMapping(hat, direction, to, _) => {
-                if hat != 0 {
-                  continue
-                }
-                let (from_axis, from_btn) = match direction {
-                  1 => (AXIS_DPADY, BTN_DPAD_UP)
-                  4 => (AXIS_DPADY, BTN_DPAD_DOWN)
-                  2 => (AXIS_DPADX, BTN_DPAD_RIGHT)
-                  8 => (AXIS_DPADX, BTN_DPAD_LEFT)
-                  0 => continue
-                  _ => raise ParseSdlMappingError::UnknownHatDirection
-                }
-                if to.is_button() {
-                  match to {
-                    AxisOrBtn::Btn(Button::DPadLeft | Button::DPadRight) =>
-                      insert_mapping(
-                        mapping.mappings,
-                        from_axis,
-                        AxisOrBtn::Axis(Axis::DPadX),
-                      )
-                    AxisOrBtn::Btn(Button::DPadUp | Button::DPadDown) =>
-                      insert_mapping(
-                        mapping.mappings,
-                        from_axis,
-                        AxisOrBtn::Axis(Axis::DPadY),
-                      )
-                    _ => ()
-                  }
-                  insert_mapping(mapping.mappings, from_btn, to)
-                } else {
-                  insert_mapping(mapping.mappings, from_axis, to)
-                }
-                mapping.hats_mapped = mapping.hats_mapped | direction
-              }
+    let token_opt = parser.next_token() catch {
+      ParserError::Error(ParserErrorKind::EmptyValue, _) => continue
+      e => raise ParseSdlMappingError::ParseError(e)
+    }
+    match token_opt {
+      None => break
+      Some(token) =>
+        match token {
+          Token::Uuid(_) => ()
+          Token::Platform(_) => ()
+          Token::Name(n) => mapping.name = n
+          Token::AxisMapping(idx, to, _, _, _) =>
+            if idx >= 0 && idx < axes.length() {
+              insert_mapping(mapping.mappings, axes[idx], to)
             }
-        }
-      Err(e) =>
-        match e {
-          ParserError::Error(ParserErrorKind::EmptyValue, _) => continue
-          _ => raise ParseSdlMappingError::ParseError(e)
+          Token::ButtonMapping(idx, to, _) =>
+            if idx >= 0 && idx < buttons.length() {
+              insert_mapping(mapping.mappings, buttons[idx], to)
+            }
+          Token::HatMapping(hat, direction, to, _) => {
+            if hat != 0 {
+              continue
+            }
+            let (from_axis, from_btn) = match direction {
+              1 => (AXIS_DPADY, BTN_DPAD_UP)
+              4 => (AXIS_DPADY, BTN_DPAD_DOWN)
+              2 => (AXIS_DPADX, BTN_DPAD_RIGHT)
+              8 => (AXIS_DPADX, BTN_DPAD_LEFT)
+              0 => continue
+              _ => raise ParseSdlMappingError::UnknownHatDirection
+            }
+            if to.is_button() {
+              match to {
+                AxisOrBtn::Btn(Button::DPadLeft | Button::DPadRight) =>
+                  insert_mapping(
+                    mapping.mappings,
+                    from_axis,
+                    AxisOrBtn::Axis(Axis::DPadX),
+                  )
+                AxisOrBtn::Btn(Button::DPadUp | Button::DPadDown) =>
+                  insert_mapping(
+                    mapping.mappings,
+                    from_axis,
+                    AxisOrBtn::Axis(Axis::DPadY),
+                  )
+                _ => ()
+              }
+              insert_mapping(mapping.mappings, from_btn, to)
+            } else {
+              insert_mapping(mapping.mappings, from_axis, to)
+            }
+            mapping.hats_mapped = mapping.hats_mapped | direction
+          }
         }
     }
   }
@@ -675,12 +670,12 @@ fn mapping_line_platform(line : String) -> String? {
       if start >= line.length() {
         return Some("")
       }
-      let tail = line[start:line.length()].to_string()
+      let tail = line[start:line.length()].to_owned()
       let end = match find_first_comma(tail) {
         None => tail.length()
         Some(i) => i
       }
-      Some(tail[0:end].to_string())
+      Some(tail[0:end].to_owned())
     }
   }
 }
@@ -713,7 +708,7 @@ fn trim_trailing_cr(line : String) -> String {
   }
   let last = line.code_unit_at(line.length() - 1).to_int()
   if last == '\r'.to_int() {
-    line[0:line.length() - 1].to_string()
+    line[0:line.length() - 1].to_owned()
   } else {
     line
   }
@@ -722,7 +717,7 @@ fn trim_trailing_cr(line : String) -> String {
 ///|
 pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
   for line_view in s.split("\n") {
-    let line = trim_trailing_cr(line_view.to_string())
+    let line = trim_trailing_cr(line_view.to_owned())
     if line.length() == 0 {
       continue
     }
@@ -733,7 +728,7 @@ pub fn MappingDb::insert(self : MappingDb, s : String) -> Unit {
       None => line.length()
       Some(i) => i
     }
-    let guid = line[0:guid_end].to_string()
+    let guid = line[0:guid_end].to_owned()
     try {
       let uuid = Uuid::parse(guid)
       upsert_mapping(self, uuid, line)

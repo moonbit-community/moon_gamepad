@@ -1,8 +1,9 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "moonbit.h"
+
+#include <string.h>
 
 #include "backend.h"
 
@@ -130,6 +131,16 @@ static char *moonbit_string_to_ascii_cstr(moonbit_string_t s) {
 #endif
 
 #if defined(__APPLE__)
+typedef struct mac_run_loop_thread_t {
+  pthread_t handle;
+  pthread_mutex_t mu;
+  pthread_cond_t cv;
+  CFRunLoopRef run_loop;
+  int started;
+  int ready;
+  int shutdown_requested;
+} mac_run_loop_thread_t;
+
 typedef struct mac_u32_vec_t {
   uint32_t *xs;
   uint32_t len;
@@ -429,6 +440,15 @@ static void mac_device_free(mac_device_t *d) {
   mac_codes_vec_free(&d->buttons);
   mac_axis_info_vec_free(&d->axis_info);
 }
+
+typedef struct mac_backend_state_t {
+  IOHIDManagerRef manager;
+  mac_run_loop_thread_t loop;
+  mac_device_t *devices;
+  uint32_t devices_len;
+  uint32_t devices_cap;
+  uint32_t next_id;
+} mac_backend_state_t;
 #endif
 
 // -----------------------------------------------------------------------------
@@ -638,13 +658,7 @@ typedef struct moon_gamepad_backend_t {
   int32_t gamepad_count;
 
 #if defined(__APPLE__)
-  IOHIDManagerRef mgr;
-  CFRunLoopRef rl;
-  pthread_t thread;
-  mac_device_t *mac_devices;
-  uint32_t devices_len;
-  uint32_t devices_cap;
-  uint32_t next_id;
+  mac_backend_state_t mac;
 #endif
 
 #if defined(__linux__)
@@ -743,10 +757,10 @@ static int mac_devices_reserve(moon_gamepad_backend_t *b, uint32_t needed) {
   if (b == NULL) {
     return 0;
   }
-  if (needed <= b->devices_cap) {
+  if (needed <= b->mac.devices_cap) {
     return 1;
   }
-  uint32_t new_cap = (b->devices_cap == 0) ? 8 : b->devices_cap;
+  uint32_t new_cap = (b->mac.devices_cap == 0) ? 8 : b->mac.devices_cap;
   while (new_cap < needed) {
     uint32_t next = new_cap * 2;
     if (next < new_cap) {
@@ -761,12 +775,12 @@ static int mac_devices_reserve(moon_gamepad_backend_t *b, uint32_t needed) {
   if (new_devs == NULL) {
     return 0;
   }
-  if (b->devices_len != 0 && b->mac_devices != NULL) {
-    memcpy(new_devs, b->mac_devices, (size_t)b->devices_len * sizeof(mac_device_t));
+  if (b->mac.devices_len != 0 && b->mac.devices != NULL) {
+    memcpy(new_devs, b->mac.devices, (size_t)b->mac.devices_len * sizeof(mac_device_t));
   }
-  free(b->mac_devices);
-  b->mac_devices = new_devs;
-  b->devices_cap = new_cap;
+  free(b->mac.devices);
+  b->mac.devices = new_devs;
+  b->mac.devices_cap = new_cap;
   return 1;
 }
 
@@ -774,8 +788,8 @@ static int mac_idx_by_entry_id(moon_gamepad_backend_t *b, uint64_t entry_id) {
   if (b == NULL) {
     return -1;
   }
-  for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->mac_devices[i].connected && b->mac_devices[i].entry_id == entry_id) {
+  for (uint32_t i = 0; i < b->mac.devices_len; i++) {
+    if (b->mac.devices[i].connected && b->mac.devices[i].entry_id == entry_id) {
       return (int)i;
     }
   }
@@ -786,8 +800,8 @@ static int mac_idx_by_location_id(moon_gamepad_backend_t *b, uint32_t location_i
   if (b == NULL) {
     return -1;
   }
-  for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->mac_devices[i].connected && b->mac_devices[i].location_id == location_id) {
+  for (uint32_t i = 0; i < b->mac.devices_len; i++) {
+    if (b->mac.devices[i].connected && b->mac.devices[i].location_id == location_id) {
       return (int)i;
     }
   }
@@ -799,8 +813,8 @@ static int mac_connected_count(moon_gamepad_backend_t *b) {
     return 0;
   }
   int n = 0;
-  for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->mac_devices[i].connected) {
+  for (uint32_t i = 0; i < b->mac.devices_len; i++) {
+    if (b->mac.devices[i].connected) {
       n++;
     }
   }
@@ -1148,20 +1162,20 @@ static void device_matching_cb(void *ctx, IOReturn res, void *sender, IOHIDDevic
 
   // Deduplicate only already-connected entry IDs. A reconnect after disconnect
   // allocates a new slot, matching gilrs-core device_infos behavior.
-  for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->mac_devices[i].entry_id == entry_id && b->mac_devices[i].connected) {
-      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, b->mac_devices[i].id, 0, 0, 0.0, now_ms()};
+  for (uint32_t i = 0; i < b->mac.devices_len; i++) {
+    if (b->mac.devices[i].entry_id == entry_id && b->mac.devices[i].connected) {
+      moon_gamepad_event_t ev = {MOON_GAMEPAD_EV_CONNECTED, b->mac.devices[i].id, 0, 0, 0.0, now_ms()};
       queue_push(&b->q, ev);
       return;
     }
   }
-  if (!mac_devices_reserve(b, b->devices_len + 1)) {
+  if (!mac_devices_reserve(b, b->mac.devices_len + 1)) {
     return;
   }
-  uint32_t idx = b->devices_len++;
-  mac_device_t *d = &b->mac_devices[idx];
+  uint32_t idx = b->mac.devices_len++;
+  mac_device_t *d = &b->mac.devices[idx];
   memset(d, 0, sizeof(*d));
-  d->id = b->next_id++;
+  d->id = b->mac.next_id++;
   d->entry_id = entry_id;
 
   // Retain device while stored.
@@ -1195,7 +1209,7 @@ static void device_removal_cb(void *ctx, IOReturn res, void *sender, IOHIDDevice
   if (idx < 0) {
     return;
   }
-  mac_device_t *d = &b->mac_devices[(uint32_t)idx];
+  mac_device_t *d = &b->mac.devices[(uint32_t)idx];
   uint32_t id = d->id;
   if (d->device != NULL) {
     CFRelease(d->device);
@@ -1226,7 +1240,7 @@ static void input_value_cb(void *ctx, IOReturn res, void *sender, IOHIDValueRef 
   if (dev_idx < 0) {
     return;
   }
-  uint32_t id = b->mac_devices[(uint32_t)dev_idx].id;
+  uint32_t id = b->mac.devices[(uint32_t)dev_idx].id;
   IOHIDElementRef el = IOHIDValueGetElement(value);
   if (el == NULL) {
     return;
@@ -1300,13 +1314,84 @@ static CFDictionaryRef make_matching_dict(uint32_t page, uint32_t usage) {
   return dict;
 }
 
+static void mac_run_loop_thread_init(mac_run_loop_thread_t *loop) {
+  if (loop == NULL) {
+    return;
+  }
+  loop->run_loop = NULL;
+  loop->started = 0;
+  loop->ready = 0;
+  loop->shutdown_requested = 0;
+  pthread_mutex_init(&loop->mu, NULL);
+  pthread_cond_init(&loop->cv, NULL);
+}
+
+static void mac_run_loop_thread_start(mac_run_loop_thread_t *loop, void *(*main)(void *), void *arg) {
+  if (loop == NULL || main == NULL) {
+    return;
+  }
+  loop->started = pthread_create(&loop->handle, NULL, main, arg) == 0;
+  if (!loop->started) {
+    pthread_mutex_lock(&loop->mu);
+    loop->ready = 1;
+    pthread_cond_signal(&loop->cv);
+    pthread_mutex_unlock(&loop->mu);
+  }
+}
+
+static int mac_run_loop_thread_publish(mac_run_loop_thread_t *loop, CFRunLoopRef run_loop) {
+  if (loop == NULL) {
+    return 1;
+  }
+  pthread_mutex_lock(&loop->mu);
+  loop->run_loop = run_loop;
+  loop->ready = 1;
+  int should_stop = loop->shutdown_requested;
+  pthread_cond_signal(&loop->cv);
+  pthread_mutex_unlock(&loop->mu);
+  return should_stop;
+}
+
+static CFRunLoopRef mac_run_loop_thread_request_stop(mac_run_loop_thread_t *loop) {
+  if (loop == NULL) {
+    return NULL;
+  }
+  pthread_mutex_lock(&loop->mu);
+  loop->shutdown_requested = 1;
+  while (loop->started && !loop->ready) {
+    pthread_cond_wait(&loop->cv, &loop->mu);
+  }
+  CFRunLoopRef run_loop = loop->run_loop;
+  pthread_mutex_unlock(&loop->mu);
+  return run_loop;
+}
+
+static void mac_run_loop_thread_join(mac_run_loop_thread_t *loop) {
+  if (loop != NULL && loop->started) {
+    pthread_join(loop->handle, NULL);
+    loop->started = 0;
+  }
+}
+
+static void mac_run_loop_thread_destroy(mac_run_loop_thread_t *loop) {
+  if (loop == NULL) {
+    return;
+  }
+  pthread_cond_destroy(&loop->cv);
+  pthread_mutex_destroy(&loop->mu);
+  loop->run_loop = NULL;
+  loop->ready = 0;
+  loop->shutdown_requested = 0;
+}
+
 static void *mac_thread_main(void *arg) {
   moon_gamepad_backend_t *b = (moon_gamepad_backend_t *)arg;
   if (b == NULL) {
     return NULL;
   }
-  b->mgr = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
-  if (b->mgr == NULL) {
+  b->mac.manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+  if (b->mac.manager == NULL) {
+    (void)mac_run_loop_thread_publish(&b->mac.loop, NULL);
     return NULL;
   }
 
@@ -1322,7 +1407,7 @@ static void *mac_thread_main(void *arg) {
       CFArrayAppendValue(arr, m2);
     if (m3 != NULL)
       CFArrayAppendValue(arr, m3);
-    IOHIDManagerSetDeviceMatchingMultiple(b->mgr, arr);
+    IOHIDManagerSetDeviceMatchingMultiple(b->mac.manager, arr);
     CFRelease(arr);
   }
   if (m1 != NULL)
@@ -1332,59 +1417,64 @@ static void *mac_thread_main(void *arg) {
   if (m3 != NULL)
     CFRelease(m3);
 
-  IOHIDManagerRegisterDeviceMatchingCallback(b->mgr, device_matching_cb, b);
-  IOHIDManagerRegisterDeviceRemovalCallback(b->mgr, device_removal_cb, b);
-  IOHIDManagerRegisterInputValueCallback(b->mgr, input_value_cb, b);
+  IOHIDManagerRegisterDeviceMatchingCallback(b->mac.manager, device_matching_cb, b);
+  IOHIDManagerRegisterDeviceRemovalCallback(b->mac.manager, device_removal_cb, b);
+  IOHIDManagerRegisterInputValueCallback(b->mac.manager, input_value_cb, b);
 
-  IOHIDManagerScheduleWithRunLoop(b->mgr, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
-  IOReturn open_res = IOHIDManagerOpen(b->mgr, kIOHIDOptionsTypeNone);
+  IOHIDManagerScheduleWithRunLoop(b->mac.manager, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+  IOReturn open_res = IOHIDManagerOpen(b->mac.manager, kIOHIDOptionsTypeNone);
   if (open_res != kIOReturnSuccess) {
-    IOHIDManagerUnscheduleFromRunLoop(b->mgr, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
-    CFRelease(b->mgr);
-    b->mgr = NULL;
+    IOHIDManagerUnscheduleFromRunLoop(b->mac.manager, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+    CFRelease(b->mac.manager);
+    b->mac.manager = NULL;
+    (void)mac_run_loop_thread_publish(&b->mac.loop, NULL);
     return NULL;
   }
 
-  b->rl = CFRunLoopGetCurrent();
-  CFRunLoopRun();
-  IOHIDManagerUnscheduleFromRunLoop(b->mgr, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+  int should_stop = mac_run_loop_thread_publish(&b->mac.loop, CFRunLoopGetCurrent());
+  if (!should_stop) {
+    CFRunLoopRun();
+  }
+  IOHIDManagerUnscheduleFromRunLoop(b->mac.manager, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
 
   return NULL;
 }
 
 static void mac_backend_init(moon_gamepad_backend_t *b) {
-  b->mgr = NULL;
-  b->rl = NULL;
-  b->mac_devices = NULL;
-  b->devices_len = 0;
-  b->devices_cap = 0;
-  b->next_id = 0;
+  b->mac.manager = NULL;
+  b->mac.devices = NULL;
+  b->mac.devices_len = 0;
+  b->mac.devices_cap = 0;
+  b->mac.next_id = 0;
   b->gamepad_count = 0;
+  mac_run_loop_thread_init(&b->mac.loop);
   (void)mac_devices_reserve(b, 8);
-  pthread_create(&b->thread, NULL, mac_thread_main, b);
+  mac_run_loop_thread_start(&b->mac.loop, mac_thread_main, b);
 }
 
 static void mac_backend_shutdown(moon_gamepad_backend_t *b) {
   if (b == NULL) {
     return;
   }
-  if (b->rl != NULL) {
-    CFRunLoopStop(b->rl);
+  CFRunLoopRef rl = mac_run_loop_thread_request_stop(&b->mac.loop);
+  if (rl != NULL) {
+    CFRunLoopStop(rl);
+    CFRunLoopWakeUp(rl);
   }
-  // Best-effort join.
-  pthread_join(b->thread, NULL);
-  if (b->mgr != NULL) {
-    IOHIDManagerClose(b->mgr, kIOHIDOptionsTypeNone);
-    CFRelease(b->mgr);
-    b->mgr = NULL;
+  mac_run_loop_thread_join(&b->mac.loop);
+  mac_run_loop_thread_destroy(&b->mac.loop);
+  if (b->mac.manager != NULL) {
+    IOHIDManagerClose(b->mac.manager, kIOHIDOptionsTypeNone);
+    CFRelease(b->mac.manager);
+    b->mac.manager = NULL;
   }
-  for (uint32_t i = 0; i < b->devices_len; i++) {
-    mac_device_free(&b->mac_devices[i]);
+  for (uint32_t i = 0; i < b->mac.devices_len; i++) {
+    mac_device_free(&b->mac.devices[i]);
   }
-  free(b->mac_devices);
-  b->mac_devices = NULL;
-  b->devices_len = 0;
-  b->devices_cap = 0;
+  free(b->mac.devices);
+  b->mac.devices = NULL;
+  b->mac.devices_len = 0;
+  b->mac.devices_cap = 0;
   b->gamepad_count = 0;
 }
 
@@ -3076,7 +3166,7 @@ int32_t moon_gamepad_backend_last_gamepad_hint(void *owner) {
     return 0;
   }
 #if defined(__APPLE__)
-  return (int32_t)b->devices_len;
+  return (int32_t)b->mac.devices_len;
 #elif defined(__linux__)
   return (int32_t)b->next_id;
 #elif defined(_WIN32)
@@ -3100,8 +3190,8 @@ static int mac_idx_by_id(moon_gamepad_backend_t *b, uint32_t id) {
   if (b == NULL) {
     return -1;
   }
-  for (uint32_t i = 0; i < b->devices_len; i++) {
-    if (b->mac_devices[i].id == id) {
+  for (uint32_t i = 0; i < b->mac.devices_len; i++) {
+    if (b->mac.devices[i].id == id) {
       return (int)i;
     }
   }
@@ -3119,7 +3209,7 @@ int32_t moon_gamepad_backend_is_connected(void *owner, int32_t id) {
   if (idx < 0) {
     return 0;
   }
-  return b->mac_devices[(uint32_t)idx].connected ? 1 : 0;
+  return b->mac.devices[(uint32_t)idx].connected ? 1 : 0;
 #elif defined(__linux__)
   int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
   return (idx >= 0) ? 1 : 0;
@@ -3143,7 +3233,7 @@ moonbit_string_t moon_gamepad_backend_name(void *owner, int32_t id) {
   if (idx < 0) {
     return moonbit_make_string_raw(0);
   }
-  return moonbit_string_from_utf8_lossy(b->mac_devices[(uint32_t)idx].name);
+  return moonbit_string_from_utf8_lossy(b->mac.devices[(uint32_t)idx].name);
 #elif defined(__linux__)
   int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
   if (idx < 0) {
@@ -3172,7 +3262,7 @@ moonbit_string_t moon_gamepad_backend_uuid_simple(void *owner, int32_t id) {
   if (idx < 0) {
     return moonbit_make_string_raw(0);
   }
-  return moonbit_string_from_utf8_lossy(b->mac_devices[(uint32_t)idx].uuid);
+  return moonbit_string_from_utf8_lossy(b->mac.devices[(uint32_t)idx].uuid);
 #elif defined(__linux__)
   int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
   if (idx < 0) {
@@ -3201,7 +3291,7 @@ int32_t moon_gamepad_backend_vendor_id(void *owner, int32_t id) {
   if (idx < 0) {
     return -1;
   }
-  return b->mac_devices[(uint32_t)idx].vendor;
+  return b->mac.devices[(uint32_t)idx].vendor;
 #elif defined(__linux__)
   int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
   if (idx < 0) {
@@ -3225,7 +3315,7 @@ int32_t moon_gamepad_backend_product_id(void *owner, int32_t id) {
   if (idx < 0) {
     return -1;
   }
-  return b->mac_devices[(uint32_t)idx].product;
+  return b->mac.devices[(uint32_t)idx].product;
 #elif defined(__linux__)
   int idx = idx_by_id_u32(b->fd_ids, b->fds_len, (uint32_t)id);
   if (idx < 0) {
@@ -3299,7 +3389,7 @@ moonbit_bytes_t moon_gamepad_backend_axes_bin(void *owner, int32_t id) {
   if (idx < 0) {
     return moonbit_make_bytes_raw(0);
   }
-  mac_device_t *d = &b->mac_devices[(uint32_t)idx];
+  mac_device_t *d = &b->mac.devices[(uint32_t)idx];
   uint32_t len = d->axes.len;
   if (len > (uint32_t)(INT32_MAX / 4)) {
     return moonbit_make_bytes_raw(0);
@@ -3359,7 +3449,7 @@ moonbit_bytes_t moon_gamepad_backend_buttons_bin(void *owner, int32_t id) {
   if (idx < 0) {
     return moonbit_make_bytes_raw(0);
   }
-  mac_device_t *d = &b->mac_devices[(uint32_t)idx];
+  mac_device_t *d = &b->mac.devices[(uint32_t)idx];
   uint32_t len = d->buttons.len;
   if (len > (uint32_t)(INT32_MAX / 4)) {
     return moonbit_make_bytes_raw(0);
@@ -3419,7 +3509,7 @@ moonbit_bytes_t moon_gamepad_backend_axis_info_bin(void *owner, int32_t id, int3
   if (idx < 0) {
     return moonbit_make_bytes_raw(0);
   }
-  mac_device_t *d = &b->mac_devices[(uint32_t)idx];
+  mac_device_t *d = &b->mac.devices[(uint32_t)idx];
   int32_t present = 0;
   int32_t minv = 0;
   int32_t maxv = 0;

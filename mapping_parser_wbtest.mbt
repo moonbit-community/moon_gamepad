@@ -17,7 +17,11 @@ fn non_empty_parser_errors(line : String) -> Int {
   let parser = Parser::new(line)
   let mut errors = 0
   while true {
-    let token : Result[Token?, ParserError] = try? parser.next_token()
+    let token : Result[Token?, ParserError] = try
+      parser.next_token() |> Ok
+    catch {
+      e => Err(e)
+    }
     match token {
       Ok(None) => break
       Ok(Some(_)) => ()
@@ -55,9 +59,15 @@ test "full SDL corpus parses without non-empty parser errors" {
 ///|
 test "hat direction invalid value error position matches gil" {
   let p = Parser::new("xinput,Pad,dpup:h0.x,")
-  ignore(try? p.next_token())
-  ignore(try? p.next_token())
-  let token : Result[Token?, ParserError] = try? p.next_token()
+  try {
+    ignore(p.next_token())
+    ignore(p.next_token())
+  } catch {
+    _ => return
+  }
+  let token : Result[Token?, ParserError] = try p.next_token() |> Ok catch {
+    e => Err(e)
+  }
   let ok = match token {
     Err(ParserError::Error(ParserErrorKind::InvalidValue, 14)) => true
     _ => false

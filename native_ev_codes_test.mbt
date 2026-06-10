@@ -24,8 +24,11 @@ test "native_ev_codes: mac HID codes are page<<16|usage" {
 
 ///|
 test "native_ev_codes: hid_page/hid_usage roundtrip" {
-  inspect((hid_page(BTN_WEST), hid_usage(BTN_WEST)), content="(9, 4)")
-  inspect((hid_page(AXIS_LSTICKY), hid_usage(AXIS_LSTICKY)), content="(1, 49)")
+  debug_inspect((hid_page(BTN_WEST), hid_usage(BTN_WEST)), content="(9, 4)")
+  debug_inspect(
+    (hid_page(AXIS_LSTICKY), hid_usage(AXIS_LSTICKY)),
+    content="(1, 49)",
+  )
 }
 
 ///|
@@ -49,14 +52,14 @@ test "native_ev_codes: unconfirmed macOS axes remain unmapped by default" {
     None => true
     _ => false
   }
-  inspect((ok_rx, ok_ry), content="(true, true)")
+  debug_inspect((ok_rx, ok_ry), content="(true, true)")
 }
 
 ///|
 test "native_ev_codes: unconfirmed constants use GenericDesktop usage 0" {
   let zero_usage = hid_code(PAGE_GENERIC_DESKTOP, 0)
   inspect(zero_usage, content="65536")
-  inspect(
+  debug_inspect(
     (AXIS_LEFTZ, AXIS_RIGHTZ, AXIS_LT, AXIS_RT),
     content="(65536, 65536, 65536, 65536)",
   )
@@ -80,7 +83,7 @@ test "native_ev_codes: usage-0 constants collide to one default mapping" {
     Some(AxisOrBtn::Axis(Axis::RightZ)) => true
     _ => false
   }
-  inspect(
+  debug_inspect(
     (hit_leftz, hit_rightz, hit_lt, hit_rt),
     content="(true, true, true, true)",
   )

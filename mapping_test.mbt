@@ -112,11 +112,11 @@ fn mapping_debug(m : Mapping) -> String {
 
 ///|
 test "parse_sdl_mapping" {
-  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-    TEST_STR,
-    buttons,
-    axes,
-  )
+  let res : Result[Mapping, Error] = try
+    Mapping::parse_sdl_mapping(TEST_STR, buttons, axes) |> Ok
+  catch {
+    e => Err(e)
+  }
   match res {
     Ok(m) =>
       inspect(
@@ -137,11 +137,11 @@ test "parse_sdl_mapping preserves unmapped button indices" {
     hid_code(PAGE_BUTTON, 2),
     hid_code(PAGE_BUTTON, 3),
   ]
-  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-    line,
-    buttons2,
-    [],
-  )
+  let res : Result[Mapping, Error] = try
+    Mapping::parse_sdl_mapping(line, buttons2, []) |> Ok
+  catch {
+    e => Err(e)
+  }
   match res {
     Ok(m) => {
       let code = hid_code(PAGE_BUTTON, 3)
@@ -177,14 +177,18 @@ test "from_data roundtrip + errors" {
   data.insert_btn(buttons[9], Button::RightThumb) |> ignore
   data.insert_btn(buttons[2], Button::C) |> ignore
   data.insert_btn(buttons[10], Button::Z) |> ignore
-  let ok_res : Result[(Mapping, String), Error] = try? Mapping::from_data(
-    data, buttons, axes, name, uuid,
-  )
+  let ok_res : Result[(Mapping, String), Error] = try
+    Mapping::from_data(data, buttons, axes, name, uuid) |> Ok
+  catch {
+    e => Err(e)
+  }
   match ok_res {
     Ok((mappings, sdl)) => {
-      let parsed : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-        sdl, buttons, axes,
-      )
+      let parsed : Result[Mapping, Error] = try
+        Mapping::parse_sdl_mapping(sdl, buttons, axes) |> Ok
+      catch {
+        e => Err(e)
+      }
       match parsed {
         Ok(m2) =>
           inspect(mapping_debug(mappings) == mapping_debug(m2), content="true")
@@ -193,29 +197,37 @@ test "from_data roundtrip + errors" {
     }
     Err(_) => fail("from_data should not fail")
   }
-  let bad_name : Result[Unit, Error] = try? (Mapping::from_data(
-    data, buttons, axes, "Inval,id name", uuid,
+  let bad_name : Result[Unit, Error] = try
+    Mapping::from_data(data, buttons, axes, "Inval,id name", uuid)
+    |> ignore
+    |> Ok
+  catch {
+    e => Err(e)
+  }
+  debug_inspect(
+    bad_name,
+    content="Err(<Milky2018/gamepad.MappingError.InvalidName: ...>)",
   )
-  |> ignore)
-  inspect(bad_name, content="Err(Milky2018/gamepad.MappingError.InvalidName)")
   data.insert_btn(BTN_DPAD_RIGHT, Button::DPadRight) |> ignore
-  let invalid_code : Result[Unit, MappingError] = try? (Mapping::from_data(
-    data, buttons, axes, name, uuid,
-  )
-  |> ignore)
+  let invalid_code : Result[Unit, MappingError] = try
+    Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
+  catch {
+    e => Err(e)
+  }
   let invalid_code_payload = match invalid_code {
     Ok(_) => None
     Err(e) => e.invalid_code()
   }
   inspect(invalid_code_payload == Some(BTN_DPAD_RIGHT), content="true")
   data.insert_btn(buttons[3], Button::Unknown) |> ignore
-  let unknown_el : Result[Unit, Error] = try? (Mapping::from_data(
-    data, buttons, axes, name, uuid,
-  )
-  |> ignore)
-  inspect(
+  let unknown_el : Result[Unit, Error] = try
+    Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
+  catch {
+    e => Err(e)
+  }
+  debug_inspect(
     unknown_el,
-    content="Err(Milky2018/gamepad.MappingError.UnknownElement)",
+    content="Err(<Milky2018/gamepad.MappingError.UnknownElement: ...>)",
   )
 }
 
@@ -226,7 +238,7 @@ test "mapping_db insert/get" {
   let db = MappingDb::new()
   db.insert(mappings)
   let uuid = Uuid::parse("03000000260900008888000000010001")
-  inspect(
+  debug_inspect(
     db.get(uuid),
     content=(
       #|Some("03000000260900008888000000010001,GameCube {WiseGroup USB box},a:b0,b:b2,y:b3,x:b1,start:b7,rightshoulder:b6,dpup:h0.1,dpleft:h0.8,dpdown:h0.4,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a4,righttrigger:a5,")
@@ -274,43 +286,51 @@ test "mapping_db insert accepts UUID-only line" {
 ///|
 test "parse_sdl_mapping hat unknown direction" {
   let map_str = "03000000341a00003608000000010000,Test,platform:Linux,dpup:h0.16,"
-  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-    map_str, buttons, axes,
-  )
+  let res : Result[Mapping, Error] = try
+    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  catch {
+    e => Err(e)
+  }
   let res2 : Result[Unit, Error] = match res {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
-  inspect(
+  debug_inspect(
     res2,
-    content="Err(Milky2018/gamepad.ParseSdlMappingError.UnknownHatDirection)",
+    content="Err(<Milky2018/gamepad.ParseSdlMappingError.UnknownHatDirection: ...>)",
   )
 }
 
 ///|
 test "parse_sdl_mapping rejects out-of-range u16 numbers" {
   let map_str = "03000000341a00003608000000010000,Test,platform:Linux,a:h70000.1,"
-  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-    map_str, buttons, axes,
-  )
+  let res : Result[Mapping, Error] = try
+    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(res is Err(_), content="true")
 }
 
 ///|
 test "parse_sdl_mapping accepts xinput pseudo-guid" {
   let map_str = "xinput,Test,a:b0,"
-  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-    map_str, buttons, axes,
-  )
+  let res : Result[Mapping, Error] = try
+    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(res is Ok(_), content="true")
 }
 
 ///|
 test "parse_sdl_mapping invalid guid maps to InvalidGuid" {
   let map_str = "not-a-guid,Test,platform:Linux,a:b0,"
-  let res : Result[Mapping, Error] = try? Mapping::parse_sdl_mapping(
-    map_str, buttons, axes,
-  )
+  let res : Result[Mapping, Error] = try
+    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  catch {
+    e => Err(e)
+  }
   let mut is_err = false
   match res {
     Ok(_) => is_err = false

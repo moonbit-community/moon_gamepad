@@ -26,7 +26,9 @@ fn ev_sig(e : Event) -> (Int, Int, Double, Int) {
 
 ///|
 fn build_ok_remap(builder : GilBuilder) -> Gil {
-  let res : Result[Gil, GilError] = try? builder.build()
+  let res : Result[Gil, GilError] = try builder.build() |> Ok catch {
+    e => Err(e)
+  }
   match res {
     Ok(g) => g
     Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
@@ -105,7 +107,7 @@ test "native remap: digital button emits edge then value" {
     None => return
     Some(e) => e
   }
-  inspect(
+  debug_inspect(
     [ev_sig(e1), ev_sig(e2)],
     content="[(1, 0, 1, 589825), (2, 0, 1, 589825)]",
   )
@@ -128,7 +130,7 @@ test "native remap: button mapped to axis produces axis change" {
     None => return
     Some(e) => e
   }
-  inspect(ev_sig(e1), content="(0, 7, 1, 589840)")
+  debug_inspect(ev_sig(e1), content="(0, 7, 1, 589840)")
 }
 
 ///|
@@ -151,7 +153,7 @@ test "native remap: axis mapped to button uses thresholds" {
     None => return
     Some(e) => e
   }
-  inspect(ev_sig(e1), content="(2, 8, 0, 131269)")
+  debug_inspect(ev_sig(e1), content="(2, 8, 0, 131269)")
 
   // 0.75 -> edge + value
   g.push_native_event({
@@ -169,7 +171,7 @@ test "native remap: axis mapped to button uses thresholds" {
     None => return
     Some(e) => e
   }
-  inspect(
+  debug_inspect(
     [ev_sig(e2), ev_sig(e3)],
     content="[(1, 8, 1, 131269), (2, 8, 0.75, 131269)]",
   )
@@ -186,7 +188,7 @@ test "native remap: axis mapped to button uses thresholds" {
     None => return
     Some(e) => e
   }
-  inspect(ev_sig(e4), content="(2, 8, 1, 131269)")
+  debug_inspect(ev_sig(e4), content="(2, 8, 1, 131269)")
 
   // 0.5 -> release edge + value
   g.push_native_event({
@@ -204,7 +206,7 @@ test "native remap: axis mapped to button uses thresholds" {
     None => return
     Some(e) => e
   }
-  inspect(
+  debug_inspect(
     [ev_sig(e5), ev_sig(e6)],
     content="[(4, 8, 0, 131269), (2, 8, 0.5, 131269)]",
   )
@@ -234,7 +236,7 @@ test "native remap: axis-to-button threshold edges are inclusive" {
     None => return
     Some(e) => e
   }
-  inspect(
+  debug_inspect(
     [ev_sig(p1), ev_sig(p2)],
     content="[(1, 8, 1, 131269), (2, 8, 0.75, 131269)]",
   )
@@ -255,7 +257,7 @@ test "native remap: axis-to-button threshold edges are inclusive" {
     None => return
     Some(e) => e
   }
-  inspect(
+  debug_inspect(
     [ev_sig(r1), ev_sig(r2)],
     content="[(4, 8, 0, 131269), (2, 8, 0.6499999761581421, 131269)]",
   )
@@ -345,7 +347,7 @@ test "repeat filter scans connected ids only" {
   g.set_time(500L)
 
   let out = Repeat::new().filter(None, g)
-  inspect(
+  debug_inspect(
     out.map(fn(e) { (e.id().value(), ev_sig(e)) }),
     content="Some((1, (3, 1, 0, 589826)))",
   )
@@ -365,7 +367,7 @@ test "repeat uses runtime clock fallback when logical clock is unset" {
   g.set_time(0L)
   let out = Repeat::new().filter(None, g)
   runtime_now_clear_for_test()
-  inspect(out.map(ev_sig), content="Some((3, 0, 0, 589825))")
+  debug_inspect(out.map(ev_sig), content="Some((3, 0, 0, 589825))")
 }
 
 ///|
@@ -382,7 +384,7 @@ test "repeat uses runtime clock even when logical clock is set" {
   g.set_time(500L)
   let out = Repeat::new().filter(None, g)
   runtime_now_clear_for_test()
-  inspect(out.map(ev_sig), content="Some((3, 0, 0, 589825))")
+  debug_inspect(out.map(ev_sig), content="Some((3, 0, 0, 589825))")
 }
 
 ///|
@@ -419,7 +421,11 @@ test "set_mapping_data returns NotConnected for disconnected gamepad" {
 
   let data = MappingData::new()
   ignore(data.insert_btn(BTN_SOUTH, Button::South))
-  let res : Result[String, MappingError] = try? g.set_mapping_data(id, data)
+  let res : Result[String, MappingError] = try
+    g.set_mapping_data(id, data) |> Ok
+  catch {
+    e => Err(e)
+  }
   let ok = match res {
     Err(MappingError::NotConnected) => true
     _ => false
@@ -436,9 +442,11 @@ test "set_mapping_data_strict rejects SDL-incompatible entries" {
 
   let data = MappingData::new()
   ignore(data.insert_btn(BTN_C, Button::C))
-  let res : Result[String, MappingError] = try? g.set_mapping_data_strict(
-    id, data,
-  )
+  let res : Result[String, MappingError] = try
+    g.set_mapping_data_strict(id, data) |> Ok
+  catch {
+    e => Err(e)
+  }
   let ok = match res {
     Err(MappingError::NotSdl2Compatible) => true
     _ => false
@@ -472,7 +480,7 @@ test "gamepad map_name follows mapping default/name semantics" {
   g.gamepads_data[0].axes = []
   g.apply_identity_mapping(0)
   let n0 = g.gamepad(id).unwrap().map_name()
-  inspect(n0, content="None")
+  debug_inspect(n0, content="None")
 
   // Non-default mapping with custom name => Some(name)
   g.gamepads_data[0].name = "Mock Pad"
@@ -480,7 +488,7 @@ test "gamepad map_name follows mapping default/name semantics" {
   ignore(data.insert_btn(BTN_SOUTH, Button::South))
   ignore(g.set_mapping_data(id, data, name=Some("Named Mapping")))
   let n1 = g.gamepad(id).unwrap().map_name()
-  inspect(n1, content="Some(\"Named Mapping\")")
+  debug_inspect(n1, content="Some(\"Named Mapping\")")
 }
 
 ///|
@@ -494,7 +502,7 @@ test "builder add_mappings loads mapping DB entries" {
     .add_mappings("11111111111111111111111111111111,Pad Two,a:b0,"),
   )
   inspect(g.mappings.get(Uuid::nil()) is Some(_), content="true")
-  inspect(
+  debug_inspect(
     g.mappings.get(Uuid::parse("11111111111111111111111111111111")),
     content="Some(\"11111111111111111111111111111111,Pad Two,a:b0,\")",
   )
@@ -613,7 +621,7 @@ test "builder set_axis_to_btn affects axis-to-button press edge" {
     None => return
     Some(e) => e
   }
-  inspect(
+  debug_inspect(
     [ev_sig(e1), ev_sig(e2)],
     content="[(1, 8, 1, 131269), (2, 8, 0.5, 131269)]",
   )
@@ -746,10 +754,15 @@ test "deadzone falls back to axis_info and user override wins" {
 test "ff completed event is emitted before queued events when due" {
   runtime_now_set_for_test(0L)
   let g = remap_new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .repeat(FfRepeat::For(0L))
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => {
       runtime_now_clear_for_test()
@@ -757,7 +770,13 @@ test "ff completed event is emitted before queued events when due" {
     }
     Ok(e) => e
   }
-  inspect((try? effect.play()) is Ok(_), content="true")
+  inspect(
+    (try effect.play() |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
   g.insert_event(Event::at(GamepadId::new(0), EventType::Connected, 999L))
   runtime_now_set_for_test(50L)
 
@@ -796,10 +815,15 @@ test "ff completed event is emitted before queued events when due" {
 test "ff completed event is not emitted before due time" {
   runtime_now_set_for_test(0L)
   let g = remap_new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .repeat(FfRepeat::For(0L))
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => {
       runtime_now_clear_for_test()
@@ -807,7 +831,13 @@ test "ff completed event is not emitted before due time" {
     }
     Ok(e) => e
   }
-  inspect((try? effect.play()) is Ok(_), content="true")
+  inspect(
+    (try effect.play() |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
   runtime_now_set_for_test(49L)
   inspect(g.next_event() is None, content="true")
   runtime_now_set_for_test(50L)
@@ -832,10 +862,15 @@ test "ff completed event is not emitted before due time" {
 test "stopped effect does not emit ff completed event" {
   runtime_now_set_for_test(0L)
   let g = remap_new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .repeat(FfRepeat::For(0L))
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => {
       runtime_now_clear_for_test()
@@ -843,8 +878,20 @@ test "stopped effect does not emit ff completed event" {
     }
     Ok(e) => e
   }
-  inspect((try? effect.play()) is Ok(_), content="true")
-  inspect((try? effect.stop()) is Ok(_), content="true")
+  inspect(
+    (try effect.play() |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
+  inspect(
+    (try effect.stop() |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
   runtime_now_set_for_test(100L)
   inspect(g.next_event() is None, content="true")
   runtime_now_clear_for_test()
@@ -854,10 +901,15 @@ test "stopped effect does not emit ff completed event" {
 test "disconnect prevents ff completed event emission for single-device effect" {
   runtime_now_set_for_test(0L)
   let g = remap_new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .repeat(FfRepeat::For(0L))
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => {
       runtime_now_clear_for_test()
@@ -865,7 +917,13 @@ test "disconnect prevents ff completed event emission for single-device effect" 
     }
     Ok(e) => e
   }
-  inspect((try? effect.play()) is Ok(_), content="true")
+  inspect(
+    (try effect.play() |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
   g.push_native_event({
     tag: NativeEventTag::Disconnected,
     id: 0,

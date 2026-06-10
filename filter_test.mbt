@@ -34,7 +34,7 @@ test "jitter drops small delta" {
     2L,
   )
   let out = Jitter::new().filter(Some(ev), g)
-  inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
+  debug_inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
 }
 
 ///|
@@ -53,7 +53,7 @@ test "jitter keeps first axis event without prior axis_data" {
     1L,
   )
   let out = Jitter::new().filter(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((0, 0, 0.005, 65584))")
+  debug_inspect(out.map(filter_event_sig), content="Some((0, 0, 0.005, 65584))")
 }
 
 ///|
@@ -66,7 +66,7 @@ test "filter_ev passes through filter output" {
     fn(_ev : Event?, _gilrs : Gil) -> Event? { None },
     g,
   )
-  inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
+  debug_inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
 }
 
 ///|
@@ -92,7 +92,7 @@ test "deadzone clamps axis and preserves range" {
     1L,
   )
   let out = deadzone(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((99, 0, 0, 0))")
+  debug_inspect(out.map(filter_event_sig), content="Some((99, 0, 0, 0))")
 }
 
 ///|
@@ -124,7 +124,7 @@ test "deadzone enqueues paired-axis zero when primary event drops" {
   let out = deadzone(Some(ev), g).unwrap()
   inspect(out.is_dropped(), content="true")
   let queued = g.next_event()
-  inspect(queued.map(filter_event_sig), content="Some((0, 0, 0, 65584))")
+  debug_inspect(queued.map(filter_event_sig), content="Some((0, 0, 0, 65584))")
   inspect(g.gamepads_data[0].have_sent_nonzero_for_axis[2], content="false")
 }
 
@@ -141,7 +141,7 @@ test "deadzone button branch drops or emits changed value" {
     1L,
   )
   let out1 = deadzone(Some(ev1), g)
-  inspect(out1.map(fn(e) { e.is_dropped() }), content="Some(true)")
+  debug_inspect(out1.map(fn(e) { e.is_dropped() }), content="Some(true)")
 
   // 0.5 survives deadzone => changed with remapped value.
   let ev2 = Event::at(
@@ -177,10 +177,10 @@ test "axis_dpad_to_button maps dpad axis to button events" {
     1L,
   )
   let out = axis_dpad_to_button(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 589843))")
+  debug_inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 589843))")
   // extra queued event should exist
   let extra = g.next_event()
-  inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 589843))")
+  debug_inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 589843))")
 }
 
 ///|
@@ -198,9 +198,9 @@ test "axis_dpad_to_button uses legacy codes when input axis code is legacy" {
     1L,
   )
   let out = axis_dpad_to_button(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 18))")
+  debug_inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 18))")
   let extra = g.next_event()
-  inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 18))")
+  debug_inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 18))")
 }
 
 ///|
@@ -216,10 +216,10 @@ test "axis_dpad_to_button handles immediate left-to-right transition" {
     1L,
   )
   let left_out = axis_dpad_to_button(Some(left_ev), g).unwrap()
-  inspect(filter_event_sig(left_out), content="(1, 17, 1, 589842)")
+  debug_inspect(filter_event_sig(left_out), content="(1, 17, 1, 589842)")
   g.update(left_out)
   let left_extra = g.next_event().unwrap()
-  inspect(filter_event_sig(left_extra), content="(2, 17, 1, 589842)")
+  debug_inspect(filter_event_sig(left_extra), content="(2, 17, 1, 589842)")
   g.update(left_extra)
   let right_ev = Event::at(
     id,
@@ -227,11 +227,11 @@ test "axis_dpad_to_button handles immediate left-to-right transition" {
     2L,
   )
   let right_out = axis_dpad_to_button(Some(right_ev), g).unwrap()
-  inspect(filter_event_sig(right_out), content="(4, 17, 0, 589842)")
+  debug_inspect(filter_event_sig(right_out), content="(4, 17, 0, 589842)")
   let q1 = g.next_event().unwrap()
   let q2 = g.next_event().unwrap()
   let q3 = g.next_event().unwrap()
-  inspect(
+  debug_inspect(
     [filter_event_sig(q1), filter_event_sig(q2), filter_event_sig(q3)],
     content="[(2, 18, 1, 589843), (1, 18, 1, 589843), (2, 17, 0, 589842)]",
   )
@@ -250,10 +250,10 @@ test "axis_dpad_to_button handles immediate up-to-down transition" {
     1L,
   )
   let up_out = axis_dpad_to_button(Some(up_ev), g).unwrap()
-  inspect(filter_event_sig(up_out), content="(1, 15, 1, 589840)")
+  debug_inspect(filter_event_sig(up_out), content="(1, 15, 1, 589840)")
   g.update(up_out)
   let up_extra = g.next_event().unwrap()
-  inspect(filter_event_sig(up_extra), content="(2, 15, 1, 589840)")
+  debug_inspect(filter_event_sig(up_extra), content="(2, 15, 1, 589840)")
   g.update(up_extra)
   let down_ev = Event::at(
     id,
@@ -261,11 +261,11 @@ test "axis_dpad_to_button handles immediate up-to-down transition" {
     2L,
   )
   let down_out = axis_dpad_to_button(Some(down_ev), g).unwrap()
-  inspect(filter_event_sig(down_out), content="(4, 15, 0, 589840)")
+  debug_inspect(filter_event_sig(down_out), content="(4, 15, 0, 589840)")
   let q1 = g.next_event().unwrap()
   let q2 = g.next_event().unwrap()
   let q3 = g.next_event().unwrap()
-  inspect(
+  debug_inspect(
     [filter_event_sig(q1), filter_event_sig(q2), filter_event_sig(q3)],
     content="[(2, 16, 1, 589841), (1, 16, 1, 589841), (2, 15, 0, 589840)]",
   )
@@ -284,7 +284,7 @@ test "axis_dpad_to_button keeps axis event when hats mapping is partial" {
     1L,
   )
   let out = axis_dpad_to_button(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
+  debug_inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
   inspect(g.next_event() is None, content="true")
 }
 
@@ -301,7 +301,7 @@ test "axis_dpad_to_button keeps axis event when dpad button exists" {
     1L,
   )
   let out = axis_dpad_to_button(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
+  debug_inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
   inspect(g.next_event() is None, content="true")
 }
 
@@ -318,8 +318,8 @@ test "axis_dpad_to_button maps when hats_mapped is zero and no dpad bindings" {
     1L,
   )
   let out = axis_dpad_to_button(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 589843))")
-  inspect(
+  debug_inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 589843))")
+  debug_inspect(
     g.next_event().map(filter_event_sig),
     content="Some((2, 18, 1, 589843))",
   )
@@ -335,7 +335,7 @@ test "axis_dpad_to_button passthrough when mapping is missing" {
     1L,
   )
   let out = axis_dpad_to_button(Some(ev), g)
-  inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
+  debug_inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
   inspect(g.next_event() is None, content="true")
 }
 
@@ -360,9 +360,9 @@ test "axis_dpad_to_button releases X direction on center value" {
     2L,
   )
   let center_out = axis_dpad_to_button(Some(center_ev), g).unwrap()
-  inspect(filter_event_sig(center_out), content="(4, 18, 0, 589843)")
+  debug_inspect(filter_event_sig(center_out), content="(4, 18, 0, 589843)")
   let extra = g.next_event().unwrap()
-  inspect(filter_event_sig(extra), content="(2, 18, 0, 589843)")
+  debug_inspect(filter_event_sig(extra), content="(2, 18, 0, 589843)")
 }
 
 ///|
@@ -386,9 +386,9 @@ test "axis_dpad_to_button releases Y direction on center value" {
     2L,
   )
   let center_out = axis_dpad_to_button(Some(center_ev), g).unwrap()
-  inspect(filter_event_sig(center_out), content="(4, 15, 0, 589840)")
+  debug_inspect(filter_event_sig(center_out), content="(4, 15, 0, 589840)")
   let extra = g.next_event().unwrap()
-  inspect(filter_event_sig(extra), content="(2, 15, 0, 589840)")
+  debug_inspect(filter_event_sig(extra), content="(2, 15, 0, 589840)")
 }
 
 ///|
@@ -407,11 +407,11 @@ test "repeat generates repeated events on None" {
   runtime_now_set_for_test(500L)
   let rep = Repeat::new()
   let out1 = rep.filter(None, g)
-  inspect(out1.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
+  debug_inspect(out1.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
   // update state with repeat, then next repeat at +30ms
   g.update(out1.unwrap())
   runtime_now_set_for_test(530L)
   let out2 = rep.filter(None, g)
-  inspect(out2.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
+  debug_inspect(out2.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
   runtime_now_clear_for_test()
 }

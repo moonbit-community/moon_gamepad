@@ -29,9 +29,13 @@ test "effect play/stop without backend errors" {
     gain: 1.0,
     playing_since_ms: None,
   }
-  let r1 : Result[Unit, FfError] = try? e.play()
+  let r1 : Result[Unit, FfError] = try e.play() |> Ok catch {
+    e => Err(e)
+  }
   inspect(r1 is Err(_), content="true")
-  let r2 : Result[Unit, FfError] = try? e.stop()
+  let r2 : Result[Unit, FfError] = try e.stop() |> Ok catch {
+    e => Err(e)
+  }
   inspect(r2 is Err(_), content="true")
 }
 
@@ -95,12 +99,17 @@ test "builder paths reach backend-not-supported branch" {
     None => return
     Some(gp) => gp
   }
-  let er : Result[Effect, FfError] = try? EffectBuilder::new()
+  let er : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .gamepads([GamepadId::new(1)])
     .add_gamepad(gp0)
     .duration(123L)
     .rumble(1.0, 0.25)
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match er {
       Err(FfError::NotSupported) => true
@@ -113,28 +122,39 @@ test "builder paths reach backend-not-supported branch" {
 ///|
 test "finish succeeds with backend Some and play/stop fail path" {
   let g = new_ff_ready_with_null_backend(1)
-  let er : Result[Effect, FfError] = try? EffectBuilder::new()
+  let er : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .duration(-1L)
     .rumble(1.0, 0.0)
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(er is Ok(_), content="true")
   let e = match er {
     Err(_) => return
     Ok(e) => e
   }
-  let play_res : Result[Unit, FfError] = try? e.play()
+  let play_res : Result[Unit, FfError] = try e.play() |> Ok catch {
+    e => Err(e)
+  }
   inspect(play_res is Ok(_), content="true")
-  let stop_res : Result[Unit, FfError] = try? e.stop()
+  let stop_res : Result[Unit, FfError] = try e.stop() |> Ok catch {
+    e => Err(e)
+  }
   inspect(stop_res is Ok(_), content="true")
 }
 
 ///|
 test "finish returns Disconnected for missing gamepad id" {
   let g = new_ff_ready_mock(0)
-  let er : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let er : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match er {
       Err(FfError::Disconnected(_)) => true
@@ -148,9 +168,11 @@ test "finish returns Disconnected for missing gamepad id" {
 test "finish returns Disconnected for not connected gamepad" {
   let g = new_ff_ready_mock(1)
   g.gamepads_data[0].connected = false
-  let er : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let er : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match er {
       Err(FfError::Disconnected(_)) => true
@@ -164,9 +186,11 @@ test "finish returns Disconnected for not connected gamepad" {
 test "finish returns FfNotSupported when gamepad has no ff capability" {
   let g = new_ff_ready_mock(1)
   g.gamepads_data[0].ff_supported = false
-  let er : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let er : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match er {
       Err(FfError::FfNotSupported(_)) => true
@@ -301,7 +325,11 @@ test "set_listener_position returns Disconnected for disconnected gamepad" {
     None => return
     Some(gp) => gp
   }
-  let r : Result[Unit, FfError] = try? gp.set_listener_position((0.0, 0.0, 0.0))
+  let r : Result[Unit, FfError] = try
+    gp.set_listener_position((0.0, 0.0, 0.0)) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match r {
       Err(FfError::Disconnected(_)) => true
@@ -318,7 +346,11 @@ test "set_listener_position returns FfNotSupported for unsupported gamepad" {
     None => return
     Some(gp) => gp
   }
-  let r : Result[Unit, FfError] = try? gp.set_listener_position((0.0, 0.0, 0.0))
+  let r : Result[Unit, FfError] = try
+    gp.set_listener_position((0.0, 0.0, 0.0)) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match r {
       Err(FfError::FfNotSupported(_)) => true
@@ -335,7 +367,11 @@ test "set_listener_position succeeds for connected ff-supported gamepad" {
     None => return
     Some(gp) => gp
   }
-  let r : Result[Unit, FfError] = try? gp.set_listener_position((0.0, 0.0, 0.0))
+  let r : Result[Unit, FfError] = try
+    gp.set_listener_position((0.0, 0.0, 0.0)) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(r is Ok(_), content="true")
 }
 
@@ -346,51 +382,62 @@ test "builder deduplicates gamepad ids across gamepads/add calls" {
     None => return
     Some(gp) => gp
   }
-  let er : Result[Effect, FfError] = try? EffectBuilder::new()
+  let er : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .gamepads([GamepadId::new(0), GamepadId::new(0), GamepadId::new(1)])
     .add_gamepad_id(GamepadId::new(1))
     .add_gamepad(gp0)
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   let ids = match er {
     Err(_) => return
     Ok(e) => e.gamepads
   }
-  inspect(ids.map(fn(id) { id.value() }), content="[0, 1]")
+  debug_inspect(ids.map(fn(id) { id.value() }), content="[0, 1]")
 }
 
 ///|
 test "effect set_gamepads validates and deduplicates target ids" {
   let g = new_ff_ready_with_null_backend(2)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => return
     Ok(e) => e
   }
-  let set_ok : Result[Unit, FfError] = try? effect.set_gamepads(
-    [GamepadId::new(1), GamepadId::new(1)],
-    g,
-  )
+  let set_ok : Result[Unit, FfError] = try
+    effect.set_gamepads([GamepadId::new(1), GamepadId::new(1)], g) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(set_ok is Ok(_), content="true")
-  inspect(effect.gamepads.map(fn(id) { id.value() }), content="[1]")
+  debug_inspect(effect.gamepads.map(fn(id) { id.value() }), content="[1]")
 }
 
 ///|
 test "effect set_gamepads returns FfNotSupported for unsupported id" {
   let g = new_ff_ready_with_null_backend(2)
   g.gamepads_data[1].ff_supported = false
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => return
     Ok(e) => e
   }
-  let set_res : Result[Unit, FfError] = try? effect.set_gamepads(
-    [GamepadId::new(1)],
-    g,
-  )
+  let set_res : Result[Unit, FfError] = try
+    effect.set_gamepads([GamepadId::new(1)], g) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match set_res {
       Err(FfError::FfNotSupported(_)) => true
@@ -403,9 +450,11 @@ test "effect set_gamepads returns FfNotSupported for unsupported id" {
 ///|
 test "effect add_gamepad deduplicates and validates" {
   let g = new_ff_ready_with_null_backend(2)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => return
     Ok(e) => e
@@ -418,17 +467,31 @@ test "effect add_gamepad deduplicates and validates" {
     None => return
     Some(gp) => gp
   }
-  inspect((try? effect.add_gamepad(gp0)) is Ok(_), content="true")
-  inspect((try? effect.add_gamepad(gp1)) is Ok(_), content="true")
-  inspect(effect.gamepads.map(fn(id) { id.value() }), content="[0, 1]")
+  inspect(
+    (try effect.add_gamepad(gp0) |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
+  inspect(
+    (try effect.add_gamepad(gp1) |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
+  debug_inspect(effect.gamepads.map(fn(id) { id.value() }), content="[0, 1]")
 }
 
 ///|
 test "effect add_gamepad returns Disconnected when handle is disconnected" {
   let g = new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => return
     Ok(e) => e
@@ -438,7 +501,9 @@ test "effect add_gamepad returns Disconnected when handle is disconnected" {
     None => return
     Some(gp) => gp
   }
-  let add_res : Result[Unit, FfError] = try? effect.add_gamepad(gp)
+  let add_res : Result[Unit, FfError] = try effect.add_gamepad(gp) |> Ok catch {
+    e => Err(e)
+  }
   inspect(
     match add_res {
       Err(FfError::Disconnected(_)) => true
@@ -451,9 +516,11 @@ test "effect add_gamepad returns Disconnected when handle is disconnected" {
 ///|
 test "set_gain clamps lower bound and updates effect gain" {
   let g = new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => return
     Ok(e) => e
@@ -466,11 +533,19 @@ test "set_gain clamps lower bound and updates effect gain" {
 
 ///|
 test "distance_model validate follows upstream guard branches" {
-  inspect((try? DistanceModel::None.validate()) is Ok(_), content="true")
-  let bad_inv : Result[Unit, DistanceModelError] = try? DistanceModel::Inverse(
-    ref_distance=0.0,
-    rolloff_factor=1.0,
-  ).validate()
+  inspect(
+    (try DistanceModel::None.validate() |> Ok catch {
+      e => Err(e)
+    })
+    is Ok(_),
+    content="true",
+  )
+  let bad_inv : Result[Unit, DistanceModelError] = try
+    DistanceModel::Inverse(ref_distance=0.0, rolloff_factor=1.0).validate()
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match bad_inv {
       Err(DistanceModelError::InvalidModelParameter) => true
@@ -478,11 +553,16 @@ test "distance_model validate follows upstream guard branches" {
     },
     content="true",
   )
-  let bad_lin : Result[Unit, DistanceModelError] = try? DistanceModel::Linear(
-    ref_distance=1.0,
-    rolloff_factor=1.0,
-    max_distance=1.0,
-  ).validate()
+  let bad_lin : Result[Unit, DistanceModelError] = try
+    DistanceModel::Linear(
+      ref_distance=1.0,
+      rolloff_factor=1.0,
+      max_distance=1.0,
+    ).validate()
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match bad_lin {
       Err(DistanceModelError::InvalidModelParameter) => true
@@ -500,7 +580,8 @@ test "builder advanced setters persist into effect" {
     scheduling: Replay::default(),
     envelope: Envelope::default(),
   }
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .add_effect(base)
     .repeat(FfRepeat::For(10L))
@@ -514,6 +595,10 @@ test "builder advanced setters persist into effect" {
     .position((1.0, 2.0, 3.0))
     .gain(-1.0)
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => return
     Ok(e) => e
@@ -527,13 +612,14 @@ test "builder advanced setters persist into effect" {
     },
     content="true",
   )
-  inspect(effect.position, content="(1, 2, 3)")
+  debug_inspect(effect.position, content="(1, 2, 3)")
 }
 
 ///|
 test "builder finish returns InvalidDistanceModel on invalid model" {
   let g = new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .distance_model(
       DistanceModel::Linear(
@@ -543,6 +629,10 @@ test "builder finish returns InvalidDistanceModel on invalid model" {
       ),
     )
     .finish(g)
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match built {
       Err(FfError::InvalidDistanceModel(_)) => true
@@ -555,9 +645,11 @@ test "builder finish returns InvalidDistanceModel on invalid model" {
 ///|
 test "effect set_repeat/set_position/set_distance_model update state" {
   let g = new_ff_ready_with_null_backend(1)
-  let built : Result[Effect, FfError] = try? EffectBuilder::new()
-    .add_gamepad_id(GamepadId::new(0))
-    .finish(g)
+  let built : Result[Effect, FfError] = try
+    EffectBuilder::new().add_gamepad_id(GamepadId::new(0)).finish(g) |> Ok
+  catch {
+    e => Err(e)
+  }
   let effect = match built {
     Err(_) => return
     Ok(e) => e
@@ -571,22 +663,32 @@ test "effect set_repeat/set_position/set_distance_model update state" {
     },
     content="true",
   )
-  inspect(effect.position, content="(4, 5, 6)")
-  let ok : Result[Unit, FfError] = try? effect.set_distance_model(
-    DistanceModel::Linear(
-      ref_distance=1.0,
-      rolloff_factor=1.0,
-      max_distance=3.0,
-    ),
-  )
+  debug_inspect(effect.position, content="(4, 5, 6)")
+  let ok : Result[Unit, FfError] = try
+    effect.set_distance_model(
+      DistanceModel::Linear(
+        ref_distance=1.0,
+        rolloff_factor=1.0,
+        max_distance=3.0,
+      ),
+    )
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(ok is Ok(_), content="true")
-  let bad : Result[Unit, FfError] = try? effect.set_distance_model(
-    DistanceModel::Linear(
-      ref_distance=1.0,
-      rolloff_factor=1.0,
-      max_distance=1.0,
-    ),
-  )
+  let bad : Result[Unit, FfError] = try
+    effect.set_distance_model(
+      DistanceModel::Linear(
+        ref_distance=1.0,
+        rolloff_factor=1.0,
+        max_distance=1.0,
+      ),
+    )
+    |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(
     match bad {
       Err(FfError::InvalidDistanceModel(_)) => true
@@ -678,10 +780,11 @@ test "set_gamepads reschedules completion targets for running effect" {
     playing_since_ms: Some(100L),
   }
   effect.set_repeat(FfRepeat::For(20L))
-  let set_res : Result[Unit, FfError] = try? effect.set_gamepads(
-    [GamepadId::new(1)],
-    g,
-  )
+  let set_res : Result[Unit, FfError] = try
+    effect.set_gamepads([GamepadId::new(1)], g) |> Ok
+  catch {
+    e => Err(e)
+  }
   inspect(set_res is Ok(_), content="true")
   ff_runtime_now_set_for_test(120L)
   let ev = match g.next_event() {

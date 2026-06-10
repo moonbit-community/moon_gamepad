@@ -46,7 +46,7 @@ test "macOS hat mapping (8 positions) matches gil-core directional layout" {
     inspect(true, content="true")
     return
   }
-  inspect(
+  debug_inspect(
     [
       unpack_hat(macos_hat_pack_for_test(0, 0, 7)),
       unpack_hat(macos_hat_pack_for_test(1, 0, 7)),
@@ -67,7 +67,7 @@ test "macOS hat mapping (4 positions) is scaled to 8-position semantics" {
     inspect(true, content="true")
     return
   }
-  inspect(
+  debug_inspect(
     [
       unpack_hat(macos_hat_pack_for_test(0, 0, 3)),
       unpack_hat(macos_hat_pack_for_test(1, 0, 3)),
@@ -84,7 +84,7 @@ test "macOS hat mapping supports shifted min/max ranges" {
     inspect(true, content="true")
     return
   }
-  inspect(
+  debug_inspect(
     [
       unpack_hat(macos_hat_pack_for_test(1, 1, 8)),
       unpack_hat(macos_hat_pack_for_test(5, 1, 8)),
@@ -99,5 +99,5 @@ test "macOS hat mapping falls back to center for unsupported range sizes" {
     inspect(true, content="true")
     return
   }
-  inspect(unpack_hat(macos_hat_pack_for_test(3, 0, 5)), content="(0, 0)")
+  debug_inspect(unpack_hat(macos_hat_pack_for_test(3, 0, 5)), content="(0, 0)")
 }

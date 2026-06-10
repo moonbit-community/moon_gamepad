@@ -26,7 +26,9 @@ fn core_event_sig(e : Event) -> (Int, Int, Double, Int) {
 
 ///|
 fn build_ok_core(builder : GilBuilder) -> Gil {
-  let res : Result[Gil, GilError] = try? builder.build()
+  let res : Result[Gil, GilError] = try builder.build() |> Ok catch {
+    e => Err(e)
+  }
   match res {
     Ok(g) => g
     Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
@@ -59,11 +61,14 @@ test "gil next_event default filters skip dropped" {
     ),
   )
   let ev1 = g.next_event()
-  inspect(ev1.map(core_event_sig), content="Some((0, 0, 0.5, 65584))")
+  debug_inspect(ev1.map(core_event_sig), content="Some((0, 0, 0.5, 65584))")
   let ev2 = g.next_event()
   // The small-delta event is dropped by Jitter and skipped.
-  inspect(ev2.map(core_event_sig), content="Some((0, 0, 0.7, 65584))")
-  inspect(g.state(id).map(fn(s) { s.value(AXIS_LSTICKX) }), content="Some(0.7)")
+  debug_inspect(ev2.map(core_event_sig), content="Some((0, 0, 0.7, 65584))")
+  debug_inspect(
+    g.state(id).map(fn(s) { s.value(AXIS_LSTICKX) }),
+    content="Some(0.7)",
+  )
   inspect(g.next_event() is None, content="true")
 }
 
@@ -80,9 +85,11 @@ test "builder build_mock wires flags" {
 
 ///|
 test "builder rejects invalid axis_to_btn thresholds" {
-  let bad : Result[Gil, GilError] = try? GilBuilder::new()
-    .set_axis_to_btn(0.4, 0.5)
-    .build()
+  let bad : Result[Gil, GilError] = try
+    GilBuilder::new().set_axis_to_btn(0.4, 0.5).build() |> Ok
+  catch {
+    e => Err(e)
+  }
   let is_invalid = match bad {
     Ok(_) => false
     Err(e) => e.is_invalid_axis_to_btn()
@@ -122,11 +129,11 @@ test "gamepad handle delegates mapping/state" {
   let gp2 = g.gamepad(id).unwrap()
   inspect(gp2.is_pressed(Button::South), content="true")
   inspect(gp2.value(Axis::LeftStickX), content="0.25")
-  inspect(
+  debug_inspect(
     gp2.button_data(Button::South).map(fn(d) { d.is_pressed() }),
     content="Some(true)",
   )
-  inspect(
+  debug_inspect(
     gp2.axis_data(Axis::LeftStickX).map(fn(d) { d.value() }),
     content="Some(0.25)",
   )
@@ -138,13 +145,13 @@ test "gamepad name/map_name/os_name semantics" {
   let id = GamepadId::new(0)
   let gp0 = g.gamepad(id).unwrap()
   let os_name = gp0.os_name()
-  inspect(gp0.map_name(), content="Some(\"\")")
+  debug_inspect(gp0.map_name(), content="Some(\"\")")
   inspect(gp0.name() == os_name, content="true")
 
   let data = MappingData::new()
   ignore(g.set_mapping_data(id, data, name=Some("Mapped Pad")))
   let gp1 = g.gamepad(id).unwrap()
-  inspect(gp1.map_name(), content="Some(\"Mapped Pad\")")
+  debug_inspect(gp1.map_name(), content="Some(\"Mapped Pad\")")
   inspect(gp1.name(), content="Mapped Pad")
   inspect(gp1.os_name() == os_name, content="true")
 }
