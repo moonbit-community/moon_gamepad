@@ -16,12 +16,8 @@
 test "gil fifo + auto update_state" {
   let gil = Gil::new_mock(1, update_state=true)
   let id = GamepadId::new(0)
-  gil.insert_event(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
-  )
-  gil.insert_event(
-    Event::at(id, EventType::ButtonReleased(Button::South, BTN_SOUTH), 11L),
-  )
+  gil.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 10L))
+  gil.insert_event(Event::at(id, ButtonReleased(South, BTN_SOUTH), 11L))
   let ev1 = gil.next_event()
   inspect(ev1 is Some(_), content="true")
   debug_inspect(
@@ -51,17 +47,13 @@ test "gil fifo + auto update_state" {
 test "gil no auto update when disabled" {
   let gil = Gil::new_mock(1, update_state=false)
   let id = GamepadId::new(0)
-  gil.insert_event(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
-  )
+  gil.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 10L))
   let _ = gil.next_event()
   debug_inspect(
     gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(false)",
   )
-  gil.update(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 10L),
-  )
+  gil.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 10L))
   debug_inspect(
     gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
     content="Some(true)",
@@ -71,10 +63,10 @@ test "gil no auto update when disabled" {
 ///|
 fn gilrs_event_sig(e : Event) -> (Int, Int, Double, Int) {
   match e.event() {
-    EventType::AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
-    EventType::ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
-    EventType::ButtonChanged(btn, val, code) => (2, btn.to_index(), val, code)
-    EventType::ButtonReleased(btn, code) => (4, btn.to_index(), 0.0, code)
+    AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
+    ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
+    ButtonChanged(btn, val, code) => (2, btn.to_index(), val, code)
+    ButtonReleased(btn, code) => (4, btn.to_index(), 0.0, code)
     _ => (99, 0, 0.0, 0)
   }
 }
@@ -96,22 +88,12 @@ test "gil next_event applies default filters by default" {
   let id = GamepadId::new(0)
 
   // seed state so jitter can compare
-  g.insert_event(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.5, AXIS_LSTICKX),
-      1L,
-    ),
-  )
+  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.5, AXIS_LSTICKX), 1L))
   let _ = g.next_event()
 
   // small delta should be dropped; next_event skips dropped events
   g.insert_event(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.505, AXIS_LSTICKX),
-      2L,
-    ),
+    Event::at(id, AxisChanged(LeftStickX, 0.505, AXIS_LSTICKX), 2L),
   )
   inspect(g.next_event() is None, content="true")
 }
@@ -125,20 +107,10 @@ test "gil builder can disable default filters" {
     .with_default_filters(false),
   )
   let id = GamepadId::new(0)
-  g.insert_event(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.5, AXIS_LSTICKX),
-      1L,
-    ),
-  )
+  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.5, AXIS_LSTICKX), 1L))
   let _ = g.next_event()
   g.insert_event(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.505, AXIS_LSTICKX),
-      2L,
-    ),
+    Event::at(id, AxisChanged(LeftStickX, 0.505, AXIS_LSTICKX), 2L),
   )
   debug_inspect(
     g.next_event().map(gilrs_event_sig),
@@ -150,12 +122,12 @@ test "gil builder can disable default filters" {
 test "gil returns dropped when default filters are disabled" {
   let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let id = GamepadId::new(0)
-  g.insert_event(Event::at(id, EventType::Dropped, 1L))
+  g.insert_event(Event::at(id, Dropped, 1L))
   let got = g
     .next_event()
     .map(fn(ev) {
       match ev.event() {
-        EventType::Dropped => 1
+        Dropped => 1
         _ => 0
       }
     })
@@ -166,12 +138,12 @@ test "gil returns dropped when default filters are disabled" {
 test "gil update ignores connection events but next_event syncs connection" {
   let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let id = GamepadId::new(0)
-  g.update(Event::at(id, EventType::Disconnected, 1L))
+  g.update(Event::at(id, Disconnected, 1L))
   debug_inspect(
     g.gamepad(id).map(fn(gp) { gp.is_connected() }),
     content="Some(true)",
   )
-  g.insert_event(Event::at(id, EventType::Disconnected, 2L))
+  g.insert_event(Event::at(id, Disconnected, 2L))
   ignore(g.next_event())
   debug_inspect(
     g.gamepad(id).map(fn(gp) { gp.is_connected() }),
@@ -186,9 +158,7 @@ test "gil next_event runs axis_dpad_to_button in default pipeline" {
   let m = Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  g.insert_event(
-    Event::at(id, EventType::AxisChanged(Axis::DPadX, 1.0, AXIS_DPADX), 1L),
-  )
+  g.insert_event(Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L))
   debug_inspect(
     g.next_event().map(gilrs_event_sig),
     content="Some((1, 18, 1, 589843))",
@@ -204,12 +174,12 @@ test "gil next_event_blocking timeout 0 behaves like next_event (mock)" {
   let g = Gil::new_mock(1)
   inspect(g.next_event_blocking(Some(0L)) is None, content="true")
   let id = GamepadId::new(0)
-  g.insert_event(Event::at(id, EventType::Connected, 1L))
+  g.insert_event(Event::at(id, Connected, 1L))
   let got = g
     .next_event_blocking(Some(0L))
     .map(fn(ev) {
       match ev.event() {
-        EventType::Connected => 1
+        Connected => 1
         _ => 0
       }
     })
@@ -224,7 +194,7 @@ test "gamepad power_info default is Unknown (mock)" {
     .gamepad(id)
     .map(fn(gp) {
       match gp.power_info() {
-        PowerInfo::Unknown => 0
+        Unknown => 0
         _ => 1
       }
     })
@@ -244,15 +214,15 @@ test "gil keeps historical disconnected ids after reconnect-style sequence" {
   let g = Gil::new_mock(2)
   let id0 = GamepadId::new(0)
   let id1 = GamepadId::new(1)
-  g.insert_event(Event::at(id0, EventType::Connected, 1L))
-  g.insert_event(Event::at(id0, EventType::Disconnected, 2L))
-  g.insert_event(Event::at(id1, EventType::Connected, 3L))
+  g.insert_event(Event::at(id0, Connected, 1L))
+  g.insert_event(Event::at(id0, Disconnected, 2L))
+  g.insert_event(Event::at(id1, Connected, 3L))
   let t1 = g
     .next_event()
     .map(fn(ev) {
       match ev.event() {
-        EventType::Connected => 1
-        EventType::Disconnected => 2
+        Connected => 1
+        Disconnected => 2
         _ => 0
       }
     })
@@ -260,8 +230,8 @@ test "gil keeps historical disconnected ids after reconnect-style sequence" {
     .next_event()
     .map(fn(ev) {
       match ev.event() {
-        EventType::Connected => 1
-        EventType::Disconnected => 2
+        Connected => 1
+        Disconnected => 2
         _ => 0
       }
     })
@@ -269,8 +239,8 @@ test "gil keeps historical disconnected ids after reconnect-style sequence" {
     .next_event()
     .map(fn(ev) {
       match ev.event() {
-        EventType::Connected => 1
-        EventType::Disconnected => 2
+        Connected => 1
+        Disconnected => 2
         _ => 0
       }
     })

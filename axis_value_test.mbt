@@ -15,7 +15,7 @@
 ///|
 test "axis_value documented case" {
   let info = AxisInfo::new(0, 255, None)
-  inspect(axis_value(info, 127, Axis::LeftStickY), content="0")
+  inspect(axis_value(info, 127, LeftStickY), content="0")
 }
 
 ///|

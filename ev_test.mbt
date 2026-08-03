@@ -15,7 +15,7 @@
 ///|
 test "event drop" {
   let id = GamepadId::new(0)
-  let ev = Event::new(id, EventType::Connected)
+  let ev = Event::new(id, Connected)
   inspect(ev.is_dropped(), content="false")
   inspect(ev.drop().is_dropped(), content="true")
 }
@@ -34,15 +34,15 @@ test "button categories" {
 test "axis second axis" {
   fn axis_name(ax : Axis) -> String {
     match ax {
-      Axis::LeftStickX => "LeftStickX"
-      Axis::LeftStickY => "LeftStickY"
-      Axis::LeftZ => "LeftZ"
-      Axis::RightStickX => "RightStickX"
-      Axis::RightStickY => "RightStickY"
-      Axis::RightZ => "RightZ"
-      Axis::DPadX => "DPadX"
-      Axis::DPadY => "DPadY"
-      Axis::Unknown => "Unknown"
+      LeftStickX => "LeftStickX"
+      LeftStickY => "LeftStickY"
+      LeftZ => "LeftZ"
+      RightStickX => "RightStickX"
+      RightStickY => "RightStickY"
+      RightZ => "RightZ"
+      DPadX => "DPadX"
+      DPadY => "DPadY"
+      Unknown => "Unknown"
     }
   }
 
@@ -87,5 +87,5 @@ test "ev helper branches parity" {
   inspect(Button::South.is_dpad(), content="false")
   inspect(Button::C.to_index(), content="2")
   inspect(Button::Z.to_index(), content="5")
-  inspect(AxisOrBtn::Axis(Axis::Unknown).is_button(), content="false")
+  inspect(AxisOrBtn::Axis(Unknown).is_button(), content="false")
 }

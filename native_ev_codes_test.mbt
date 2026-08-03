@@ -34,7 +34,7 @@ test "native_ev_codes: hid_page/hid_usage roundtrip" {
 ///|
 test "native_ev_codes: trigger axes map to buttons" {
   let ok = match axis_or_btn_from_code(AXIS_LT2) {
-    Some(AxisOrBtn::Btn(Button::LeftTrigger2)) => true
+    Some(Btn(LeftTrigger2)) => true
     _ => false
   }
   inspect(ok, content="true")
@@ -68,19 +68,19 @@ test "native_ev_codes: unconfirmed constants use GenericDesktop usage 0" {
 ///|
 test "native_ev_codes: usage-0 constants collide to one default mapping" {
   let hit_leftz = match axis_or_btn_from_code(AXIS_LEFTZ) {
-    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
+    Some(Axis(RightZ)) => true
     _ => false
   }
   let hit_rightz = match axis_or_btn_from_code(AXIS_RIGHTZ) {
-    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
+    Some(Axis(RightZ)) => true
     _ => false
   }
   let hit_lt = match axis_or_btn_from_code(AXIS_LT) {
-    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
+    Some(Axis(RightZ)) => true
     _ => false
   }
   let hit_rt = match axis_or_btn_from_code(AXIS_RT) {
-    Some(AxisOrBtn::Axis(Axis::RightZ)) => true
+    Some(Axis(RightZ)) => true
     _ => false
   }
   debug_inspect(

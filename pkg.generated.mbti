@@ -688,4 +688,3 @@ pub fn Uuid::simple(Self) -> String
 pub type Code = Int
 
 // Traits
-

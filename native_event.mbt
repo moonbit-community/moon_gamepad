@@ -67,11 +67,11 @@ pub fn decode_native_event(b : Bytes) -> NativeEvent? {
   let time_ms = UInt64::reinterpret_as_int64(time_bits)
   let tag = match tag_i {
     0 => NativeEventTag::Connected
-    1 => NativeEventTag::Disconnected
-    2 => NativeEventTag::ButtonPressed
-    3 => NativeEventTag::ButtonReleased
-    4 => NativeEventTag::AxisChanged
-    5 => NativeEventTag::ButtonChanged
+    1 => Disconnected
+    2 => ButtonPressed
+    3 => ButtonReleased
+    4 => AxisChanged
+    5 => ButtonChanged
     _ => return None
   }
   Some({ tag, id, code, value, time_ms })

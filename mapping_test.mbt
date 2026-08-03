@@ -57,47 +57,47 @@ let axes : Array[Code] = [
 fn mapping_debug(m : Mapping) -> String {
   fn axis_name(ax : Axis) -> String {
     match ax {
-      Axis::LeftStickX => "LeftStickX"
-      Axis::LeftStickY => "LeftStickY"
-      Axis::LeftZ => "LeftZ"
-      Axis::RightStickX => "RightStickX"
-      Axis::RightStickY => "RightStickY"
-      Axis::RightZ => "RightZ"
-      Axis::DPadX => "DPadX"
-      Axis::DPadY => "DPadY"
-      Axis::Unknown => "Unknown"
+      LeftStickX => "LeftStickX"
+      LeftStickY => "LeftStickY"
+      LeftZ => "LeftZ"
+      RightStickX => "RightStickX"
+      RightStickY => "RightStickY"
+      RightZ => "RightZ"
+      DPadX => "DPadX"
+      DPadY => "DPadY"
+      Unknown => "Unknown"
     }
   }
 
   fn button_name(btn : Button) -> String {
     match btn {
-      Button::South => "South"
-      Button::East => "East"
-      Button::C => "C"
-      Button::North => "North"
-      Button::West => "West"
-      Button::Z => "Z"
-      Button::LeftTrigger => "LeftTrigger"
-      Button::RightTrigger => "RightTrigger"
-      Button::LeftTrigger2 => "LeftTrigger2"
-      Button::RightTrigger2 => "RightTrigger2"
-      Button::Select => "Select"
-      Button::Start => "Start"
-      Button::Mode => "Mode"
-      Button::LeftThumb => "LeftThumb"
-      Button::RightThumb => "RightThumb"
-      Button::DPadUp => "DPadUp"
-      Button::DPadDown => "DPadDown"
-      Button::DPadLeft => "DPadLeft"
-      Button::DPadRight => "DPadRight"
-      Button::Unknown => "Unknown"
+      South => "South"
+      East => "East"
+      C => "C"
+      North => "North"
+      West => "West"
+      Z => "Z"
+      LeftTrigger => "LeftTrigger"
+      RightTrigger => "RightTrigger"
+      LeftTrigger2 => "LeftTrigger2"
+      RightTrigger2 => "RightTrigger2"
+      Select => "Select"
+      Start => "Start"
+      Mode => "Mode"
+      LeftThumb => "LeftThumb"
+      RightThumb => "RightThumb"
+      DPadUp => "DPadUp"
+      DPadDown => "DPadDown"
+      DPadLeft => "DPadLeft"
+      DPadRight => "DPadRight"
+      Unknown => "Unknown"
     }
   }
 
   fn el_name(el : AxisOrBtn) -> String {
     match el {
-      AxisOrBtn::Axis(ax) => "Axis:" + axis_name(ax)
-      AxisOrBtn::Btn(btn) => "Btn:" + button_name(btn)
+      Axis(ax) => "Axis:" + axis_name(ax)
+      Btn(btn) => "Btn:" + button_name(btn)
     }
   }
 
@@ -146,7 +146,7 @@ test "parse_sdl_mapping preserves unmapped button indices" {
     Ok(m) => {
       let code = hid_code(PAGE_BUTTON, 3)
       let ok = match m.map(code) {
-        Some(AxisOrBtn::Btn(Button::South)) => true
+        Some(Btn(South)) => true
         _ => false
       }
       inspect(ok, content="true")
@@ -160,23 +160,23 @@ test "from_data roundtrip + errors" {
   let uuid = Uuid::nil()
   let name = "Best Gamepad"
   let data = MappingData::new()
-  data.insert_axis(AXIS_LSTICKX, Axis::LeftStickX) |> ignore
-  data.insert_axis(AXIS_LSTICKY, Axis::LeftStickY) |> ignore
-  data.insert_axis(LEGACY_AXIS_LEFTZ, Axis::LeftZ) |> ignore
-  data.insert_axis(AXIS_RSTICKX, Axis::RightStickX) |> ignore
-  data.insert_axis(AXIS_RSTICKY, Axis::RightStickY) |> ignore
-  data.insert_axis(LEGACY_AXIS_RIGHTZ, Axis::RightZ) |> ignore
-  data.insert_btn(buttons[0], Button::South) |> ignore
-  data.insert_btn(buttons[1], Button::East) |> ignore
-  data.insert_btn(buttons[3], Button::North) |> ignore
-  data.insert_btn(buttons[4], Button::West) |> ignore
-  data.insert_btn(buttons[5], Button::Select) |> ignore
-  data.insert_btn(buttons[6], Button::Start) |> ignore
-  data.insert_btn(buttons[7], Button::DPadDown) |> ignore
-  data.insert_btn(buttons[8], Button::DPadLeft) |> ignore
-  data.insert_btn(buttons[9], Button::RightThumb) |> ignore
-  data.insert_btn(buttons[2], Button::C) |> ignore
-  data.insert_btn(buttons[10], Button::Z) |> ignore
+  data.insert_axis(AXIS_LSTICKX, LeftStickX) |> ignore
+  data.insert_axis(AXIS_LSTICKY, LeftStickY) |> ignore
+  data.insert_axis(LEGACY_AXIS_LEFTZ, LeftZ) |> ignore
+  data.insert_axis(AXIS_RSTICKX, RightStickX) |> ignore
+  data.insert_axis(AXIS_RSTICKY, RightStickY) |> ignore
+  data.insert_axis(LEGACY_AXIS_RIGHTZ, RightZ) |> ignore
+  data.insert_btn(buttons[0], South) |> ignore
+  data.insert_btn(buttons[1], East) |> ignore
+  data.insert_btn(buttons[3], North) |> ignore
+  data.insert_btn(buttons[4], West) |> ignore
+  data.insert_btn(buttons[5], Select) |> ignore
+  data.insert_btn(buttons[6], Start) |> ignore
+  data.insert_btn(buttons[7], DPadDown) |> ignore
+  data.insert_btn(buttons[8], DPadLeft) |> ignore
+  data.insert_btn(buttons[9], RightThumb) |> ignore
+  data.insert_btn(buttons[2], C) |> ignore
+  data.insert_btn(buttons[10], Z) |> ignore
   let ok_res : Result[(Mapping, String), Error] = try
     Mapping::from_data(data, buttons, axes, name, uuid) |> Ok
   catch {
@@ -208,7 +208,7 @@ test "from_data roundtrip + errors" {
     bad_name,
     content="Err(<Milky2018/gamepad.MappingError.InvalidName: ...>)",
   )
-  data.insert_btn(BTN_DPAD_RIGHT, Button::DPadRight) |> ignore
+  data.insert_btn(BTN_DPAD_RIGHT, DPadRight) |> ignore
   let invalid_code : Result[Unit, MappingError] = try
     Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
   catch {
@@ -219,7 +219,7 @@ test "from_data roundtrip + errors" {
     Err(e) => e.invalid_code()
   }
   inspect(invalid_code_payload == Some(BTN_DPAD_RIGHT), content="true")
-  data.insert_btn(buttons[3], Button::Unknown) |> ignore
+  data.insert_btn(buttons[3], Unknown) |> ignore
   let unknown_el : Result[Unit, Error] = try
     Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
   catch {

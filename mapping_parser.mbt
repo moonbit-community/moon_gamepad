@@ -77,7 +77,7 @@ priv struct Parser {
 
 ///|
 fn Parser::new(mapping : String) -> Parser {
-  { data: mapping, pos: 0, state: State::Uuid }
+  { data: mapping, pos: 0, state: Uuid }
 }
 
 ///|
@@ -109,17 +109,17 @@ fn slice_to_string(data : String, start : Int, end : Int) -> String {
 ///|
 fn parse_u16_decimal(s : String, pos : Int) -> Int raise ParserError {
   if s.length() == 0 {
-    raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
+    raise Error(InvalidValue, pos)
   }
   let mut acc = 0
   for c in s {
     if c is ('0'..='9') {
       acc = acc * 10 + (c.to_int() - '0'.to_int())
       if acc > 65535 {
-        raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
+        raise Error(InvalidValue, pos)
       }
     } else {
-      raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
+      raise Error(InvalidValue, pos)
     }
   }
   acc
@@ -135,37 +135,37 @@ let axes_sdl : Array[String] = [
 
 ///|
 let axes : Array[AxisOrBtn] = [
-  AxisOrBtn::Btn(Button::South),
-  AxisOrBtn::Btn(Button::East),
-  AxisOrBtn::Btn(Button::Select),
-  AxisOrBtn::Btn(Button::C),
-  AxisOrBtn::Btn(Button::DPadDown),
-  AxisOrBtn::Btn(Button::DPadLeft),
-  AxisOrBtn::Btn(Button::DPadRight),
-  AxisOrBtn::Btn(Button::DPadUp),
-  AxisOrBtn::Btn(Button::Mode),
-  AxisOrBtn::Btn(Button::LeftTrigger),
-  AxisOrBtn::Btn(Button::LeftThumb),
-  AxisOrBtn::Btn(Button::LeftTrigger2),
-  AxisOrBtn::Axis(Axis::LeftStickX),
-  AxisOrBtn::Axis(Axis::LeftStickY),
-  AxisOrBtn::Axis(Axis::LeftZ),
-  AxisOrBtn::Btn(Button::Unknown),
-  AxisOrBtn::Btn(Button::Unknown),
-  AxisOrBtn::Btn(Button::Unknown),
-  AxisOrBtn::Btn(Button::Unknown),
-  AxisOrBtn::Btn(Button::Unknown),
-  AxisOrBtn::Btn(Button::RightTrigger),
-  AxisOrBtn::Btn(Button::RightThumb),
-  AxisOrBtn::Btn(Button::RightTrigger2),
-  AxisOrBtn::Axis(Axis::RightStickX),
-  AxisOrBtn::Axis(Axis::RightStickY),
-  AxisOrBtn::Axis(Axis::RightZ),
-  AxisOrBtn::Btn(Button::Start),
-  AxisOrBtn::Btn(Button::Unknown),
-  AxisOrBtn::Btn(Button::West),
-  AxisOrBtn::Btn(Button::North),
-  AxisOrBtn::Btn(Button::Z),
+  Btn(South),
+  Btn(East),
+  Btn(Select),
+  Btn(C),
+  Btn(DPadDown),
+  Btn(DPadLeft),
+  Btn(DPadRight),
+  Btn(DPadUp),
+  Btn(Mode),
+  Btn(LeftTrigger),
+  Btn(LeftThumb),
+  Btn(LeftTrigger2),
+  Axis(LeftStickX),
+  Axis(LeftStickY),
+  Axis(LeftZ),
+  Btn(Unknown),
+  Btn(Unknown),
+  Btn(Unknown),
+  Btn(Unknown),
+  Btn(Unknown),
+  Btn(RightTrigger),
+  Btn(RightThumb),
+  Btn(RightTrigger2),
+  Axis(RightStickX),
+  Axis(RightStickY),
+  Axis(RightZ),
+  Btn(Start),
+  Btn(Unknown),
+  Btn(West),
+  Btn(North),
+  Btn(Z),
 ]
 
 ///|
@@ -179,7 +179,7 @@ fn lookup_axis_or_btn(
       return axes[i]
     }
   }
-  raise ParserError::Error(kind, pos)
+  raise Error(kind, pos)
 }
 
 ///|
@@ -189,14 +189,10 @@ fn Parser::next_token(self : Parser) -> Token? raise ParserError {
   } else {
     Some(
       match self.state {
-        State::Uuid => self.parse_uuid()
-        State::Name => self.parse_name()
-        State::KeyVal => self.parse_key_val()
-        State::Invalid =>
-          raise ParserError::Error(
-            ParserErrorKind::InvalidParserState,
-            self.pos,
-          )
+        Uuid => self.parse_uuid()
+        Name => self.parse_name()
+        KeyVal => self.parse_key_val()
+        Invalid => raise Error(InvalidParserState, self.pos)
       },
     )
   }
@@ -208,24 +204,24 @@ fn Parser::parse_uuid(self : Parser) -> Token raise ParserError {
   let uuid_field = slice_to_string(self.data, self.pos, next_comma)
   if uuid_field == "xinput" {
     if next_comma == self.data.length() {
-      self.state = State::Invalid
-      raise ParserError::Error(ParserErrorKind::UnexpectedEnd, self.pos)
+      self.state = Invalid
+      raise Error(UnexpectedEnd, self.pos)
     }
-    self.state = State::Name
+    self.state = Name
     self.pos = next_comma + 1
-    return Token::Uuid(Uuid::nil())
+    return Uuid(Uuid::nil())
   }
   let uuid = Token::Uuid(Uuid::parse(uuid_field)) catch {
     _ => {
-      self.state = State::Invalid
-      raise ParserError::Error(ParserErrorKind::InvalidGuid, self.pos)
+      self.state = Invalid
+      raise Error(InvalidGuid, self.pos)
     }
   }
   if next_comma == self.data.length() {
-    self.state = State::Invalid
-    raise ParserError::Error(ParserErrorKind::UnexpectedEnd, self.pos)
+    self.state = Invalid
+    raise Error(UnexpectedEnd, self.pos)
   }
-  self.state = State::Name
+  self.state = Name
   self.pos = next_comma + 1
   uuid
 }
@@ -234,9 +230,9 @@ fn Parser::parse_uuid(self : Parser) -> Token raise ParserError {
 fn Parser::parse_name(self : Parser) -> Token {
   let next_comma = next_comma_or_end(self.data, self.pos)
   let name = slice_to_string(self.data, self.pos, next_comma)
-  self.state = State::KeyVal
+  self.state = KeyVal
   self.pos = next_comma + 1
-  Token::Name(name)
+  Name(name)
 }
 
 ///|
@@ -247,23 +243,23 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
   self.pos = next_comma + 1
   let colon = match find_char(self.data, pos, next_comma, ':') {
     Some(i) => i
-    None => raise ParserError::Error(ParserErrorKind::InvalidKeyValPair, pos)
+    None => raise Error(InvalidKeyValPair, pos)
   }
   if find_char(self.data, colon + 1, next_comma, ':') is Some(_) {
-    raise ParserError::Error(ParserErrorKind::InvalidKeyValPair, pos)
+    raise Error(InvalidKeyValPair, pos)
   }
   let key = slice_to_string(self.data, pos, colon)
   let value = slice_to_string(self.data, colon + 1, next_comma)
   if value.length() == 0 {
-    raise ParserError::Error(ParserErrorKind::EmptyValue, pos)
+    raise Error(EmptyValue, pos)
   }
   if key == "platform" {
-    return Token::Platform(value)
+    return Platform(value)
   }
   let (key, output) = match key {
     ['+', .. rest] => (rest.to_owned(), AxisRange::UpperHalf)
-    ['-', .. rest] => (rest.to_owned(), AxisRange::LowerHalf)
-    _ => (key, AxisRange::Full)
+    ['-', .. rest] => (rest.to_owned(), LowerHalf)
+    _ => (key, Full)
   }
   let (from_str, input, inverted, is_axis) = match value {
     ['+', 'a', .. rest] => {
@@ -284,7 +280,7 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
         inv = true
         body = body[0:body.length() - 1].to_owned()
       }
-      (body, AxisRange::LowerHalf, inv, true)
+      (body, LowerHalf, inv, true)
     }
     ['a', .. rest] => {
       let mut body = rest.to_owned()
@@ -294,31 +290,31 @@ fn Parser::parse_key_val(self : Parser) -> Token raise ParserError {
         inv = true
         body = body[0:body.length() - 1].to_owned()
       }
-      (body, AxisRange::Full, inv, true)
+      (body, Full, inv, true)
     }
-    ['b', .. rest] => (rest.to_owned(), AxisRange::Full, false, false)
+    ['b', .. rest] => (rest.to_owned(), Full, false, false)
     ['h', .. rest] => {
       let body = rest.to_owned()
       let dot = match find_char(body, 0, body.length(), '.') {
         Some(i) => i
-        None => raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
+        None => raise Error(InvalidValue, pos)
       }
       let hat = parse_u16_decimal(body[0:dot].to_owned(), pos + 1)
       let direction = parse_u16_decimal(
         body[dot + 1:body.length()].to_owned(),
         pos + dot + 2,
       )
-      let to = lookup_axis_or_btn(key, ParserErrorKind::UnknownButton, pos)
-      return Token::HatMapping(hat, direction, to, output)
+      let to = lookup_axis_or_btn(key, UnknownButton, pos)
+      return HatMapping(hat, direction, to, output)
     }
-    _ => raise ParserError::Error(ParserErrorKind::InvalidValue, pos)
+    _ => raise Error(InvalidValue, pos)
   }
   let from = parse_u16_decimal(from_str, pos)
   if is_axis {
-    let to = lookup_axis_or_btn(key, ParserErrorKind::UnknownAxis, pos)
-    Token::AxisMapping(from, to, input, output, inverted)
+    let to = lookup_axis_or_btn(key, UnknownAxis, pos)
+    AxisMapping(from, to, input, output, inverted)
   } else {
-    let to = lookup_axis_or_btn(key, ParserErrorKind::UnknownButton, pos)
-    Token::ButtonMapping(from, to, output)
+    let to = lookup_axis_or_btn(key, UnknownButton, pos)
+    ButtonMapping(from, to, output)
   }
 }

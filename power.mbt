@@ -28,8 +28,8 @@ pub enum PowerInfo {
 
 ///|
 let _power_info_keepalive : Array[PowerInfo] = [
-  PowerInfo::Wired,
-  PowerInfo::Discharging(0),
-  PowerInfo::Charging(0),
-  PowerInfo::Charged,
+  Wired,
+  Discharging(0),
+  Charging(0),
+  Charged,
 ]

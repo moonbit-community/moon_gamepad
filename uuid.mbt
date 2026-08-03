@@ -66,31 +66,31 @@ pub fn Uuid::parse(s : String) -> Uuid raise UuidError {
   for c in s {
     if c == '-' {
       if pos != 8 && pos != 13 && pos != 18 && pos != 23 {
-        raise UuidError::InvalidGuid
+        raise InvalidGuid
       }
       hyphen_count = hyphen_count + 1
       pos = pos + 1
       continue
     }
     if !is_hex_char(c) {
-      raise UuidError::InvalidGuid
+      raise InvalidGuid
     }
     buf = buf + [to_lower_hex(c)]
     pos = pos + 1
   }
   if pos == 32 {
     if hyphen_count != 0 {
-      raise UuidError::InvalidGuid
+      raise InvalidGuid
     }
   } else if pos == 36 {
     if hyphen_count != 4 {
-      raise UuidError::InvalidGuid
+      raise InvalidGuid
     }
   } else {
-    raise UuidError::InvalidGuid
+    raise InvalidGuid
   }
   if buf.length() != 32 {
-    raise UuidError::InvalidGuid
+    raise InvalidGuid
   }
   { simple: buf }
 }

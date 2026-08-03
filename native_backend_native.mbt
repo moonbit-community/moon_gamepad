@@ -202,16 +202,16 @@ pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
 pub fn NativeBackend::power_info(self : NativeBackend, id : Int) -> PowerInfo {
   let b = backend_power_info_bin(self.owner, id)
   if b.length() < 8 {
-    return PowerInfo::Unknown
+    return Unknown
   }
   let tag = read_i32_le(b, 0)
   let value = read_i32_le(b, 4)
   match tag {
-    1 => PowerInfo::Wired
-    2 => PowerInfo::Discharging(value)
-    3 => PowerInfo::Charging(value)
-    4 => PowerInfo::Charged
-    _ => PowerInfo::Unknown
+    1 => Wired
+    2 => Discharging(value)
+    3 => Charging(value)
+    4 => Charged
+    _ => Unknown
   }
 }
 

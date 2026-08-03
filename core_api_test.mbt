@@ -15,11 +15,11 @@
 ///|
 fn core_event_sig(e : Event) -> (Int, Int, Double, Int) {
   match e.event() {
-    EventType::AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
-    EventType::ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
-    EventType::ButtonChanged(btn, val, code) => (2, btn.to_index(), val, code)
-    EventType::ButtonRepeated(btn, code) => (3, btn.to_index(), 0.0, code)
-    EventType::ButtonReleased(btn, code) => (4, btn.to_index(), 0.0, code)
+    AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
+    ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
+    ButtonChanged(btn, val, code) => (2, btn.to_index(), val, code)
+    ButtonRepeated(btn, code) => (3, btn.to_index(), 0.0, code)
+    ButtonReleased(btn, code) => (4, btn.to_index(), 0.0, code)
     _ => (99, 0, 0.0, 0)
   }
 }
@@ -39,27 +39,11 @@ fn build_ok_core(builder : GilBuilder) -> Gil {
 test "gil next_event default filters skip dropped" {
   let g = Gil::new_mock(1, update_state=true, default_filters=true)
   let id = GamepadId::new(0)
+  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.5, AXIS_LSTICKX), 1L))
   g.insert_event(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.5, AXIS_LSTICKX),
-      1L,
-    ),
+    Event::at(id, AxisChanged(LeftStickX, 0.505, AXIS_LSTICKX), 2L),
   )
-  g.insert_event(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.505, AXIS_LSTICKX),
-      2L,
-    ),
-  )
-  g.insert_event(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.7, AXIS_LSTICKX),
-      3L,
-    ),
-  )
+  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.7, AXIS_LSTICKX), 3L))
   let ev1 = g.next_event()
   debug_inspect(ev1.map(core_event_sig), content="Some((0, 0, 0.5, 65584))")
   let ev2 = g.next_event()
@@ -107,34 +91,26 @@ test "gamepad handle delegates mapping/state" {
   )
   let id = GamepadId::new(0)
   let m = Mapping::new()
-  m.insert(BTN_SOUTH, AxisOrBtn::Btn(Button::South))
-  m.insert(AXIS_LSTICKX, AxisOrBtn::Axis(Axis::LeftStickX))
+  m.insert(BTN_SOUTH, Btn(South))
+  m.insert(AXIS_LSTICKX, Axis(LeftStickX))
   g.set_mapping(id, m)
   let gp = g.gamepad(id).unwrap()
   let ok = match gp.axis_or_btn_name(BTN_SOUTH) {
-    Some(AxisOrBtn::Btn(Button::South)) => true
+    Some(Btn(South)) => true
     _ => false
   }
   inspect(ok, content="true")
-  g.update(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
-  )
-  g.update(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.25, AXIS_LSTICKX),
-      1L,
-    ),
-  )
+  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
+  g.update(Event::at(id, AxisChanged(LeftStickX, 0.25, AXIS_LSTICKX), 1L))
   let gp2 = g.gamepad(id).unwrap()
-  inspect(gp2.is_pressed(Button::South), content="true")
-  inspect(gp2.value(Axis::LeftStickX), content="0.25")
+  inspect(gp2.is_pressed(South), content="true")
+  inspect(gp2.value(LeftStickX), content="0.25")
   debug_inspect(
-    gp2.button_data(Button::South).map(fn(d) { d.is_pressed() }),
+    gp2.button_data(South).map(fn(d) { d.is_pressed() }),
     content="Some(true)",
   )
   debug_inspect(
-    gp2.axis_data(Axis::LeftStickX).map(fn(d) { d.value() }),
+    gp2.axis_data(LeftStickX).map(fn(d) { d.value() }),
     content="Some(0.25)",
   )
 }
@@ -160,19 +136,11 @@ test "gamepad name/map_name/os_name semantics" {
 test "gamepad semantic accessors follow gil mapping rules" {
   let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
-  g.update(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
-  )
-  g.update(
-    Event::at(
-      id,
-      EventType::AxisChanged(Axis::LeftStickX, 0.42, AXIS_LSTICKX),
-      1L,
-    ),
-  )
+  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
+  g.update(Event::at(id, AxisChanged(LeftStickX, 0.42, AXIS_LSTICKX), 1L))
   let gp = g.gamepad(id).unwrap()
-  inspect(gp.is_pressed(Button::South), content="true")
-  inspect(gp.value(Axis::LeftStickX), content="0")
-  inspect(gp.button_data(Button::South) is None, content="true")
-  inspect(gp.axis_data(Axis::LeftStickX) is None, content="true")
+  inspect(gp.is_pressed(South), content="true")
+  inspect(gp.value(LeftStickX), content="0")
+  inspect(gp.button_data(South) is None, content="true")
+  inspect(gp.axis_data(LeftStickX) is None, content="true")
 }

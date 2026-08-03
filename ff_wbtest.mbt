@@ -23,8 +23,8 @@ test "effect play/stop without backend errors" {
     weak: 1.0,
     duration_ms: 100L,
     base_effects: [],
-    repeat_mode: FfRepeat::Infinitely,
-    distance_model: DistanceModel::None,
+    repeat_mode: Infinitely,
+    distance_model: None,
     position: (0.0, 0.0, 0.0),
     gain: 1.0,
     playing_since_ms: None,
@@ -112,7 +112,7 @@ test "builder paths reach backend-not-supported branch" {
   }
   inspect(
     match er {
-      Err(FfError::NotSupported) => true
+      Err(NotSupported) => true
       _ => false
     },
     content="true",
@@ -157,7 +157,7 @@ test "finish returns Disconnected for missing gamepad id" {
   }
   inspect(
     match er {
-      Err(FfError::Disconnected(_)) => true
+      Err(Disconnected(_)) => true
       _ => false
     },
     content="true",
@@ -175,7 +175,7 @@ test "finish returns Disconnected for not connected gamepad" {
   }
   inspect(
     match er {
-      Err(FfError::Disconnected(_)) => true
+      Err(Disconnected(_)) => true
       _ => false
     },
     content="true",
@@ -193,7 +193,7 @@ test "finish returns FfNotSupported when gamepad has no ff capability" {
   }
   inspect(
     match er {
-      Err(FfError::FfNotSupported(_)) => true
+      Err(FfNotSupported(_)) => true
       _ => false
     },
     content="true",
@@ -274,27 +274,27 @@ test "ticks from_ms quantizes to tick duration" {
 ///|
 test "base effect scheduling wraps after+with_delay" {
   let eff : BaseEffect = {
-    kind: BaseEffectType::Strong(1000),
+    kind: Strong(1000),
     scheduling: { after: 2, play_for: 2, with_delay: 1 },
     envelope: Envelope::default(),
   }
   inspect(
     match eff.magnitude_at(0) {
-      BaseEffectType::Strong(m) => m == 0
+      Strong(m) => m == 0
       _ => false
     },
     content="true",
   )
   inspect(
     match eff.magnitude_at(2) {
-      BaseEffectType::Strong(m) => m > 0
+      Strong(m) => m > 0
       _ => false
     },
     content="true",
   )
   inspect(
     match eff.magnitude_at(3) {
-      BaseEffectType::Strong(m) => m > 0
+      Strong(m) => m > 0
       _ => false
     },
     content="true",
@@ -302,7 +302,7 @@ test "base effect scheduling wraps after+with_delay" {
   // Delay slice (wrapped >= play_for).
   inspect(
     match eff.magnitude_at(4) {
-      BaseEffectType::Strong(m) => m == 0
+      Strong(m) => m == 0
       _ => false
     },
     content="true",
@@ -310,7 +310,7 @@ test "base effect scheduling wraps after+with_delay" {
   // Wraps back to the start.
   inspect(
     match eff.magnitude_at(5) {
-      BaseEffectType::Strong(m) => m > 0
+      Strong(m) => m > 0
       _ => false
     },
     content="true",
@@ -332,7 +332,7 @@ test "set_listener_position returns Disconnected for disconnected gamepad" {
   }
   inspect(
     match r {
-      Err(FfError::Disconnected(_)) => true
+      Err(Disconnected(_)) => true
       _ => false
     },
     content="true",
@@ -353,7 +353,7 @@ test "set_listener_position returns FfNotSupported for unsupported gamepad" {
   }
   inspect(
     match r {
-      Err(FfError::FfNotSupported(_)) => true
+      Err(FfNotSupported(_)) => true
       _ => false
     },
     content="true",
@@ -440,7 +440,7 @@ test "effect set_gamepads returns FfNotSupported for unsupported id" {
   }
   inspect(
     match set_res {
-      Err(FfError::FfNotSupported(_)) => true
+      Err(FfNotSupported(_)) => true
       _ => false
     },
     content="true",
@@ -506,7 +506,7 @@ test "effect add_gamepad returns Disconnected when handle is disconnected" {
   }
   inspect(
     match add_res {
-      Err(FfError::Disconnected(_)) => true
+      Err(Disconnected(_)) => true
       _ => false
     },
     content="true",
@@ -548,7 +548,7 @@ test "distance_model validate follows upstream guard branches" {
   }
   inspect(
     match bad_inv {
-      Err(DistanceModelError::InvalidModelParameter) => true
+      Err(InvalidModelParameter) => true
       _ => false
     },
     content="true",
@@ -565,7 +565,7 @@ test "distance_model validate follows upstream guard branches" {
   }
   inspect(
     match bad_lin {
-      Err(DistanceModelError::InvalidModelParameter) => true
+      Err(InvalidModelParameter) => true
       _ => false
     },
     content="true",
@@ -576,7 +576,7 @@ test "distance_model validate follows upstream guard branches" {
 test "builder advanced setters persist into effect" {
   let g = new_ff_ready_with_null_backend(1)
   let base = {
-    kind: BaseEffectType::Strong(60_000),
+    kind: Strong(60_000),
     scheduling: Replay::default(),
     envelope: Envelope::default(),
   }
@@ -584,13 +584,9 @@ test "builder advanced setters persist into effect" {
     EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .add_effect(base)
-    .repeat(FfRepeat::For(10L))
+    .repeat(For(10L))
     .distance_model(
-      DistanceModel::Linear(
-        ref_distance=1.0,
-        rolloff_factor=1.0,
-        max_distance=2.0,
-      ),
+      Linear(ref_distance=1.0, rolloff_factor=1.0, max_distance=2.0),
     )
     .position((1.0, 2.0, 3.0))
     .gain(-1.0)
@@ -607,7 +603,7 @@ test "builder advanced setters persist into effect" {
   inspect(effect.gain, content="0")
   inspect(
     match effect.repeat_mode {
-      FfRepeat::For(ms) => ms == 10L
+      For(ms) => ms == 10L
       _ => false
     },
     content="true",
@@ -622,11 +618,7 @@ test "builder finish returns InvalidDistanceModel on invalid model" {
     EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
     .distance_model(
-      DistanceModel::Linear(
-        ref_distance=1.0,
-        rolloff_factor=1.0,
-        max_distance=1.0,
-      ),
+      Linear(ref_distance=1.0, rolloff_factor=1.0, max_distance=1.0),
     )
     .finish(g)
     |> Ok
@@ -635,7 +627,7 @@ test "builder finish returns InvalidDistanceModel on invalid model" {
   }
   inspect(
     match built {
-      Err(FfError::InvalidDistanceModel(_)) => true
+      Err(InvalidDistanceModel(_)) => true
       _ => false
     },
     content="true",
@@ -654,11 +646,11 @@ test "effect set_repeat/set_position/set_distance_model update state" {
     Err(_) => return
     Ok(e) => e
   }
-  effect.set_repeat(FfRepeat::For(7L))
+  effect.set_repeat(For(7L))
   effect.set_position((4.0, 5.0, 6.0))
   inspect(
     match effect.repeat_mode {
-      FfRepeat::For(ms) => ms == 7L
+      For(ms) => ms == 7L
       _ => false
     },
     content="true",
@@ -666,11 +658,7 @@ test "effect set_repeat/set_position/set_distance_model update state" {
   debug_inspect(effect.position, content="(4, 5, 6)")
   let ok : Result[Unit, FfError] = try
     effect.set_distance_model(
-      DistanceModel::Linear(
-        ref_distance=1.0,
-        rolloff_factor=1.0,
-        max_distance=3.0,
-      ),
+      Linear(ref_distance=1.0, rolloff_factor=1.0, max_distance=3.0),
     )
     |> Ok
   catch {
@@ -679,11 +667,7 @@ test "effect set_repeat/set_position/set_distance_model update state" {
   inspect(ok is Ok(_), content="true")
   let bad : Result[Unit, FfError] = try
     effect.set_distance_model(
-      DistanceModel::Linear(
-        ref_distance=1.0,
-        rolloff_factor=1.0,
-        max_distance=1.0,
-      ),
+      Linear(ref_distance=1.0, rolloff_factor=1.0, max_distance=1.0),
     )
     |> Ok
   catch {
@@ -691,7 +675,7 @@ test "effect set_repeat/set_position/set_distance_model update state" {
   }
   inspect(
     match bad {
-      Err(FfError::InvalidDistanceModel(_)) => true
+      Err(InvalidDistanceModel(_)) => true
       _ => false
     },
     content="true",
@@ -710,13 +694,13 @@ test "set_repeat schedules completion for running effect" {
     weak: 0.0,
     duration_ms: 0L,
     base_effects: [],
-    repeat_mode: FfRepeat::Infinitely,
-    distance_model: DistanceModel::None,
+    repeat_mode: Infinitely,
+    distance_model: None,
     position: (0.0, 0.0, 0.0),
     gain: 1.0,
     playing_since_ms: Some(100L),
   }
-  effect.set_repeat(FfRepeat::For(50L))
+  effect.set_repeat(For(50L))
   inspect(g.next_event() is None, content="true")
   ff_runtime_now_set_for_test(150L)
   let ev = match g.next_event() {
@@ -728,7 +712,7 @@ test "set_repeat schedules completion for running effect" {
   }
   inspect(
     match ev.event() {
-      EventType::ForceFeedbackEffectCompleted => ev.id().value() == 0
+      ForceFeedbackEffectCompleted => ev.id().value() == 0
       _ => false
     },
     content="true",
@@ -748,14 +732,14 @@ test "set_repeat infinitely cancels completion for running effect" {
     weak: 0.0,
     duration_ms: 0L,
     base_effects: [],
-    repeat_mode: FfRepeat::Infinitely,
-    distance_model: DistanceModel::None,
+    repeat_mode: Infinitely,
+    distance_model: None,
     position: (0.0, 0.0, 0.0),
     gain: 1.0,
     playing_since_ms: Some(100L),
   }
-  effect.set_repeat(FfRepeat::For(20L))
-  effect.set_repeat(FfRepeat::Infinitely)
+  effect.set_repeat(For(20L))
+  effect.set_repeat(Infinitely)
   ff_runtime_now_set_for_test(200L)
   inspect(g.next_event() is None, content="true")
   ff_runtime_now_clear_for_test()
@@ -773,13 +757,13 @@ test "set_gamepads reschedules completion targets for running effect" {
     weak: 0.0,
     duration_ms: 0L,
     base_effects: [],
-    repeat_mode: FfRepeat::Infinitely,
-    distance_model: DistanceModel::None,
+    repeat_mode: Infinitely,
+    distance_model: None,
     position: (0.0, 0.0, 0.0),
     gain: 1.0,
     playing_since_ms: Some(100L),
   }
-  effect.set_repeat(FfRepeat::For(20L))
+  effect.set_repeat(For(20L))
   let set_res : Result[Unit, FfError] = try
     effect.set_gamepads([GamepadId::new(1)], g) |> Ok
   catch {
@@ -796,7 +780,7 @@ test "set_gamepads reschedules completion targets for running effect" {
   }
   inspect(
     match ev.event() {
-      EventType::ForceFeedbackEffectCompleted => ev.id().value() == 1
+      ForceFeedbackEffectCompleted => ev.id().value() == 1
       _ => false
     },
     content="true",

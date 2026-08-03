@@ -27,10 +27,10 @@ fn non_empty_parser_errors(line : String) -> Int {
       Ok(Some(_)) => ()
       Err(e) =>
         match e {
-          ParserError::Error(ParserErrorKind::EmptyValue, _) => ()
-          ParserError::Error(ParserErrorKind::UnknownAxis, _) => ()
-          ParserError::Error(ParserErrorKind::UnknownButton, _) => ()
-          ParserError::Error(ParserErrorKind::InvalidParserState, _) => {
+          Error(EmptyValue, _) => ()
+          Error(UnknownAxis, _) => ()
+          Error(UnknownButton, _) => ()
+          Error(InvalidParserState, _) => {
             errors += 1
             break
           }
@@ -69,7 +69,7 @@ test "hat direction invalid value error position matches gil" {
     e => Err(e)
   }
   let ok = match token {
-    Err(ParserError::Error(ParserErrorKind::InvalidValue, 14)) => true
+    Err(Error(InvalidValue, 14)) => true
     _ => false
   }
   inspect(ok, content="true")

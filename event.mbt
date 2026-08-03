@@ -79,13 +79,13 @@ pub fn Event::time(self : Event) -> Int64 {
 
 ///|
 pub fn Event::drop(self : Event) -> Event {
-  { id: self.id, event: EventType::Dropped, time: self.time }
+  { id: self.id, event: Dropped, time: self.time }
 }
 
 ///|
 pub fn Event::is_dropped(self : Event) -> Bool {
   match self.event {
-    EventType::Dropped => true
+    Dropped => true
     _ => false
   }
 }

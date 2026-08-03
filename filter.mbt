@@ -44,7 +44,7 @@ pub fn jitter(ev : Event?, gil : Gil, threshold : Double) -> Event? {
   match ev {
     Some(e) =>
       match e.event() {
-        EventType::AxisChanged(_, val, axis_code) => {
+        AxisChanged(_, val, axis_code) => {
           let old_data = match gil.state(e.id()) {
             None => 0.0
             Some(s) =>
@@ -89,12 +89,12 @@ fn apply_deadzone(
 fn deadzone_nonzero_axis_idx(axis : Axis) -> Int? {
   Some(
     match axis {
-      Axis::DPadX => 0
-      Axis::DPadY => 1
-      Axis::LeftStickX => 2
-      Axis::LeftStickY => 3
-      Axis::RightStickX => 4
-      Axis::RightStickY => 5
+      DPadX => 0
+      DPadY => 1
+      LeftStickX => 2
+      LeftStickY => 3
+      RightStickX => 4
+      RightStickY => 5
       _ => return None
     },
   )
@@ -105,10 +105,8 @@ pub fn deadzone(ev : Event?, gil : Gil) -> Event? {
   match ev {
     Some(e) =>
       match e.event() {
-        EventType::AxisChanged(axis, val, code) =>
-          deadzone_axis(e, axis, val, code, gil)
-        EventType::ButtonChanged(btn, val, code) =>
-          deadzone_button(e, btn, val, code, gil)
+        AxisChanged(axis, val, code) => deadzone_axis(e, axis, val, code, gil)
+        ButtonChanged(btn, val, code) => deadzone_button(e, btn, val, code, gil)
         _ => ev
       }
     None => None
@@ -153,7 +151,7 @@ fn deadzone_axis(
             gil.gamepads_data[id.value()].have_sent_nonzero_for_axis[axis_idx] = new_val !=
               0.0
         }
-        Some(Event::at(id, EventType::AxisChanged(axis, new_val, code), time))
+        Some(Event::at(id, AxisChanged(axis, new_val, code), time))
       }
     }
     Some((other_axis, other_code)) => {
@@ -175,11 +173,7 @@ fn deadzone_axis(
             sent_nonzero &&
             other_state_val != 0.0 {
             gil.insert_event(
-              Event::at(
-                id,
-                EventType::AxisChanged(other_axis, 0.0, other_code),
-                time,
-              ),
+              Event::at(id, AxisChanged(other_axis, 0.0, other_code), time),
             )
             gil.gamepads_data[id.value()].have_sent_nonzero_for_axis[other_axis_idx] = false
           }
@@ -198,7 +192,7 @@ fn deadzone_axis(
             gil.gamepads_data[id.value()].have_sent_nonzero_for_axis[axis_idx] = new_val !=
               0.0
         }
-        Some(Event::at(id, EventType::AxisChanged(axis, new_val, code), time))
+        Some(Event::at(id, AxisChanged(axis, new_val, code), time))
       }
     }
   }
@@ -224,9 +218,7 @@ fn deadzone_button(
   if cur == new_val {
     Some(e.drop())
   } else {
-    Some(
-      Event::at(e.id(), EventType::ButtonChanged(btn, new_val, code), e.time()),
-    )
+    Some(Event::at(e.id(), ButtonChanged(btn, new_val, code), e.time()))
   }
 }
 
@@ -236,10 +228,10 @@ pub fn axis_dpad_to_button(ev : Event?, gil : Gil) -> Event? {
     None => None
     Some(e) =>
       match e.event() {
-        EventType::AxisChanged(axis, val, axis_code) =>
+        AxisChanged(axis, val, axis_code) =>
           match axis {
-            Axis::DPadX => axis_dpad_x_to_buttons(e, val, axis_code, gil)
-            Axis::DPadY => axis_dpad_y_to_buttons(e, val, axis_code, gil)
+            DPadX => axis_dpad_x_to_buttons(e, val, axis_code, gil)
+            DPadY => axis_dpad_y_to_buttons(e, val, axis_code, gil)
             _ => ev
           }
         _ => ev
@@ -281,7 +273,7 @@ fn can_map_axis_dpad_to_button(
         gil.axis_or_btn_name(id, btn_left) is None &&
         gil.axis_or_btn_name(id, btn_down) is None &&
         gil.axis_or_btn_name(id, btn_up) is None &&
-        gil.button_code(id, Button::DPadRight) is None
+        gil.button_code(id, DPadRight) is None
       } else {
         false
       }
@@ -316,31 +308,15 @@ fn axis_dpad_x_to_buttons(
   if val == 1.0 {
     release_left = pressed_left
     gil.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadRight, 1.0, btn_right),
-        time,
-      ),
+      Event::at(id, ButtonChanged(DPadRight, 1.0, btn_right), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonPressed(Button::DPadRight, btn_right),
-      time,
-    )
+    out = Event::at(id, ButtonPressed(DPadRight, btn_right), time)
   } else if val == -1.0 {
     release_right = pressed_right
     gil.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadLeft, 1.0, btn_left),
-        time,
-      ),
+      Event::at(id, ButtonChanged(DPadLeft, 1.0, btn_left), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonPressed(Button::DPadLeft, btn_left),
-      time,
-    )
+    out = Event::at(id, ButtonPressed(DPadLeft, btn_left), time)
   } else {
     release_left = pressed_left
     release_right = pressed_right
@@ -350,34 +326,18 @@ fn axis_dpad_x_to_buttons(
       gil.insert_event(out)
     }
     gil.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadRight, 0.0, btn_right),
-        time,
-      ),
+      Event::at(id, ButtonChanged(DPadRight, 0.0, btn_right), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonReleased(Button::DPadRight, btn_right),
-      time,
-    )
+    out = Event::at(id, ButtonReleased(DPadRight, btn_right), time)
   }
   if release_left {
     if !out.is_dropped() {
       gil.insert_event(out)
     }
     gil.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadLeft, 0.0, btn_left),
-        time,
-      ),
+      Event::at(id, ButtonChanged(DPadLeft, 0.0, btn_left), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonReleased(Button::DPadLeft, btn_left),
-      time,
-    )
+    out = Event::at(id, ButtonReleased(DPadLeft, btn_left), time)
   }
   Some(out)
 }
@@ -408,24 +368,14 @@ fn axis_dpad_y_to_buttons(
   }
   if val == 1.0 {
     release_down = pressed_down
-    gil.insert_event(
-      Event::at(id, EventType::ButtonChanged(Button::DPadUp, 1.0, btn_up), time),
-    )
-    out = Event::at(id, EventType::ButtonPressed(Button::DPadUp, btn_up), time)
+    gil.insert_event(Event::at(id, ButtonChanged(DPadUp, 1.0, btn_up), time))
+    out = Event::at(id, ButtonPressed(DPadUp, btn_up), time)
   } else if val == -1.0 {
     release_up = pressed_up
     gil.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadDown, 1.0, btn_down),
-        time,
-      ),
+      Event::at(id, ButtonChanged(DPadDown, 1.0, btn_down), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonPressed(Button::DPadDown, btn_down),
-      time,
-    )
+    out = Event::at(id, ButtonPressed(DPadDown, btn_down), time)
   } else {
     release_up = pressed_up
     release_down = pressed_down
@@ -434,27 +384,17 @@ fn axis_dpad_y_to_buttons(
     if !out.is_dropped() {
       gil.insert_event(out)
     }
-    gil.insert_event(
-      Event::at(id, EventType::ButtonChanged(Button::DPadUp, 0.0, btn_up), time),
-    )
-    out = Event::at(id, EventType::ButtonReleased(Button::DPadUp, btn_up), time)
+    gil.insert_event(Event::at(id, ButtonChanged(DPadUp, 0.0, btn_up), time))
+    out = Event::at(id, ButtonReleased(DPadUp, btn_up), time)
   }
   if release_down {
     if !out.is_dropped() {
       gil.insert_event(out)
     }
     gil.insert_event(
-      Event::at(
-        id,
-        EventType::ButtonChanged(Button::DPadDown, 0.0, btn_down),
-        time,
-      ),
+      Event::at(id, ButtonChanged(DPadDown, 0.0, btn_down), time),
     )
-    out = Event::at(
-      id,
-      EventType::ButtonReleased(Button::DPadDown, btn_down),
-      time,
-    )
+    out = Event::at(id, ButtonReleased(DPadDown, btn_down), time)
   }
   Some(out)
 }
@@ -473,8 +413,8 @@ pub fn Repeat::new() -> Repeat {
 ///|
 fn code_to_button_name(id : GamepadId, code : Code, gil : Gil) -> Button {
   match gil.axis_or_btn_name(id, code) {
-    Some(AxisOrBtn::Btn(b)) => b
-    _ => Button::Unknown
+    Some(Btn(b)) => b
+    _ => Unknown
   }
 }
 
@@ -502,7 +442,7 @@ pub fn Repeat::filter(self : Repeat, ev : Event?, gil : Gil) -> Event? {
                 return Some(
                   Event::at(
                     id,
-                    EventType::ButtonRepeated(btn, code),
+                    ButtonRepeated(btn, code),
                     data.timestamp() + self.after_ms,
                   ),
                 )
@@ -512,7 +452,7 @@ pub fn Repeat::filter(self : Repeat, ev : Event?, gil : Gil) -> Event? {
                 return Some(
                   Event::at(
                     id,
-                    EventType::ButtonRepeated(btn, code),
+                    ButtonRepeated(btn, code),
                     data.timestamp() + self.every_ms,
                   ),
                 )

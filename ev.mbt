@@ -31,10 +31,7 @@ pub(all) enum Axis {
 ///|
 pub fn Axis::is_stick(self : Axis) -> Bool {
   match self {
-    Axis::LeftStickX
-    | Axis::LeftStickY
-    | Axis::RightStickX
-    | Axis::RightStickY => true
+    LeftStickX | LeftStickY | RightStickX | RightStickY => true
     _ => false
   }
 }
@@ -42,12 +39,12 @@ pub fn Axis::is_stick(self : Axis) -> Bool {
 ///|
 pub fn Axis::second_axis(self : Axis) -> Axis? {
   match self {
-    Axis::LeftStickX => Some(Axis::LeftStickY)
-    Axis::LeftStickY => Some(Axis::LeftStickX)
-    Axis::RightStickX => Some(Axis::RightStickY)
-    Axis::RightStickY => Some(Axis::RightStickX)
-    Axis::DPadX => Some(Axis::DPadY)
-    Axis::DPadY => Some(Axis::DPadX)
+    LeftStickX => Some(LeftStickY)
+    LeftStickY => Some(LeftStickX)
+    RightStickX => Some(RightStickY)
+    RightStickY => Some(RightStickX)
+    DPadX => Some(DPadY)
+    DPadY => Some(DPadX)
     _ => None
   }
 }
@@ -97,12 +94,7 @@ pub(all) enum Button {
 ///|
 pub fn Button::is_action(self : Button) -> Bool {
   match self {
-    Button::South
-    | Button::East
-    | Button::North
-    | Button::West
-    | Button::C
-    | Button::Z => true
+    South | East | North | West | C | Z => true
     _ => false
   }
 }
@@ -110,10 +102,7 @@ pub fn Button::is_action(self : Button) -> Bool {
 ///|
 pub fn Button::is_trigger(self : Button) -> Bool {
   match self {
-    Button::LeftTrigger
-    | Button::LeftTrigger2
-    | Button::RightTrigger
-    | Button::RightTrigger2 => true
+    LeftTrigger | LeftTrigger2 | RightTrigger | RightTrigger2 => true
     _ => false
   }
 }
@@ -121,7 +110,7 @@ pub fn Button::is_trigger(self : Button) -> Bool {
 ///|
 pub fn Button::is_menu(self : Button) -> Bool {
   match self {
-    Button::Select | Button::Start | Button::Mode => true
+    Select | Start | Mode => true
     _ => false
   }
 }
@@ -129,7 +118,7 @@ pub fn Button::is_menu(self : Button) -> Bool {
 ///|
 pub fn Button::is_stick(self : Button) -> Bool {
   match self {
-    Button::LeftThumb | Button::RightThumb => true
+    LeftThumb | RightThumb => true
     _ => false
   }
 }
@@ -137,8 +126,7 @@ pub fn Button::is_stick(self : Button) -> Bool {
 ///|
 pub fn Button::is_dpad(self : Button) -> Bool {
   match self {
-    Button::DPadUp | Button::DPadDown | Button::DPadLeft | Button::DPadRight =>
-      true
+    DPadUp | DPadDown | DPadLeft | DPadRight => true
     _ => false
   }
 }

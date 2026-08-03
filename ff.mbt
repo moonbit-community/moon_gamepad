@@ -66,7 +66,7 @@ pub struct BaseEffect {
 ///|
 pub fn BaseEffect::default() -> BaseEffect {
   {
-    kind: BaseEffectType::Weak(0),
+    kind: Weak(0),
     scheduling: Replay::default(),
     envelope: Envelope::default(),
   }
@@ -79,7 +79,7 @@ pub enum FfRepeat {
 }
 
 ///|
-let _ff_repeat_keepalive : Array[FfRepeat] = [FfRepeat::For(0L)]
+let _ff_repeat_keepalive : Array[FfRepeat] = [For(0L)]
 
 ///|
 pub enum DistanceModel {
@@ -110,24 +110,12 @@ pub enum DistanceModel {
 
 ///|
 let _distance_model_keepalive : Array[DistanceModel] = [
-  DistanceModel::Linear(ref_distance=1.0, rolloff_factor=1.0, max_distance=2.0),
-  DistanceModel::LinearClamped(
-    ref_distance=1.0,
-    rolloff_factor=1.0,
-    max_distance=2.0,
-  ),
-  DistanceModel::Inverse(ref_distance=1.0, rolloff_factor=1.0),
-  DistanceModel::InverseClamped(
-    ref_distance=1.0,
-    rolloff_factor=1.0,
-    max_distance=2.0,
-  ),
-  DistanceModel::Exponential(ref_distance=1.0, rolloff_factor=1.0),
-  DistanceModel::ExponentialClamped(
-    ref_distance=1.0,
-    rolloff_factor=1.0,
-    max_distance=2.0,
-  ),
+  Linear(ref_distance=1.0, rolloff_factor=1.0, max_distance=2.0),
+  LinearClamped(ref_distance=1.0, rolloff_factor=1.0, max_distance=2.0),
+  Inverse(ref_distance=1.0, rolloff_factor=1.0),
+  InverseClamped(ref_distance=1.0, rolloff_factor=1.0, max_distance=2.0),
+  Exponential(ref_distance=1.0, rolloff_factor=1.0),
+  ExponentialClamped(ref_distance=1.0, rolloff_factor=1.0, max_distance=2.0),
 ]
 
 ///|
@@ -135,56 +123,52 @@ pub fn DistanceModel::validate(
   self : DistanceModel,
 ) -> Unit raise DistanceModelError {
   let (ref_distance, rolloff_factor, max_distance) = match self {
-    DistanceModel::None => (0.0, 0.0, 0.0)
-    DistanceModel::Linear(ref_distance~, rolloff_factor~, max_distance~) => {
+    None => (0.0, 0.0, 0.0)
+    Linear(ref_distance~, rolloff_factor~, max_distance~) => {
       if ref_distance == max_distance {
-        raise DistanceModelError::InvalidModelParameter
+        raise InvalidModelParameter
       }
       (ref_distance, rolloff_factor, max_distance)
     }
-    DistanceModel::LinearClamped(ref_distance~, rolloff_factor~, max_distance~) => {
+    LinearClamped(ref_distance~, rolloff_factor~, max_distance~) => {
       if ref_distance == max_distance {
-        raise DistanceModelError::InvalidModelParameter
+        raise InvalidModelParameter
       }
       (ref_distance, rolloff_factor, max_distance)
     }
-    DistanceModel::Inverse(ref_distance~, rolloff_factor~) => {
+    Inverse(ref_distance~, rolloff_factor~) => {
       if ref_distance <= 0.0 {
-        raise DistanceModelError::InvalidModelParameter
+        raise InvalidModelParameter
       }
       (ref_distance, rolloff_factor, 0.0)
     }
-    DistanceModel::InverseClamped(ref_distance~, rolloff_factor~, max_distance~) => {
+    InverseClamped(ref_distance~, rolloff_factor~, max_distance~) => {
       if ref_distance <= 0.0 {
-        raise DistanceModelError::InvalidModelParameter
+        raise InvalidModelParameter
       }
       (ref_distance, rolloff_factor, max_distance)
     }
-    DistanceModel::Exponential(ref_distance~, rolloff_factor~) => {
+    Exponential(ref_distance~, rolloff_factor~) => {
       if ref_distance <= 0.0 {
-        raise DistanceModelError::InvalidModelParameter
+        raise InvalidModelParameter
       }
       (ref_distance, rolloff_factor, 0.0)
     }
-    DistanceModel::ExponentialClamped(
-      ref_distance~,
-      rolloff_factor~,
-      max_distance~
-    ) => {
+    ExponentialClamped(ref_distance~, rolloff_factor~, max_distance~) => {
       if ref_distance <= 0.0 {
-        raise DistanceModelError::InvalidModelParameter
+        raise InvalidModelParameter
       }
       (ref_distance, rolloff_factor, max_distance)
     }
   }
   if ref_distance < 0.0 {
-    raise DistanceModelError::InvalidReferenceDistance
+    raise InvalidReferenceDistance
   }
   if rolloff_factor < 0.0 {
-    raise DistanceModelError::InvalidRolloffFactor
+    raise InvalidRolloffFactor
   }
   if max_distance < 0.0 {
-    raise DistanceModelError::InvalidMaxDistance
+    raise InvalidMaxDistance
   }
 }
 
@@ -275,13 +259,13 @@ fn BaseEffectType::scaled(
   rhs : Double,
 ) -> BaseEffectType {
   let mg = match self {
-    BaseEffectType::Weak(m) => m
-    BaseEffectType::Strong(m) => m
+    Weak(m) => m
+    Strong(m) => m
   }
   let mg2 = clamp_u16(mg.to_double() * rhs)
   match self {
-    BaseEffectType::Weak(_) => BaseEffectType::Weak(mg2)
-    BaseEffectType::Strong(_) => BaseEffectType::Strong(mg2)
+    Weak(_) => Weak(mg2)
+    Strong(_) => Strong(mg2)
   }
 }
 
@@ -318,33 +302,29 @@ fn DistanceModel::attenuation(
 ) -> Double {
   let mut distance = distance
   match self {
-    DistanceModel::Linear(ref_distance~, rolloff_factor~, max_distance~) => {
+    Linear(ref_distance~, rolloff_factor~, max_distance~) => {
       distance = if distance > max_distance { max_distance } else { distance }
       1.0 -
       rolloff_factor * (distance - ref_distance) / (max_distance - ref_distance)
     }
-    DistanceModel::LinearClamped(ref_distance~, rolloff_factor~, max_distance~) => {
+    LinearClamped(ref_distance~, rolloff_factor~, max_distance~) => {
       distance = clamp_distance(distance, ref_distance, max_distance)
       1.0 -
       rolloff_factor * (distance - ref_distance) / (max_distance - ref_distance)
     }
-    DistanceModel::Inverse(ref_distance~, rolloff_factor~) =>
+    Inverse(ref_distance~, rolloff_factor~) =>
       ref_distance / (ref_distance + rolloff_factor * (distance - ref_distance))
-    DistanceModel::InverseClamped(ref_distance~, rolloff_factor~, max_distance~) => {
+    InverseClamped(ref_distance~, rolloff_factor~, max_distance~) => {
       distance = clamp_distance(distance, ref_distance, max_distance)
       ref_distance / (ref_distance + rolloff_factor * (distance - ref_distance))
     }
-    DistanceModel::Exponential(ref_distance~, rolloff_factor~) =>
+    Exponential(ref_distance~, rolloff_factor~) =>
       @math.pow(distance / ref_distance, -rolloff_factor)
-    DistanceModel::ExponentialClamped(
-      ref_distance~,
-      rolloff_factor~,
-      max_distance~
-    ) => {
+    ExponentialClamped(ref_distance~, rolloff_factor~, max_distance~) => {
       distance = clamp_distance(distance, ref_distance, max_distance)
       @math.pow(distance / ref_distance, -rolloff_factor)
     }
-    DistanceModel::None => 1.0
+    None => 1.0
   }
 }
 
@@ -382,8 +362,8 @@ pub fn EffectBuilder::new() -> EffectBuilder {
   {
     gamepads: [],
     base_effects: [],
-    repeat_mode: FfRepeat::Infinitely,
-    distance_model: DistanceModel::None,
+    repeat_mode: Infinitely,
+    distance_model: None,
     position: (0.0, 0.0, 0.0),
     gain: 1.0,
     strong: 0.0,
@@ -511,27 +491,27 @@ pub fn EffectBuilder::finish(
   gil : Gil,
 ) -> Effect raise FfError {
   if self.gamepads.length() == 0 {
-    raise FfError::NoGamepads
+    raise NoGamepads
   }
   // Validate: connected + ff supported.
   for id in self.gamepads {
     match gil.gamepad(id) {
-      None => raise FfError::Disconnected(id)
+      None => raise Disconnected(id)
       Some(gp) =>
         if !gp.is_connected() {
-          raise FfError::Disconnected(id)
+          raise Disconnected(id)
         } else if !gp.is_ff_supported() {
-          raise FfError::FfNotSupported(id)
+          raise FfNotSupported(id)
         }
     }
   }
   // Must have a native backend to talk to.
   match gil.backend {
-    None => raise FfError::NotSupported
+    None => raise NotSupported
     Some(_) => ()
   }
   self.distance_model.validate() catch {
-    err => raise FfError::InvalidDistanceModel(err)
+    err => raise InvalidDistanceModel(err)
   }
   let effect : Effect = {
     gil,
@@ -560,10 +540,10 @@ pub fn Effect::set_gamepads(
   let out : Array[GamepadId] = []
   for id in ids {
     match gil.connected_gamepad(id) {
-      None => raise FfError::Disconnected(id)
+      None => raise Disconnected(id)
       Some(gp) =>
         if !gp.is_ff_supported() {
-          raise FfError::FfNotSupported(id)
+          raise FfNotSupported(id)
         } else if !contains_gamepad_id(out, id) {
           out.push(id)
         }
@@ -580,10 +560,10 @@ pub fn Effect::add_gamepad(
 ) -> Unit raise FfError {
   let id = gamepad.id()
   if !gamepad.is_connected() {
-    raise FfError::Disconnected(id)
+    raise Disconnected(id)
   }
   if !gamepad.is_ff_supported() {
-    raise FfError::FfNotSupported(id)
+    raise FfNotSupported(id)
   }
   if !contains_gamepad_id(self.gamepads, id) {
     self.gamepads.push(id)
@@ -609,7 +589,7 @@ pub fn Effect::set_distance_model(
   model : DistanceModel,
 ) -> Unit raise FfError {
   model.validate() catch {
-    err => raise FfError::InvalidDistanceModel(err)
+    err => raise InvalidDistanceModel(err)
   }
   self.distance_model = model
   self.gil.ff_set_effect_distance_model(self.effect_token, model)
@@ -627,7 +607,7 @@ pub fn Effect::set_position(
 ///|
 pub fn Effect::play(self : Effect) -> Unit raise FfError {
   if self.gil.backend is None {
-    raise FfError::NotSupported
+    raise NotSupported
   }
   self.gil.ff_upsert_effect_from_handle(self)
   let now = runtime_now_ms()
@@ -640,7 +620,7 @@ pub fn Effect::play(self : Effect) -> Unit raise FfError {
 ///|
 pub fn Effect::stop(self : Effect) -> Unit raise FfError {
   if self.gil.backend is None {
-    raise FfError::NotSupported
+    raise NotSupported
   }
   self.gil.ff_upsert_effect_from_handle(self)
   self.playing_since_ms = None

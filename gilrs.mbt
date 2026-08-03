@@ -19,12 +19,12 @@ suberror GilError {
 }
 
 ///|
-let _gilrs_error_keepalive : Array[GilError] = [GilError::NotImplemented]
+let _gilrs_error_keepalive : Array[GilError] = [NotImplemented]
 
 ///|
 pub fn GilError::is_invalid_axis_to_btn(self : GilError) -> Bool {
   match self {
-    GilError::InvalidAxisToBtn => true
+    InvalidAxisToBtn => true
     _ => false
   }
 }
@@ -60,7 +60,7 @@ fn GamepadData::new() -> GamepadData {
     product_id: None,
     ff_supported: false,
     listener_position: (0.0, 0.0, 0.0),
-    power_info: PowerInfo::Unknown,
+    power_info: Unknown,
     axes: [],
     buttons: [],
     axis_info: [],
@@ -195,7 +195,7 @@ pub fn Gil::set_axis_to_btn(
     pressed > 1.0 ||
     released < 0.0 ||
     released > 1.0 {
-    raise GilError::InvalidAxisToBtn
+    raise InvalidAxisToBtn
   }
   self.axis_to_btn_pressed = pressed
   self.axis_to_btn_released = released
@@ -314,8 +314,8 @@ fn ff_devices_contains(devices : Array[Int], id : Int) -> Bool {
 ///|
 fn ff_repeat_max_ticks(repeat : FfRepeat) -> Int? {
   match repeat {
-    FfRepeat::Infinitely => None
-    FfRepeat::For(ms) => {
+    Infinitely => None
+    For(ms) => {
       let q = Ticks::from_ms(ms)
       let ticks = (q.as_ms() / FF_TICK_DURATION_MS).to_int()
       Some(ticks)
@@ -354,8 +354,8 @@ fn Gil::ff_now_tick(self : Gil, now_ms : Int64) -> Int {
 fn Gil::ff_has_active_effect(self : Gil) -> Bool {
   for eff in self.ff_effects {
     match eff.state {
-      FfEffectState::Playing(_) => return true
-      FfEffectState::Stopped => ()
+      Playing(_) => return true
+      Stopped => ()
     }
   }
   false
@@ -392,7 +392,7 @@ fn Gil::ff_upsert_effect_from_handle(self : Gil, effect : Effect) -> Unit {
   let mut state = FfEffectState::Stopped
   match effect.playing_since_ms {
     None => ()
-    Some(_) => state = FfEffectState::Playing(self.ff_tick)
+    Some(_) => state = Playing(self.ff_tick)
   }
   match self.ff_find_effect_idx(token) {
     None =>
@@ -498,7 +498,7 @@ fn Gil::ff_set_effect_gain(self : Gil, token : Int, gain : Double) -> Unit {
 fn Gil::ff_play_effect(self : Gil, token : Int, tick : Int) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
-    Some(idx) => self.ff_effects[idx].state = FfEffectState::Playing(tick)
+    Some(idx) => self.ff_effects[idx].state = Playing(tick)
   }
   self.ff_dirty = true
 }
@@ -507,7 +507,7 @@ fn Gil::ff_play_effect(self : Gil, token : Int, tick : Int) -> Unit {
 fn Gil::ff_stop_effect(self : Gil, token : Int) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
-    Some(idx) => self.ff_effects[idx].state = FfEffectState::Stopped
+    Some(idx) => self.ff_effects[idx].state = Stopped
   }
   self.ff_dirty = true
 }
@@ -535,8 +535,8 @@ fn Gil::ff_combine_base_effects(
 ) -> FfMagnitude {
   let mut rel_ticks = 0
   match self.ff_effects[idx].state {
-    FfEffectState::Stopped => return { strong: 0, weak: 0 }
-    FfEffectState::Playing(since_tick) => {
+    Stopped => return { strong: 0, weak: 0 }
+    Playing(since_tick) => {
       rel_ticks = tick - since_tick
       if rel_ticks < 0 {
         rel_ticks = 0
@@ -548,14 +548,10 @@ fn Gil::ff_combine_base_effects(
     None => ()
     Some(max_dur) =>
       if rel_ticks > max_dur {
-        self.ff_effects[idx].state = FfEffectState::Stopped
+        self.ff_effects[idx].state = Stopped
         for id in self.ff_effects[idx].devices {
           self.ff_push_event(
-            Event::at(
-              GamepadId::new(id),
-              EventType::ForceFeedbackEffectCompleted,
-              now_ms,
-            ),
+            Event::at(GamepadId::new(id), ForceFeedbackEffectCompleted, now_ms),
           )
         }
         return { strong: 0, weak: 0 }
@@ -573,10 +569,8 @@ fn Gil::ff_combine_base_effects(
   let mut weak = self.ff_effects[idx].weak
   for effect in self.ff_effects[idx].base_effects {
     match effect.magnitude_at(rel_ticks) {
-      BaseEffectType::Strong(magnitude) =>
-        strong = u16_saturating_add(strong, magnitude)
-      BaseEffectType::Weak(magnitude) =>
-        weak = u16_saturating_add(weak, magnitude)
+      Strong(magnitude) => strong = u16_saturating_add(strong, magnitude)
+      Weak(magnitude) => weak = u16_saturating_add(weak, magnitude)
     }
   }
   { strong: u16_scale(strong, attenuation), weak: u16_scale(weak, attenuation) }
@@ -634,8 +628,8 @@ pub fn Gil::insert_event(self : Gil, ev : Event) -> Unit {
 fn Gil::apply_connection_event(self : Gil, ev : Event) -> Unit {
   let id = ev.id().value()
   match ev.event() {
-    EventType::Connected => self.set_connected(id, true)
-    EventType::Disconnected => self.set_connected(id, false)
+    Connected => self.set_connected(id, true)
+    Disconnected => self.set_connected(id, false)
     _ => ()
   }
 }
@@ -784,11 +778,11 @@ fn Gil::push_native_event(self : Gil, ne : NativeEvent) -> Unit {
   self.ensure_gamepad_data(id)
   let gid = GamepadId::new(id)
   match ne.tag {
-    NativeEventTag::Connected => {
+    Connected => {
       self.refresh_gamepad_data_on_connected(id, existed_before)
-      self.insert_event(Event::at(gid, EventType::Connected, ne.time_ms))
+      self.insert_event(Event::at(gid, Connected, ne.time_ms))
     }
-    NativeEventTag::Disconnected => {
+    Disconnected => {
       match self.backend {
         None => ()
         Some(b) => {
@@ -796,75 +790,59 @@ fn Gil::push_native_event(self : Gil, ne : NativeEvent) -> Unit {
         }
       }
       self.set_connected(id, false)
-      self.insert_event(Event::at(gid, EventType::Disconnected, ne.time_ms))
+      self.insert_event(Event::at(gid, Disconnected, ne.time_ms))
     }
-    NativeEventTag::ButtonPressed => {
+    ButtonPressed => {
       let code = ne.code
       match self.axis_or_btn_name(gid, code) {
-        Some(AxisOrBtn::Btn(btn)) => {
+        Some(Btn(btn)) => {
           self.insert_event(
-            Event::at(gid, EventType::ButtonPressed(btn, code), ne.time_ms),
+            Event::at(gid, ButtonPressed(btn, code), ne.time_ms),
           )
           self.insert_event(
-            Event::at(gid, EventType::ButtonChanged(btn, 1.0, code), ne.time_ms),
+            Event::at(gid, ButtonChanged(btn, 1.0, code), ne.time_ms),
           )
         }
-        Some(AxisOrBtn::Axis(axis)) =>
+        Some(Axis(axis)) =>
           self.insert_event(
-            Event::at(gid, EventType::AxisChanged(axis, 1.0, code), ne.time_ms),
+            Event::at(gid, AxisChanged(axis, 1.0, code), ne.time_ms),
           )
         None => {
           self.insert_event(
-            Event::at(
-              gid,
-              EventType::ButtonPressed(Button::Unknown, code),
-              ne.time_ms,
-            ),
+            Event::at(gid, ButtonPressed(Unknown, code), ne.time_ms),
           )
           self.insert_event(
-            Event::at(
-              gid,
-              EventType::ButtonChanged(Button::Unknown, 1.0, code),
-              ne.time_ms,
-            ),
+            Event::at(gid, ButtonChanged(Unknown, 1.0, code), ne.time_ms),
           )
         }
       }
     }
-    NativeEventTag::ButtonReleased => {
+    ButtonReleased => {
       let code = ne.code
       match self.axis_or_btn_name(gid, code) {
-        Some(AxisOrBtn::Btn(btn)) => {
+        Some(Btn(btn)) => {
           self.insert_event(
-            Event::at(gid, EventType::ButtonReleased(btn, code), ne.time_ms),
+            Event::at(gid, ButtonReleased(btn, code), ne.time_ms),
           )
           self.insert_event(
-            Event::at(gid, EventType::ButtonChanged(btn, 0.0, code), ne.time_ms),
+            Event::at(gid, ButtonChanged(btn, 0.0, code), ne.time_ms),
           )
         }
-        Some(AxisOrBtn::Axis(axis)) =>
+        Some(Axis(axis)) =>
           self.insert_event(
-            Event::at(gid, EventType::AxisChanged(axis, 0.0, code), ne.time_ms),
+            Event::at(gid, AxisChanged(axis, 0.0, code), ne.time_ms),
           )
         None => {
           self.insert_event(
-            Event::at(
-              gid,
-              EventType::ButtonReleased(Button::Unknown, code),
-              ne.time_ms,
-            ),
+            Event::at(gid, ButtonReleased(Unknown, code), ne.time_ms),
           )
           self.insert_event(
-            Event::at(
-              gid,
-              EventType::ButtonChanged(Button::Unknown, 0.0, code),
-              ne.time_ms,
-            ),
+            Event::at(gid, ButtonChanged(Unknown, 0.0, code), ne.time_ms),
           )
         }
       }
     }
-    NativeEventTag::AxisChanged => {
+    AxisChanged => {
       if id < 0 || id >= self.gamepads_data.length() {
         return
       }
@@ -875,79 +853,55 @@ fn Gil::push_native_event(self : Gil, ne : NativeEvent) -> Unit {
       }
       let raw_val = ne.value.to_int()
       match self.axis_or_btn_name(gid, code) {
-        Some(AxisOrBtn::Btn(btn)) => {
+        Some(Btn(btn)) => {
           let val = btn_value(info, raw_val)
           if val >= self.axis_to_btn_pressed &&
             !self.gamepads_data[id].state.is_pressed(code) {
             self.insert_event(
-              Event::at(gid, EventType::ButtonPressed(btn, code), ne.time_ms),
+              Event::at(gid, ButtonPressed(btn, code), ne.time_ms),
             )
             self.insert_event(
-              Event::at(
-                gid,
-                EventType::ButtonChanged(btn, val, code),
-                ne.time_ms,
-              ),
+              Event::at(gid, ButtonChanged(btn, val, code), ne.time_ms),
             )
           } else if val <= self.axis_to_btn_released &&
             self.gamepads_data[id].state.is_pressed(code) {
             self.insert_event(
-              Event::at(gid, EventType::ButtonReleased(btn, code), ne.time_ms),
+              Event::at(gid, ButtonReleased(btn, code), ne.time_ms),
             )
             self.insert_event(
-              Event::at(
-                gid,
-                EventType::ButtonChanged(btn, val, code),
-                ne.time_ms,
-              ),
+              Event::at(gid, ButtonChanged(btn, val, code), ne.time_ms),
             )
           } else {
             self.insert_event(
-              Event::at(
-                gid,
-                EventType::ButtonChanged(btn, val, code),
-                ne.time_ms,
-              ),
+              Event::at(gid, ButtonChanged(btn, val, code), ne.time_ms),
             )
           }
         }
-        Some(AxisOrBtn::Axis(axis)) => {
+        Some(Axis(axis)) => {
           let val = axis_value(info, raw_val, axis)
           self.insert_event(
-            Event::at(gid, EventType::AxisChanged(axis, val, code), ne.time_ms),
+            Event::at(gid, AxisChanged(axis, val, code), ne.time_ms),
           )
         }
         None => {
-          let val = axis_value(info, raw_val, Axis::Unknown)
+          let val = axis_value(info, raw_val, Unknown)
           self.insert_event(
-            Event::at(
-              gid,
-              EventType::AxisChanged(Axis::Unknown, val, code),
-              ne.time_ms,
-            ),
+            Event::at(gid, AxisChanged(Unknown, val, code), ne.time_ms),
           )
         }
       }
     }
-    NativeEventTag::ButtonChanged => {
+    ButtonChanged => {
       // Legacy tag: treat backend value as already normalized.
       let code = ne.code
       match self.axis_or_btn_name(gid, code) {
-        Some(AxisOrBtn::Btn(btn)) =>
+        Some(Btn(btn)) =>
           self.insert_event(
-            Event::at(
-              gid,
-              EventType::ButtonChanged(btn, ne.value, code),
-              ne.time_ms,
-            ),
+            Event::at(gid, ButtonChanged(btn, ne.value, code), ne.time_ms),
           )
-        Some(AxisOrBtn::Axis(axis)) =>
+        Some(Axis(axis)) =>
           self.insert_event(
-            Event::at(
-              gid,
-              EventType::AxisChanged(axis, ne.value, code),
-              ne.time_ms,
-            ),
+            Event::at(gid, AxisChanged(axis, ne.value, code), ne.time_ms),
           )
         None => ()
       }
@@ -1126,20 +1080,16 @@ pub fn Gil::update(self : Gil, event : Event) -> Unit {
   let time = event.time()
   let data = self.gamepads_data[id]
   match event.event() {
-    EventType::ButtonPressed(_, code) =>
+    ButtonPressed(_, code) =>
       data.state.set_btn_pressed(code, true, counter, time)
-    EventType::ButtonReleased(_, code) =>
+    ButtonReleased(_, code) =>
       data.state.set_btn_pressed(code, false, counter, time)
-    EventType::ButtonRepeated(_, code) =>
-      data.state.set_btn_repeating(code, counter, time)
-    EventType::ButtonChanged(_, value, code) =>
+    ButtonRepeated(_, code) => data.state.set_btn_repeating(code, counter, time)
+    ButtonChanged(_, value, code) =>
       data.state.set_btn_value(code, value, counter, time)
-    EventType::AxisChanged(_, value, code) =>
+    AxisChanged(_, value, code) =>
       data.state.set_axis_value(code, value, counter, time)
-    EventType::Connected
-    | EventType::Disconnected
-    | EventType::Dropped
-    | EventType::ForceFeedbackEffectCompleted => ()
+    Connected | Disconnected | Dropped | ForceFeedbackEffectCompleted => ()
   }
 }
 
@@ -1191,10 +1141,10 @@ pub fn Gil::set_mapping_data(
 ) -> String raise MappingError {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
-    raise MappingError::NotConnected
+    raise NotConnected
   }
   if !self.gamepads_data[i].connected {
-    raise MappingError::NotConnected
+    raise NotConnected
   }
   let mapping_name = match name {
     Some(s) => s
@@ -1218,11 +1168,11 @@ pub fn Gil::set_mapping_data_strict(
   mapping_data : MappingData,
   name? : String? = None,
 ) -> String raise MappingError {
-  if mapping_data.button(Button::C) is Some(_) ||
-    mapping_data.button(Button::Z) is Some(_) ||
-    mapping_data.axis(Axis::LeftZ) is Some(_) ||
-    mapping_data.axis(Axis::RightZ) is Some(_) {
-    raise MappingError::NotSdl2Compatible
+  if mapping_data.button(C) is Some(_) ||
+    mapping_data.button(Z) is Some(_) ||
+    mapping_data.axis(LeftZ) is Some(_) ||
+    mapping_data.axis(RightZ) is Some(_) {
+    raise NotSdl2Compatible
   }
   self.set_mapping_data(id, mapping_data, name~)
 }
@@ -1262,7 +1212,7 @@ pub fn Gil::axis_or_btn_name(
 pub fn Gil::axis_code(self : Gil, id : GamepadId, axis : Axis) -> Code? {
   match self.mapping(id) {
     None => None
-    Some(m) => m.map_rev(AxisOrBtn::Axis(axis))
+    Some(m) => m.map_rev(Axis(axis))
   }
 }
 
@@ -1270,7 +1220,7 @@ pub fn Gil::axis_code(self : Gil, id : GamepadId, axis : Axis) -> Code? {
 pub fn Gil::button_code(self : Gil, id : GamepadId, btn : Button) -> Code? {
   match self.mapping(id) {
     None => None
-    Some(m) => m.map_rev(AxisOrBtn::Btn(btn))
+    Some(m) => m.map_rev(Btn(btn))
   }
 }
 
@@ -1444,7 +1394,7 @@ pub fn GilBuilder::build(self : GilBuilder) -> Gil raise GilError {
     self.axis_to_btn_pressed > 1.0 ||
     self.axis_to_btn_released < 0.0 ||
     self.axis_to_btn_released > 1.0 {
-    raise GilError::InvalidAxisToBtn
+    raise InvalidAxisToBtn
   }
   let use_native_backend = self.use_native_backend &&
     self.mock_gamepad_count <= 0
@@ -1496,7 +1446,7 @@ pub enum MappingSource {
 }
 
 ///|
-let _mapping_source_keepalive : Array[MappingSource] = [MappingSource::None]
+let _mapping_source_keepalive : Array[MappingSource] = [None]
 
 ///|
 pub fn Gil::gamepad(self : Gil, id : GamepadId) -> Gamepad? {
@@ -1568,13 +1518,8 @@ pub fn Gamepad::os_name(self : Gamepad) -> String {
 ///|
 pub fn Gamepad::mapping_source(self : Gamepad) -> MappingSource {
   match self.mapping() {
-    Some(m) =>
-      if m.is_default() {
-        MappingSource::Driver
-      } else {
-        MappingSource::SdlMappings
-      }
-    None => MappingSource::None
+    Some(m) => if m.is_default() { Driver } else { SdlMappings }
+    None => None
   }
 }
 
@@ -1612,7 +1557,7 @@ pub fn Gamepad::product_id(self : Gamepad) -> Int? {
 pub fn Gamepad::power_info(self : Gamepad) -> PowerInfo {
   let i = self.id.value()
   if i < 0 || i >= self.gil.gamepads_data.length() {
-    PowerInfo::Unknown
+    Unknown
   } else {
     self.gil.gamepads_data[i].power_info
   }
@@ -1738,9 +1683,9 @@ pub fn Gamepad::set_listener_position(
   position : (Double, Double, Double),
 ) -> Unit raise FfError {
   if !self.is_connected() {
-    raise FfError::Disconnected(self.id)
+    raise Disconnected(self.id)
   } else if !self.is_ff_supported() {
-    raise FfError::FfNotSupported(self.id)
+    raise FfNotSupported(self.id)
   } else {
     let i = self.id.value()
     if i >= 0 && i < self.gil.gamepads_data.length() {

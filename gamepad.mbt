@@ -52,7 +52,7 @@ pub fn axis_value(info : AxisInfo, val : Int, axis : Axis) -> Double {
   v = v / range * twof - onef
   let mut out = v.to_double()
   let is_y_axis = match axis {
-    Axis::LeftStickY | Axis::RightStickY | Axis::DPadY => true
+    LeftStickY | RightStickY | DPadY => true
     _ => false
   }
   if is_y_axis_reversed() && is_y_axis && out != 0.0 {

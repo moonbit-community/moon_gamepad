@@ -25,16 +25,16 @@ suberror MappingError {
 
 ///|
 let _mapping_error_keepalive : Array[MappingError] = [
-  MappingError::NotImplemented,
-  MappingError::NotConnected,
-  MappingError::DuplicatedEntry,
-  MappingError::NotSdl2Compatible,
+  NotImplemented,
+  NotConnected,
+  DuplicatedEntry,
+  NotSdl2Compatible,
 ]
 
 ///|
 pub fn MappingError::invalid_code(self : MappingError) -> Code? {
   match self {
-    MappingError::InvalidCode(code) => Some(code)
+    InvalidCode(code) => Some(code)
     _ => None
   }
 }
@@ -76,15 +76,15 @@ fn button_same(a : Button, b : Button) -> Bool {
 ///|
 fn axis_or_btn_same(a : AxisOrBtn, b : AxisOrBtn) -> Bool {
   match a {
-    AxisOrBtn::Axis(ax) =>
+    Axis(ax) =>
       match b {
-        AxisOrBtn::Axis(bx) => axis_same(ax, bx)
-        AxisOrBtn::Btn(_) => false
+        Axis(bx) => axis_same(ax, bx)
+        Btn(_) => false
       }
-    AxisOrBtn::Btn(btn) =>
+    Btn(btn) =>
       match b {
-        AxisOrBtn::Axis(_) => false
-        AxisOrBtn::Btn(bn) => button_same(btn, bn)
+        Axis(_) => false
+        Btn(bn) => button_same(btn, bn)
       }
   }
 }
@@ -167,25 +167,25 @@ pub fn Mapping::parse_sdl_mapping(
   let parser = Parser::new(line)
   while true {
     let token_opt = parser.next_token() catch {
-      ParserError::Error(ParserErrorKind::EmptyValue, _) => continue
-      e => raise ParseSdlMappingError::ParseError(e)
+      Error(EmptyValue, _) => continue
+      e => raise ParseError(e)
     }
     match token_opt {
       None => break
       Some(token) =>
         match token {
-          Token::Uuid(_) => ()
-          Token::Platform(_) => ()
-          Token::Name(n) => mapping.name = n
-          Token::AxisMapping(idx, to, _, _, _) =>
+          Uuid(_) => ()
+          Platform(_) => ()
+          Name(n) => mapping.name = n
+          AxisMapping(idx, to, _, _, _) =>
             if idx >= 0 && idx < axes.length() {
               insert_mapping(mapping.mappings, axes[idx], to)
             }
-          Token::ButtonMapping(idx, to, _) =>
+          ButtonMapping(idx, to, _) =>
             if idx >= 0 && idx < buttons.length() {
               insert_mapping(mapping.mappings, buttons[idx], to)
             }
-          Token::HatMapping(hat, direction, to, _) => {
+          HatMapping(hat, direction, to, _) => {
             if hat != 0 {
               continue
             }
@@ -195,22 +195,14 @@ pub fn Mapping::parse_sdl_mapping(
               2 => (AXIS_DPADX, BTN_DPAD_RIGHT)
               8 => (AXIS_DPADX, BTN_DPAD_LEFT)
               0 => continue
-              _ => raise ParseSdlMappingError::UnknownHatDirection
+              _ => raise UnknownHatDirection
             }
             if to.is_button() {
               match to {
-                AxisOrBtn::Btn(Button::DPadLeft | Button::DPadRight) =>
-                  insert_mapping(
-                    mapping.mappings,
-                    from_axis,
-                    AxisOrBtn::Axis(Axis::DPadX),
-                  )
-                AxisOrBtn::Btn(Button::DPadUp | Button::DPadDown) =>
-                  insert_mapping(
-                    mapping.mappings,
-                    from_axis,
-                    AxisOrBtn::Axis(Axis::DPadY),
-                  )
+                Btn(DPadLeft | DPadRight) =>
+                  insert_mapping(mapping.mappings, from_axis, Axis(DPadX))
+                Btn(DPadUp | DPadDown) =>
+                  insert_mapping(mapping.mappings, from_axis, Axis(DPadY))
                 _ => ()
               }
               insert_mapping(mapping.mappings, from_btn, to)
@@ -320,9 +312,9 @@ fn add_button(
 ) -> String raise MappingError {
   let idx = match index_of_code(buttons, ev_code) {
     Some(i) => i
-    None => raise MappingError::InvalidCode(ev_code)
+    None => raise InvalidCode(ev_code)
   }
-  insert_mapping(mappings, ev_code, AxisOrBtn::Btn(mapped_btn))
+  insert_mapping(mappings, ev_code, Btn(mapped_btn))
   sdl_mappings + "\{ident}:b\{idx},"
 }
 
@@ -337,9 +329,9 @@ fn add_axis(
 ) -> String raise MappingError {
   let idx = match index_of_code(axes, ev_code) {
     Some(i) => i
-    None => raise MappingError::InvalidCode(ev_code)
+    None => raise InvalidCode(ev_code)
   }
-  insert_mapping(mappings, ev_code, AxisOrBtn::Axis(mapped_axis))
+  insert_mapping(mappings, ev_code, Axis(mapped_axis))
   sdl_mappings + "\{ident}:a\{idx},"
 }
 
@@ -352,259 +344,209 @@ pub fn Mapping::from_data(
   uuid : Uuid,
 ) -> (Mapping, String) raise MappingError {
   if !is_name_valid(name) {
-    raise MappingError::InvalidName
+    raise InvalidName
   }
-  if data.button(Button::Unknown) is Some(_) ||
-    data.axis(Axis::Unknown) is Some(_) {
-    raise MappingError::UnknownElement
+  if data.button(Unknown) is Some(_) || data.axis(Unknown) is Some(_) {
+    raise UnknownElement
   }
   let mappings : Array[(Code, AxisOrBtn)] = []
   let mut sdl_mappings = "\{uuid.simple()},\{name},"
-  if data.axis(Axis::LeftStickX) is Some(code) {
+  if data.axis(LeftStickX) is Some(code) {
     sdl_mappings = add_axis(
       "leftx",
       code,
-      Axis::LeftStickX,
+      LeftStickX,
       axes,
       sdl_mappings,
       mappings,
     )
   }
-  if data.axis(Axis::LeftStickY) is Some(code) {
+  if data.axis(LeftStickY) is Some(code) {
     sdl_mappings = add_axis(
       "lefty",
       code,
-      Axis::LeftStickY,
+      LeftStickY,
       axes,
       sdl_mappings,
       mappings,
     )
   }
-  if data.axis(Axis::LeftZ) is Some(code) {
-    sdl_mappings = add_axis(
-      "leftz",
-      code,
-      Axis::LeftZ,
-      axes,
-      sdl_mappings,
-      mappings,
-    )
+  if data.axis(LeftZ) is Some(code) {
+    sdl_mappings = add_axis("leftz", code, LeftZ, axes, sdl_mappings, mappings)
   }
-  if data.axis(Axis::RightStickX) is Some(code) {
+  if data.axis(RightStickX) is Some(code) {
     sdl_mappings = add_axis(
       "rightx",
       code,
-      Axis::RightStickX,
+      RightStickX,
       axes,
       sdl_mappings,
       mappings,
     )
   }
-  if data.axis(Axis::RightStickY) is Some(code) {
+  if data.axis(RightStickY) is Some(code) {
     sdl_mappings = add_axis(
       "righty",
       code,
-      Axis::RightStickY,
+      RightStickY,
       axes,
       sdl_mappings,
       mappings,
     )
   }
-  if data.axis(Axis::RightZ) is Some(code) {
+  if data.axis(RightZ) is Some(code) {
     sdl_mappings = add_axis(
       "rightz",
       code,
-      Axis::RightZ,
+      RightZ,
       axes,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::South) is Some(code) {
-    sdl_mappings = add_button(
-      "a",
-      code,
-      Button::South,
-      buttons,
-      sdl_mappings,
-      mappings,
-    )
+  if data.button(South) is Some(code) {
+    sdl_mappings = add_button("a", code, South, buttons, sdl_mappings, mappings)
   }
-  if data.button(Button::East) is Some(code) {
-    sdl_mappings = add_button(
-      "b",
-      code,
-      Button::East,
-      buttons,
-      sdl_mappings,
-      mappings,
-    )
+  if data.button(East) is Some(code) {
+    sdl_mappings = add_button("b", code, East, buttons, sdl_mappings, mappings)
   }
-  if data.button(Button::C) is Some(code) {
-    sdl_mappings = add_button(
-      "c",
-      code,
-      Button::C,
-      buttons,
-      sdl_mappings,
-      mappings,
-    )
+  if data.button(C) is Some(code) {
+    sdl_mappings = add_button("c", code, C, buttons, sdl_mappings, mappings)
   }
-  if data.button(Button::West) is Some(code) {
-    sdl_mappings = add_button(
-      "x",
-      code,
-      Button::West,
-      buttons,
-      sdl_mappings,
-      mappings,
-    )
+  if data.button(West) is Some(code) {
+    sdl_mappings = add_button("x", code, West, buttons, sdl_mappings, mappings)
   }
-  if data.button(Button::North) is Some(code) {
-    sdl_mappings = add_button(
-      "y",
-      code,
-      Button::North,
-      buttons,
-      sdl_mappings,
-      mappings,
-    )
+  if data.button(North) is Some(code) {
+    sdl_mappings = add_button("y", code, North, buttons, sdl_mappings, mappings)
   }
-  if data.button(Button::Z) is Some(code) {
-    sdl_mappings = add_button(
-      "z",
-      code,
-      Button::Z,
-      buttons,
-      sdl_mappings,
-      mappings,
-    )
+  if data.button(Z) is Some(code) {
+    sdl_mappings = add_button("z", code, Z, buttons, sdl_mappings, mappings)
   }
-  if data.button(Button::LeftTrigger) is Some(code) {
+  if data.button(LeftTrigger) is Some(code) {
     sdl_mappings = add_button(
       "leftshoulder",
       code,
-      Button::LeftTrigger,
+      LeftTrigger,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::RightTrigger) is Some(code) {
+  if data.button(RightTrigger) is Some(code) {
     sdl_mappings = add_button(
       "rightshoulder",
       code,
-      Button::RightTrigger,
+      RightTrigger,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::LeftTrigger2) is Some(code) {
+  if data.button(LeftTrigger2) is Some(code) {
     sdl_mappings = add_button(
       "lefttrigger",
       code,
-      Button::LeftTrigger2,
+      LeftTrigger2,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::RightTrigger2) is Some(code) {
+  if data.button(RightTrigger2) is Some(code) {
     sdl_mappings = add_button(
       "righttrigger",
       code,
-      Button::RightTrigger2,
+      RightTrigger2,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::Select) is Some(code) {
+  if data.button(Select) is Some(code) {
     sdl_mappings = add_button(
       "back",
       code,
-      Button::Select,
+      Select,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::Start) is Some(code) {
+  if data.button(Start) is Some(code) {
     sdl_mappings = add_button(
       "start",
       code,
-      Button::Start,
+      Start,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::Mode) is Some(code) {
+  if data.button(Mode) is Some(code) {
     sdl_mappings = add_button(
       "guide",
       code,
-      Button::Mode,
+      Mode,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::LeftThumb) is Some(code) {
+  if data.button(LeftThumb) is Some(code) {
     sdl_mappings = add_button(
       "leftstick",
       code,
-      Button::LeftThumb,
+      LeftThumb,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::RightThumb) is Some(code) {
+  if data.button(RightThumb) is Some(code) {
     sdl_mappings = add_button(
       "rightstick",
       code,
-      Button::RightThumb,
+      RightThumb,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::DPadUp) is Some(code) {
+  if data.button(DPadUp) is Some(code) {
     sdl_mappings = add_button(
       "dpup",
       code,
-      Button::DPadUp,
+      DPadUp,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::DPadDown) is Some(code) {
+  if data.button(DPadDown) is Some(code) {
     sdl_mappings = add_button(
       "dpdown",
       code,
-      Button::DPadDown,
+      DPadDown,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::DPadLeft) is Some(code) {
+  if data.button(DPadLeft) is Some(code) {
     sdl_mappings = add_button(
       "dpleft",
       code,
-      Button::DPadLeft,
+      DPadLeft,
       buttons,
       sdl_mappings,
       mappings,
     )
   }
-  if data.button(Button::DPadRight) is Some(code) {
+  if data.button(DPadRight) is Some(code) {
     sdl_mappings = add_button(
       "dpright",
       code,
-      Button::DPadRight,
+      DPadRight,
       buttons,
       sdl_mappings,
       mappings,

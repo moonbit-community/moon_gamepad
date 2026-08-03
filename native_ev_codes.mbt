@@ -232,17 +232,17 @@ pub const LEGACY_AXIS_LT2 : Code = 111
 pub fn axis_from_code(code : Code) -> Axis? {
   // On macOS, several "unconfirmed" constants share usage=0 and collapse into one code.
   if code == AXIS_RIGHTZ {
-    return Some(Axis::RightZ)
+    return Some(RightZ)
   }
   match code {
-    AXIS_LSTICKX | LEGACY_AXIS_LSTICKX => Some(Axis::LeftStickX)
-    AXIS_LSTICKY | LEGACY_AXIS_LSTICKY => Some(Axis::LeftStickY)
-    LEGACY_AXIS_LEFTZ => Some(Axis::LeftZ)
-    AXIS_RSTICKX | LEGACY_AXIS_RSTICKX => Some(Axis::RightStickX)
-    AXIS_RSTICKY | LEGACY_AXIS_RSTICKY => Some(Axis::RightStickY)
-    LEGACY_AXIS_RIGHTZ => Some(Axis::RightZ)
-    AXIS_DPADX | LEGACY_AXIS_DPADX => Some(Axis::DPadX)
-    AXIS_DPADY | LEGACY_AXIS_DPADY => Some(Axis::DPadY)
+    AXIS_LSTICKX | LEGACY_AXIS_LSTICKX => Some(LeftStickX)
+    AXIS_LSTICKY | LEGACY_AXIS_LSTICKY => Some(LeftStickY)
+    LEGACY_AXIS_LEFTZ => Some(LeftZ)
+    AXIS_RSTICKX | LEGACY_AXIS_RSTICKX => Some(RightStickX)
+    AXIS_RSTICKY | LEGACY_AXIS_RSTICKY => Some(RightStickY)
+    LEGACY_AXIS_RIGHTZ => Some(RightZ)
+    AXIS_DPADX | LEGACY_AXIS_DPADX => Some(DPadX)
+    AXIS_DPADY | LEGACY_AXIS_DPADY => Some(DPadY)
     _ => None
   }
 }
@@ -250,25 +250,25 @@ pub fn axis_from_code(code : Code) -> Axis? {
 ///|
 pub fn button_from_code(code : Code) -> Button? {
   match code {
-    BTN_SOUTH | LEGACY_BTN_SOUTH => Some(Button::South)
-    BTN_EAST | LEGACY_BTN_EAST => Some(Button::East)
-    BTN_C | LEGACY_BTN_C => Some(Button::C)
-    BTN_NORTH | LEGACY_BTN_NORTH => Some(Button::North)
-    BTN_WEST | LEGACY_BTN_WEST => Some(Button::West)
-    BTN_Z | LEGACY_BTN_Z => Some(Button::Z)
-    BTN_LT | LEGACY_BTN_LT => Some(Button::LeftTrigger)
-    BTN_RT | LEGACY_BTN_RT => Some(Button::RightTrigger)
-    BTN_LT2 | LEGACY_BTN_LT2 => Some(Button::LeftTrigger2)
-    BTN_RT2 | LEGACY_BTN_RT2 => Some(Button::RightTrigger2)
-    BTN_SELECT | LEGACY_BTN_SELECT => Some(Button::Select)
-    BTN_START | LEGACY_BTN_START => Some(Button::Start)
-    BTN_MODE | LEGACY_BTN_MODE => Some(Button::Mode)
-    BTN_LTHUMB | LEGACY_BTN_LTHUMB => Some(Button::LeftThumb)
-    BTN_RTHUMB | LEGACY_BTN_RTHUMB => Some(Button::RightThumb)
-    BTN_DPAD_UP | LEGACY_BTN_DPAD_UP => Some(Button::DPadUp)
-    BTN_DPAD_DOWN | LEGACY_BTN_DPAD_DOWN => Some(Button::DPadDown)
-    BTN_DPAD_LEFT | LEGACY_BTN_DPAD_LEFT => Some(Button::DPadLeft)
-    BTN_DPAD_RIGHT | LEGACY_BTN_DPAD_RIGHT => Some(Button::DPadRight)
+    BTN_SOUTH | LEGACY_BTN_SOUTH => Some(South)
+    BTN_EAST | LEGACY_BTN_EAST => Some(East)
+    BTN_C | LEGACY_BTN_C => Some(C)
+    BTN_NORTH | LEGACY_BTN_NORTH => Some(North)
+    BTN_WEST | LEGACY_BTN_WEST => Some(West)
+    BTN_Z | LEGACY_BTN_Z => Some(Z)
+    BTN_LT | LEGACY_BTN_LT => Some(LeftTrigger)
+    BTN_RT | LEGACY_BTN_RT => Some(RightTrigger)
+    BTN_LT2 | LEGACY_BTN_LT2 => Some(LeftTrigger2)
+    BTN_RT2 | LEGACY_BTN_RT2 => Some(RightTrigger2)
+    BTN_SELECT | LEGACY_BTN_SELECT => Some(Select)
+    BTN_START | LEGACY_BTN_START => Some(Start)
+    BTN_MODE | LEGACY_BTN_MODE => Some(Mode)
+    BTN_LTHUMB | LEGACY_BTN_LTHUMB => Some(LeftThumb)
+    BTN_RTHUMB | LEGACY_BTN_RTHUMB => Some(RightThumb)
+    BTN_DPAD_UP | LEGACY_BTN_DPAD_UP => Some(DPadUp)
+    BTN_DPAD_DOWN | LEGACY_BTN_DPAD_DOWN => Some(DPadDown)
+    BTN_DPAD_LEFT | LEGACY_BTN_DPAD_LEFT => Some(DPadLeft)
+    BTN_DPAD_RIGHT | LEGACY_BTN_DPAD_RIGHT => Some(DPadRight)
     _ => None
   }
 }
@@ -277,19 +277,17 @@ pub fn button_from_code(code : Code) -> Button? {
 pub fn axis_or_btn_from_code(code : Code) -> AxisOrBtn? {
   match code {
     // Analog triggers are axes on some backends, but map to Button semantics in gil.
-    AXIS_LT2 | LEGACY_AXIS_LT2 =>
-      return Some(AxisOrBtn::Btn(Button::LeftTrigger2))
-    AXIS_RT2 | LEGACY_AXIS_RT2 =>
-      return Some(AxisOrBtn::Btn(Button::RightTrigger2))
-    LEGACY_AXIS_LT => return Some(AxisOrBtn::Btn(Button::LeftTrigger))
-    LEGACY_AXIS_RT => return Some(AxisOrBtn::Btn(Button::RightTrigger))
+    AXIS_LT2 | LEGACY_AXIS_LT2 => return Some(Btn(LeftTrigger2))
+    AXIS_RT2 | LEGACY_AXIS_RT2 => return Some(Btn(RightTrigger2))
+    LEGACY_AXIS_LT => return Some(Btn(LeftTrigger))
+    LEGACY_AXIS_RT => return Some(Btn(RightTrigger))
     _ => ()
   }
   match axis_from_code(code) {
-    Some(a) => Some(AxisOrBtn::Axis(a))
+    Some(a) => Some(Axis(a))
     None =>
       match button_from_code(code) {
-        Some(b) => Some(AxisOrBtn::Btn(b))
+        Some(b) => Some(Btn(b))
         None => None
       }
   }
@@ -298,40 +296,40 @@ pub fn axis_or_btn_from_code(code : Code) -> AxisOrBtn? {
 ///|
 pub fn default_axis_code(axis : Axis) -> Code? {
   match axis {
-    Axis::LeftStickX => Some(AXIS_LSTICKX)
-    Axis::LeftStickY => Some(AXIS_LSTICKY)
-    Axis::LeftZ => Some(LEGACY_AXIS_LEFTZ)
-    Axis::RightStickX => Some(AXIS_RSTICKX)
-    Axis::RightStickY => Some(AXIS_RSTICKY)
-    Axis::RightZ => Some(LEGACY_AXIS_RIGHTZ)
-    Axis::DPadX => Some(AXIS_DPADX)
-    Axis::DPadY => Some(AXIS_DPADY)
-    Axis::Unknown => None
+    LeftStickX => Some(AXIS_LSTICKX)
+    LeftStickY => Some(AXIS_LSTICKY)
+    LeftZ => Some(LEGACY_AXIS_LEFTZ)
+    RightStickX => Some(AXIS_RSTICKX)
+    RightStickY => Some(AXIS_RSTICKY)
+    RightZ => Some(LEGACY_AXIS_RIGHTZ)
+    DPadX => Some(AXIS_DPADX)
+    DPadY => Some(AXIS_DPADY)
+    Unknown => None
   }
 }
 
 ///|
 pub fn default_button_code(btn : Button) -> Code? {
   match btn {
-    Button::South => Some(BTN_SOUTH)
-    Button::East => Some(BTN_EAST)
-    Button::C => Some(BTN_C)
-    Button::North => Some(BTN_NORTH)
-    Button::West => Some(BTN_WEST)
-    Button::Z => Some(BTN_Z)
-    Button::LeftTrigger => Some(BTN_LT)
-    Button::RightTrigger => Some(BTN_RT)
-    Button::LeftTrigger2 => Some(BTN_LT2)
-    Button::RightTrigger2 => Some(BTN_RT2)
-    Button::Select => Some(BTN_SELECT)
-    Button::Start => Some(BTN_START)
-    Button::Mode => Some(BTN_MODE)
-    Button::LeftThumb => Some(BTN_LTHUMB)
-    Button::RightThumb => Some(BTN_RTHUMB)
-    Button::DPadUp => Some(BTN_DPAD_UP)
-    Button::DPadDown => Some(BTN_DPAD_DOWN)
-    Button::DPadLeft => Some(BTN_DPAD_LEFT)
-    Button::DPadRight => Some(BTN_DPAD_RIGHT)
-    Button::Unknown => None
+    South => Some(BTN_SOUTH)
+    East => Some(BTN_EAST)
+    C => Some(BTN_C)
+    North => Some(BTN_NORTH)
+    West => Some(BTN_WEST)
+    Z => Some(BTN_Z)
+    LeftTrigger => Some(BTN_LT)
+    RightTrigger => Some(BTN_RT)
+    LeftTrigger2 => Some(BTN_LT2)
+    RightTrigger2 => Some(BTN_RT2)
+    Select => Some(BTN_SELECT)
+    Start => Some(BTN_START)
+    Mode => Some(BTN_MODE)
+    LeftThumb => Some(BTN_LTHUMB)
+    RightThumb => Some(BTN_RTHUMB)
+    DPadUp => Some(BTN_DPAD_UP)
+    DPadDown => Some(BTN_DPAD_DOWN)
+    DPadLeft => Some(BTN_DPAD_LEFT)
+    DPadRight => Some(BTN_DPAD_RIGHT)
+    Unknown => None
   }
 }

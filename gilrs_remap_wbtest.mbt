@@ -15,11 +15,11 @@
 ///|
 fn ev_sig(e : Event) -> (Int, Int, Double, Int) {
   match e.event() {
-    EventType::AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
-    EventType::ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
-    EventType::ButtonChanged(btn, val, code) => (2, btn.to_index(), val, code)
-    EventType::ButtonRepeated(btn, code) => (3, btn.to_index(), 0.0, code)
-    EventType::ButtonReleased(btn, code) => (4, btn.to_index(), 0.0, code)
+    AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
+    ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
+    ButtonChanged(btn, val, code) => (2, btn.to_index(), val, code)
+    ButtonRepeated(btn, code) => (3, btn.to_index(), 0.0, code)
+    ButtonReleased(btn, code) => (4, btn.to_index(), 0.0, code)
     _ => (99, 0, 0.0, 0)
   }
 }
@@ -93,7 +93,7 @@ test "native remap: digital button emits edge then value" {
   g.gamepads_data[0].axes = []
   g.apply_identity_mapping(0)
   g.push_native_event({
-    tag: NativeEventTag::ButtonPressed,
+    tag: ButtonPressed,
     id: 0,
     code: BTN_SOUTH,
     value: 1.0,
@@ -117,10 +117,10 @@ test "native remap: digital button emits edge then value" {
 test "native remap: button mapped to axis produces axis change" {
   let g = Gil::new_mock(1, update_state=true, default_filters=false)
   let m = Mapping::new_default()
-  m.insert(BTN_DPAD_UP, AxisOrBtn::Axis(Axis::DPadY))
+  m.insert(BTN_DPAD_UP, Axis(DPadY))
   g.gamepads_data[0].mapping = m
   g.push_native_event({
-    tag: NativeEventTag::ButtonPressed,
+    tag: ButtonPressed,
     id: 0,
     code: BTN_DPAD_UP,
     value: 1.0,
@@ -143,7 +143,7 @@ test "native remap: axis mapped to button uses thresholds" {
 
   // 0.0 -> ButtonChanged
   g.push_native_event({
-    tag: NativeEventTag::AxisChanged,
+    tag: AxisChanged,
     id: 0,
     code: AXIS_LT2,
     value: 0.0,
@@ -157,7 +157,7 @@ test "native remap: axis mapped to button uses thresholds" {
 
   // 0.75 -> edge + value
   g.push_native_event({
-    tag: NativeEventTag::AxisChanged,
+    tag: AxisChanged,
     id: 0,
     code: AXIS_LT2,
     value: 3.0,
@@ -178,7 +178,7 @@ test "native remap: axis mapped to button uses thresholds" {
 
   // 1.0 -> ButtonChanged only
   g.push_native_event({
-    tag: NativeEventTag::AxisChanged,
+    tag: AxisChanged,
     id: 0,
     code: AXIS_LT2,
     value: 4.0,
@@ -192,7 +192,7 @@ test "native remap: axis mapped to button uses thresholds" {
 
   // 0.5 -> release edge + value
   g.push_native_event({
-    tag: NativeEventTag::AxisChanged,
+    tag: AxisChanged,
     id: 0,
     code: AXIS_LT2,
     value: 2.0,
@@ -222,7 +222,7 @@ test "native remap: axis-to-button threshold edges are inclusive" {
 
   // Exactly at pressed threshold (0.75) should trigger press + changed.
   g.push_native_event({
-    tag: NativeEventTag::AxisChanged,
+    tag: AxisChanged,
     id: 0,
     code: AXIS_LT2,
     value: 75.0,
@@ -243,7 +243,7 @@ test "native remap: axis-to-button threshold edges are inclusive" {
 
   // Exactly at released threshold (0.65) should trigger release + changed.
   g.push_native_event({
-    tag: NativeEventTag::AxisChanged,
+    tag: AxisChanged,
     id: 0,
     code: AXIS_LT2,
     value: 65.0,
@@ -272,16 +272,14 @@ test "native connected on existing id resets state and rebuilds mapping" {
   g.apply_identity_mapping(0)
 
   let custom = Mapping::new()
-  custom.insert(BTN_SOUTH, AxisOrBtn::Btn(Button::West))
+  custom.insert(BTN_SOUTH, Btn(West))
   g.gamepads_data[0].mapping = custom
 
-  g.update(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 1L),
-  )
+  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 1L))
   inspect(g.gamepads_data[0].state.is_pressed(BTN_SOUTH), content="true")
 
   g.push_native_event({
-    tag: NativeEventTag::Connected,
+    tag: Connected,
     id: 0,
     code: 0,
     value: 0.0,
@@ -292,7 +290,7 @@ test "native connected on existing id resets state and rebuilds mapping" {
 
   inspect(g.gamepads_data[0].state.is_pressed(BTN_SOUTH), content="false")
   let remapped = match g.gamepads_data[0].mapping.map(BTN_SOUTH) {
-    Some(AxisOrBtn::Btn(Button::South)) => true
+    Some(Btn(South)) => true
     _ => false
   }
   inspect(remapped, content="true")
@@ -306,11 +304,9 @@ test "repeat filter ignores disconnected gamepads" {
   g.gamepads_data[0].axes = []
   g.apply_identity_mapping(0)
 
-  g.update(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
-  )
+  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
   g.push_native_event({
-    tag: NativeEventTag::Disconnected,
+    tag: Disconnected,
     id: 0,
     code: 0,
     value: 0.0,
@@ -333,12 +329,10 @@ test "repeat filter scans connected ids only" {
   g.apply_identity_mapping(0)
   g.apply_identity_mapping(1)
 
-  g.update(
-    Event::at(id0, EventType::ButtonPressed(Button::South, BTN_SOUTH), 0L),
-  )
-  g.update(Event::at(id1, EventType::ButtonPressed(Button::East, BTN_EAST), 0L))
+  g.update(Event::at(id0, ButtonPressed(South, BTN_SOUTH), 0L))
+  g.update(Event::at(id1, ButtonPressed(East, BTN_EAST), 0L))
   g.push_native_event({
-    tag: NativeEventTag::Disconnected,
+    tag: Disconnected,
     id: 0,
     code: 0,
     value: 0.0,
@@ -361,9 +355,7 @@ test "repeat uses runtime clock fallback when logical clock is unset" {
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
   g.apply_identity_mapping(0)
-  g.update(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 100L),
-  )
+  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 100L))
   g.set_time(0L)
   let out = Repeat::new().filter(None, g)
   runtime_now_clear_for_test()
@@ -378,9 +370,7 @@ test "repeat uses runtime clock even when logical clock is set" {
   g.gamepads_data[0].buttons = [BTN_SOUTH]
   g.gamepads_data[0].axes = []
   g.apply_identity_mapping(0)
-  g.update(
-    Event::at(id, EventType::ButtonPressed(Button::South, BTN_SOUTH), 100L),
-  )
+  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 100L))
   g.set_time(500L)
   let out = Repeat::new().filter(None, g)
   runtime_now_clear_for_test()
@@ -396,11 +386,11 @@ test "set_mapping_data updates mapping and returns SDL line" {
   g.gamepads_data[0].name = "Mock Pad"
 
   let data = MappingData::new()
-  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  ignore(data.insert_btn(BTN_SOUTH, South))
   let s = g.set_mapping_data(id, data, name=Some("Custom Pad"))
 
   let mapped_ok = match g.mapping(id).unwrap().map(BTN_SOUTH) {
-    Some(AxisOrBtn::Btn(Button::South)) => true
+    Some(Btn(South)) => true
     _ => false
   }
   inspect(mapped_ok, content="true")
@@ -412,7 +402,7 @@ test "set_mapping_data returns NotConnected for disconnected gamepad" {
   let g = Gil::new_mock(1, update_state=false, default_filters=false)
   let id = GamepadId::new(0)
   g.push_native_event({
-    tag: NativeEventTag::Disconnected,
+    tag: Disconnected,
     id: 0,
     code: 0,
     value: 0.0,
@@ -420,14 +410,14 @@ test "set_mapping_data returns NotConnected for disconnected gamepad" {
   })
 
   let data = MappingData::new()
-  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  ignore(data.insert_btn(BTN_SOUTH, South))
   let res : Result[String, MappingError] = try
     g.set_mapping_data(id, data) |> Ok
   catch {
     e => Err(e)
   }
   let ok = match res {
-    Err(MappingError::NotConnected) => true
+    Err(NotConnected) => true
     _ => false
   }
   inspect(ok, content="true")
@@ -441,14 +431,14 @@ test "set_mapping_data_strict rejects SDL-incompatible entries" {
   g.gamepads_data[0].axes = []
 
   let data = MappingData::new()
-  ignore(data.insert_btn(BTN_C, Button::C))
+  ignore(data.insert_btn(BTN_C, C))
   let res : Result[String, MappingError] = try
     g.set_mapping_data_strict(id, data) |> Ok
   catch {
     e => Err(e)
   }
   let ok = match res {
-    Err(MappingError::NotSdl2Compatible) => true
+    Err(NotSdl2Compatible) => true
     _ => false
   }
   inspect(ok, content="true")
@@ -460,7 +450,7 @@ test "connected_gamepad returns None after disconnect while gamepad still exists
   let id = GamepadId::new(0)
   inspect(g.connected_gamepad(id) is Some(_), content="true")
   g.push_native_event({
-    tag: NativeEventTag::Disconnected,
+    tag: Disconnected,
     id: 0,
     code: 0,
     value: 0.0,
@@ -485,7 +475,7 @@ test "gamepad map_name follows mapping default/name semantics" {
   // Non-default mapping with custom name => Some(name)
   g.gamepads_data[0].name = "Mock Pad"
   let data = MappingData::new()
-  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  ignore(data.insert_btn(BTN_SOUTH, South))
   ignore(g.set_mapping_data(id, data, name=Some("Named Mapping")))
   let n1 = g.gamepad(id).unwrap().map_name()
   debug_inspect(n1, content="Some(\"Named Mapping\")")
@@ -522,7 +512,7 @@ test "builder add_mappings participates in connected remap" {
   g.gamepads_data[0].axes = []
 
   g.push_native_event({
-    tag: NativeEventTag::Connected,
+    tag: Connected,
     id: 0,
     code: 0,
     value: 0.0,
@@ -530,7 +520,7 @@ test "builder add_mappings participates in connected remap" {
   })
   ignore(g.next_event())
   let mapped = match g.mapping(id).unwrap().map(BTN_SOUTH) {
-    Some(AxisOrBtn::Btn(Button::East)) => true
+    Some(Btn(East)) => true
     _ => false
   }
   inspect(mapped, content="true")
@@ -545,7 +535,7 @@ test "mapping_source reports Driver for default mapping" {
   g.apply_identity_mapping(0)
   let source = g.gamepad(id).unwrap().mapping_source()
   let ok = match source {
-    MappingSource::Driver => true
+    Driver => true
     _ => false
   }
   inspect(ok, content="true")
@@ -559,11 +549,11 @@ test "mapping_source reports SdlMappings for parsed SDL mapping" {
   g.gamepads_data[0].axes = []
   g.gamepads_data[0].name = "Mock Pad"
   let data = MappingData::new()
-  ignore(data.insert_btn(BTN_SOUTH, Button::South))
+  ignore(data.insert_btn(BTN_SOUTH, South))
   ignore(g.set_mapping_data(id, data, name=Some("Mapped Pad")))
   let source = g.gamepad(id).unwrap().mapping_source()
   let ok = match source {
-    MappingSource::SdlMappings => true
+    SdlMappings => true
     _ => false
   }
   inspect(ok, content="true")
@@ -575,7 +565,7 @@ test "mapping_source reports None for invalid gamepad handle" {
   let ghost : Gamepad = { gil: g, id: GamepadId::new(99) }
   let source = ghost.mapping_source()
   let ok = match source {
-    MappingSource::None => true
+    None => true
     _ => false
   }
   inspect(ok, content="true")
@@ -607,7 +597,7 @@ test "builder set_axis_to_btn affects axis-to-button press edge" {
   g.apply_identity_mapping(0)
 
   g.push_native_event({
-    tag: NativeEventTag::AxisChanged,
+    tag: AxisChanged,
     id: 0,
     code: AXIS_LT2,
     value: 50.0,
@@ -757,7 +747,7 @@ test "ff completed event is emitted before queued events when due" {
   let built : Result[Effect, FfError] = try
     EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
-    .repeat(FfRepeat::For(0L))
+    .repeat(For(0L))
     .finish(g)
     |> Ok
   catch {
@@ -777,7 +767,7 @@ test "ff completed event is emitted before queued events when due" {
     is Ok(_),
     content="true",
   )
-  g.insert_event(Event::at(GamepadId::new(0), EventType::Connected, 999L))
+  g.insert_event(Event::at(GamepadId::new(0), Connected, 999L))
   runtime_now_set_for_test(50L)
 
   let e1 = match g.next_event() {
@@ -796,14 +786,14 @@ test "ff completed event is emitted before queued events when due" {
   }
   inspect(
     match e1.event() {
-      EventType::ForceFeedbackEffectCompleted => true
+      ForceFeedbackEffectCompleted => true
       _ => false
     },
     content="true",
   )
   inspect(
     match e2.event() {
-      EventType::Connected => true
+      Connected => true
       _ => false
     },
     content="true",
@@ -818,7 +808,7 @@ test "ff completed event is not emitted before due time" {
   let built : Result[Effect, FfError] = try
     EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
-    .repeat(FfRepeat::For(0L))
+    .repeat(For(0L))
     .finish(g)
     |> Ok
   catch {
@@ -850,7 +840,7 @@ test "ff completed event is not emitted before due time" {
   }
   inspect(
     match e.event() {
-      EventType::ForceFeedbackEffectCompleted => true
+      ForceFeedbackEffectCompleted => true
       _ => false
     },
     content="true",
@@ -865,7 +855,7 @@ test "stopped effect does not emit ff completed event" {
   let built : Result[Effect, FfError] = try
     EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
-    .repeat(FfRepeat::For(0L))
+    .repeat(For(0L))
     .finish(g)
     |> Ok
   catch {
@@ -904,7 +894,7 @@ test "disconnect prevents ff completed event emission for single-device effect" 
   let built : Result[Effect, FfError] = try
     EffectBuilder::new()
     .add_gamepad_id(GamepadId::new(0))
-    .repeat(FfRepeat::For(0L))
+    .repeat(For(0L))
     .finish(g)
     |> Ok
   catch {
@@ -925,7 +915,7 @@ test "disconnect prevents ff completed event emission for single-device effect" 
     content="true",
   )
   g.push_native_event({
-    tag: NativeEventTag::Disconnected,
+    tag: Disconnected,
     id: 0,
     code: 0,
     value: 0.0,
@@ -940,7 +930,7 @@ test "disconnect prevents ff completed event emission for single-device effect" 
   }
   inspect(
     match ev.event() {
-      EventType::Disconnected => true
+      Disconnected => true
       _ => false
     },
     content="true",
