@@ -14,12 +14,12 @@
 
 ///|
 pub struct NativeBackend {
-  mut _dummy : Int
+  mut _dummy : Int32
 }
 
 ///|
 pub fn NativeBackend::new() -> NativeBackend {
-  { _dummy: 0 }
+  { _dummy: 0, }
 }
 
 ///|
@@ -31,7 +31,7 @@ pub fn NativeBackend::poll(self : NativeBackend) -> Unit {
 ///|
 pub fn NativeBackend::poll_timeout(
   self : NativeBackend,
-  timeout_ms : Int,
+  timeout_ms : Int32,
 ) -> Unit {
   let _ = self
   let _ = timeout_ms
@@ -60,75 +60,75 @@ pub fn runtime_sdl_platform_name() -> String {
 }
 
 ///|
-pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
+pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int32 {
   let _ = self
   0
 }
 
 ///|
-pub fn NativeBackend::last_gamepad_hint(self : NativeBackend) -> Int {
+pub fn NativeBackend::last_gamepad_hint(self : NativeBackend) -> Int32 {
   let _ = self
   0
 }
 
 ///|
-pub fn NativeBackend::name(self : NativeBackend, id : Int) -> String {
+pub fn NativeBackend::name(self : NativeBackend, id : Int32) -> String {
   let _ = self
   let _ = id
   ""
 }
 
 ///|
-pub fn NativeBackend::uuid_simple(self : NativeBackend, id : Int) -> String {
+pub fn NativeBackend::uuid_simple(self : NativeBackend, id : Int32) -> String {
   let _ = self
   let _ = id
   ""
 }
 
 ///|
-pub fn NativeBackend::vendor_id(self : NativeBackend, id : Int) -> Int? {
+pub fn NativeBackend::vendor_id(self : NativeBackend, id : Int32) -> Int32? {
   let _ = self
   let _ = id
   None
 }
 
 ///|
-pub fn NativeBackend::product_id(self : NativeBackend, id : Int) -> Int? {
+pub fn NativeBackend::product_id(self : NativeBackend, id : Int32) -> Int32? {
   let _ = self
   let _ = id
   None
 }
 
 ///|
-pub fn NativeBackend::is_connected(self : NativeBackend, id : Int) -> Bool {
+pub fn NativeBackend::is_connected(self : NativeBackend, id : Int32) -> Bool {
   let _ = self
   let _ = id
   false
 }
 
 ///|
-pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
+pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int32) -> Bool {
   let _ = self
   let _ = id
   false
 }
 
 ///|
-pub fn NativeBackend::power_info(self : NativeBackend, id : Int) -> PowerInfo {
+pub fn NativeBackend::power_info(self : NativeBackend, id : Int32) -> PowerInfo {
   let _ = self
   let _ = id
   PowerInfo::Unknown
 }
 
 ///|
-pub fn NativeBackend::axes(self : NativeBackend, id : Int) -> Array[Int] {
+pub fn NativeBackend::axes(self : NativeBackend, id : Int32) -> Array[Int32] {
   let _ = self
   let _ = id
   []
 }
 
 ///|
-pub fn NativeBackend::buttons(self : NativeBackend, id : Int) -> Array[Int] {
+pub fn NativeBackend::buttons(self : NativeBackend, id : Int32) -> Array[Int32] {
   let _ = self
   let _ = id
   []
@@ -137,8 +137,8 @@ pub fn NativeBackend::buttons(self : NativeBackend, id : Int) -> Array[Int] {
 ///|
 pub fn NativeBackend::axis_info(
   self : NativeBackend,
-  id : Int,
-  code : Int,
+  id : Int32,
+  code : Int32,
 ) -> AxisInfo? {
   let _ = self
   let _ = id
@@ -149,10 +149,10 @@ pub fn NativeBackend::axis_info(
 ///|
 pub fn NativeBackend::set_rumble(
   self : NativeBackend,
-  id : Int,
+  id : Int32,
   strong : Double,
   weak : Double,
-  duration_ms : Int,
+  duration_ms : Int32,
 ) -> Bool {
   let _ = self
   let _ = id

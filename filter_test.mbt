@@ -14,16 +14,26 @@
 
 ///|
 test "jitter drops small delta" {
-  let g = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
 
   // seed state
-  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.5, AXIS_LSTICKX), 1L))
+  g.insert_event(
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.5, @gamepad.AXIS_LSTICKX),
+      1L,
+    ),
+  )
   ignore(g.next_event())
 
   // small delta should drop
-  let ev = Event::at(id, AxisChanged(LeftStickX, 0.505, AXIS_LSTICKX), 2L)
-  let out = Jitter::new().filter(Some(ev), g)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(LeftStickX, 0.505, @gamepad.AXIS_LSTICKX),
+    2L,
+  )
+  let out = @gamepad.Jitter::new().filter(Some(ev), g)
   debug_inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
 }
 
@@ -35,28 +45,32 @@ extern "C" fn runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_clear_
 
 ///|
 test "jitter keeps first axis event without prior axis_data" {
-  let g = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
-  let ev = Event::at(id, AxisChanged(LeftStickX, 0.005, AXIS_LSTICKX), 1L)
-  let out = Jitter::new().filter(Some(ev), g)
+  let g = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(LeftStickX, 0.005, @gamepad.AXIS_LSTICKX),
+    1L,
+  )
+  let out = @gamepad.Jitter::new().filter(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((0, 0, 0.005, 65584))")
 }
 
 ///|
 test "filter_ev passes through filter output" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let ev = Event::at(id, ButtonPressed(South, BTN_SOUTH), 1L)
-  let out = filter_ev(
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let ev = @gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 1L)
+  let out = @gamepad.filter_ev(
     Some(ev),
-    fn(_ev : Event?, _gilrs : Gil) -> Event? { None },
+    fn(_ev : @gamepad.Event?, _gilrs : @gamepad.Gil) -> @gamepad.Event? { None },
     g,
   )
   debug_inspect(out.map(fn(e) { e.is_dropped() }), content="Some(true)")
 }
 
 ///|
-fn filter_event_sig(e : Event) -> (Int, Int, Double, Int) {
+fn filter_event_sig(e : @gamepad.Event) -> (Int32, Int32, Double, Int32) {
   match e.event() {
     AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
     ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
@@ -69,33 +83,45 @@ fn filter_event_sig(e : Event) -> (Int, Int, Double, Int) {
 
 ///|
 test "deadzone clamps axis and preserves range" {
-  let g = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
-  g.set_deadzone(id, AXIS_LSTICKX, 0.2)
-  let ev = Event::at(id, AxisChanged(LeftStickX, 0.1, AXIS_LSTICKX), 1L)
-  let out = deadzone(Some(ev), g)
+  let g = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
+  g.set_deadzone(id, @gamepad.AXIS_LSTICKX, 0.2)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(LeftStickX, 0.1, @gamepad.AXIS_LSTICKX),
+    1L,
+  )
+  let out = @gamepad.deadzone(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((99, 0, 0, 0))")
 }
 
 ///|
 test "deadzone enqueues paired-axis zero when primary event drops" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  g.set_deadzone(id, AXIS_LSTICKX, 0.2)
-  g.set_deadzone(id, AXIS_LSTICKY, 0.2)
-  let m = Mapping::new()
-  m.insert(AXIS_LSTICKX, Axis(LeftStickX))
-  m.insert(AXIS_LSTICKY, Axis(LeftStickY))
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  g.set_deadzone(id, @gamepad.AXIS_LSTICKX, 0.2)
+  g.set_deadzone(id, @gamepad.AXIS_LSTICKY, 0.2)
+  let m = @gamepad.Mapping::new()
+  m.insert(@gamepad.AXIS_LSTICKX, Axis(LeftStickX))
+  m.insert(@gamepad.AXIS_LSTICKY, Axis(LeftStickY))
   g.set_mapping(id, m)
 
   // Seed non-zero X through deadzone so paired-axis clear path can trigger later.
-  let seed = Event::at(id, AxisChanged(LeftStickX, 0.3, AXIS_LSTICKX), 1L)
-  let seed_out = deadzone(Some(seed), g).unwrap()
+  let seed = @gamepad.Event::at(
+    id,
+    AxisChanged(LeftStickX, 0.3, @gamepad.AXIS_LSTICKX),
+    1L,
+  )
+  let seed_out = @gamepad.deadzone(Some(seed), g).unwrap()
   g.update(seed_out)
 
   // Y event lands both axes in deadzone; Y gets dropped, X clear is queued.
-  let ev = Event::at(id, AxisChanged(LeftStickY, 0.0, AXIS_LSTICKY), 2L)
-  let out = deadzone(Some(ev), g).unwrap()
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(LeftStickY, 0.0, @gamepad.AXIS_LSTICKY),
+    2L,
+  )
+  let out = @gamepad.deadzone(Some(ev), g).unwrap()
   inspect(out.is_dropped(), content="true")
   let queued = g.next_event()
   debug_inspect(queued.map(filter_event_sig), content="Some((0, 0, 0, 65584))")
@@ -104,18 +130,26 @@ test "deadzone enqueues paired-axis zero when primary event drops" {
 
 ///|
 test "deadzone button branch drops or emits changed value" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  g.set_deadzone(id, BTN_SOUTH, 0.2)
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  g.set_deadzone(id, @gamepad.BTN_SOUTH, 0.2)
 
   // 0.1 falls into deadzone => dropped.
-  let ev1 = Event::at(id, ButtonChanged(South, 0.1, BTN_SOUTH), 1L)
-  let out1 = deadzone(Some(ev1), g)
+  let ev1 = @gamepad.Event::at(
+    id,
+    ButtonChanged(South, 0.1, @gamepad.BTN_SOUTH),
+    1L,
+  )
+  let out1 = @gamepad.deadzone(Some(ev1), g)
   debug_inspect(out1.map(fn(e) { e.is_dropped() }), content="Some(true)")
 
   // 0.5 survives deadzone => changed with remapped value.
-  let ev2 = Event::at(id, ButtonChanged(South, 0.5, BTN_SOUTH), 2L)
-  let out2 = deadzone(Some(ev2), g)
+  let ev2 = @gamepad.Event::at(
+    id,
+    ButtonChanged(South, 0.5, @gamepad.BTN_SOUTH),
+    2L,
+  )
+  let out2 = @gamepad.deadzone(Some(ev2), g)
   let ok = match out2 {
     None => false
     Some(e) =>
@@ -129,15 +163,19 @@ test "deadzone button branch drops or emits changed value" {
 
 ///|
 test "axis_dpad_to_button maps dpad axis to button events" {
-  let g = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
 
   // mapping with hats mapped to allow mapping
-  let m = Mapping::new()
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  let ev = Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L)
-  let out = axis_dpad_to_button(Some(ev), g)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX),
+    1L,
+  )
+  let out = @gamepad.axis_dpad_to_button(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 589843))")
   // extra queued event should exist
   let extra = g.next_event()
@@ -146,15 +184,19 @@ test "axis_dpad_to_button maps dpad axis to button events" {
 
 ///|
 test "axis_dpad_to_button uses legacy codes when input axis code is legacy" {
-  let g = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
 
   // mapping with hats mapped to allow mapping
-  let m = Mapping::new()
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  let ev = Event::at(id, AxisChanged(DPadX, 1.0, LEGACY_AXIS_DPADX), 1L)
-  let out = axis_dpad_to_button(Some(ev), g)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.LEGACY_AXIS_DPADX),
+    1L,
+  )
+  let out = @gamepad.axis_dpad_to_button(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 18))")
   let extra = g.next_event()
   debug_inspect(extra.map(filter_event_sig), content="Some((2, 18, 1, 18))")
@@ -162,20 +204,28 @@ test "axis_dpad_to_button uses legacy codes when input axis code is legacy" {
 
 ///|
 test "axis_dpad_to_button handles immediate left-to-right transition" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  let left_ev = Event::at(id, AxisChanged(DPadX, -1.0, AXIS_DPADX), 1L)
-  let left_out = axis_dpad_to_button(Some(left_ev), g).unwrap()
+  let left_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, -1.0, @gamepad.AXIS_DPADX),
+    1L,
+  )
+  let left_out = @gamepad.axis_dpad_to_button(Some(left_ev), g).unwrap()
   debug_inspect(filter_event_sig(left_out), content="(1, 17, 1, 589842)")
   g.update(left_out)
   let left_extra = g.next_event().unwrap()
   debug_inspect(filter_event_sig(left_extra), content="(2, 17, 1, 589842)")
   g.update(left_extra)
-  let right_ev = Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 2L)
-  let right_out = axis_dpad_to_button(Some(right_ev), g).unwrap()
+  let right_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX),
+    2L,
+  )
+  let right_out = @gamepad.axis_dpad_to_button(Some(right_ev), g).unwrap()
   debug_inspect(filter_event_sig(right_out), content="(4, 17, 0, 589842)")
   let q1 = g.next_event().unwrap()
   let q2 = g.next_event().unwrap()
@@ -188,20 +238,28 @@ test "axis_dpad_to_button handles immediate left-to-right transition" {
 
 ///|
 test "axis_dpad_to_button handles immediate up-to-down transition" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  let up_ev = Event::at(id, AxisChanged(DPadY, 1.0, AXIS_DPADY), 1L)
-  let up_out = axis_dpad_to_button(Some(up_ev), g).unwrap()
+  let up_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadY, 1.0, @gamepad.AXIS_DPADY),
+    1L,
+  )
+  let up_out = @gamepad.axis_dpad_to_button(Some(up_ev), g).unwrap()
   debug_inspect(filter_event_sig(up_out), content="(1, 15, 1, 589840)")
   g.update(up_out)
   let up_extra = g.next_event().unwrap()
   debug_inspect(filter_event_sig(up_extra), content="(2, 15, 1, 589840)")
   g.update(up_extra)
-  let down_ev = Event::at(id, AxisChanged(DPadY, -1.0, AXIS_DPADY), 2L)
-  let down_out = axis_dpad_to_button(Some(down_ev), g).unwrap()
+  let down_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadY, -1.0, @gamepad.AXIS_DPADY),
+    2L,
+  )
+  let down_out = @gamepad.axis_dpad_to_button(Some(down_ev), g).unwrap()
   debug_inspect(filter_event_sig(down_out), content="(4, 15, 0, 589840)")
   let q1 = g.next_event().unwrap()
   let q2 = g.next_event().unwrap()
@@ -214,39 +272,51 @@ test "axis_dpad_to_button handles immediate up-to-down transition" {
 
 ///|
 test "axis_dpad_to_button keeps axis event when hats mapping is partial" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b0001)
   g.set_mapping(id, m)
-  let ev = Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L)
-  let out = axis_dpad_to_button(Some(ev), g)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX),
+    1L,
+  )
+  let out = @gamepad.axis_dpad_to_button(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
   inspect(g.next_event() is None, content="true")
 }
 
 ///|
 test "axis_dpad_to_button keeps axis event when dpad button exists" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
-  m.insert(BTN_DPAD_RIGHT, Btn(DPadRight))
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
+  m.insert(@gamepad.BTN_DPAD_RIGHT, Btn(DPadRight))
   g.set_mapping(id, m)
-  let ev = Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L)
-  let out = axis_dpad_to_button(Some(ev), g)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX),
+    1L,
+  )
+  let out = @gamepad.axis_dpad_to_button(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
   inspect(g.next_event() is None, content="true")
 }
 
 ///|
 test "axis_dpad_to_button maps when hats_mapped is zero and no dpad bindings" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0)
   g.set_mapping(id, m)
-  let ev = Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L)
-  let out = axis_dpad_to_button(Some(ev), g)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX),
+    1L,
+  )
+  let out = @gamepad.axis_dpad_to_button(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((1, 18, 1, 589843))")
   debug_inspect(
     g.next_event().map(filter_event_sig),
@@ -256,27 +326,39 @@ test "axis_dpad_to_button maps when hats_mapped is zero and no dpad bindings" {
 
 ///|
 test "axis_dpad_to_button passthrough when mapping is missing" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(9)
-  let ev = Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L)
-  let out = axis_dpad_to_button(Some(ev), g)
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(9)
+  let ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX),
+    1L,
+  )
+  let out = @gamepad.axis_dpad_to_button(Some(ev), g)
   debug_inspect(out.map(filter_event_sig), content="Some((0, 6, 1, 65593))")
   inspect(g.next_event() is None, content="true")
 }
 
 ///|
 test "axis_dpad_to_button releases X direction on center value" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  let press_ev = Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L)
-  let press_out = axis_dpad_to_button(Some(press_ev), g).unwrap()
+  let press_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX),
+    1L,
+  )
+  let press_out = @gamepad.axis_dpad_to_button(Some(press_ev), g).unwrap()
   g.update(press_out)
   g.update(g.next_event().unwrap())
-  let center_ev = Event::at(id, AxisChanged(DPadX, 0.0, AXIS_DPADX), 2L)
-  let center_out = axis_dpad_to_button(Some(center_ev), g).unwrap()
+  let center_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadX, 0.0, @gamepad.AXIS_DPADX),
+    2L,
+  )
+  let center_out = @gamepad.axis_dpad_to_button(Some(center_ev), g).unwrap()
   debug_inspect(filter_event_sig(center_out), content="(4, 18, 0, 589843)")
   let extra = g.next_event().unwrap()
   debug_inspect(filter_event_sig(extra), content="(2, 18, 0, 589843)")
@@ -284,17 +366,25 @@ test "axis_dpad_to_button releases X direction on center value" {
 
 ///|
 test "axis_dpad_to_button releases Y direction on center value" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  let press_ev = Event::at(id, AxisChanged(DPadY, 1.0, AXIS_DPADY), 1L)
-  let press_out = axis_dpad_to_button(Some(press_ev), g).unwrap()
+  let press_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadY, 1.0, @gamepad.AXIS_DPADY),
+    1L,
+  )
+  let press_out = @gamepad.axis_dpad_to_button(Some(press_ev), g).unwrap()
   g.update(press_out)
   g.update(g.next_event().unwrap())
-  let center_ev = Event::at(id, AxisChanged(DPadY, 0.0, AXIS_DPADY), 2L)
-  let center_out = axis_dpad_to_button(Some(center_ev), g).unwrap()
+  let center_ev = @gamepad.Event::at(
+    id,
+    AxisChanged(DPadY, 0.0, @gamepad.AXIS_DPADY),
+    2L,
+  )
+  let center_out = @gamepad.axis_dpad_to_button(Some(center_ev), g).unwrap()
   debug_inspect(filter_event_sig(center_out), content="(4, 15, 0, 589840)")
   let extra = g.next_event().unwrap()
   debug_inspect(filter_event_sig(extra), content="(2, 15, 0, 589840)")
@@ -302,17 +392,17 @@ test "axis_dpad_to_button releases Y direction on center value" {
 
 ///|
 test "repeat generates repeated events on None" {
-  let g = Gil::new_mock(1, update_state=false)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1, update_state=false)
+  let id = @gamepad.GamepadId::new(0)
   // mapping so Repeat can name the button
-  let m = Mapping::new()
-  m.insert(BTN_SOUTH, Btn(South))
+  let m = @gamepad.Mapping::new()
+  m.insert(@gamepad.BTN_SOUTH, Btn(South))
   g.set_mapping(id, m)
 
   // pressed at t=0
-  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
+  g.update(@gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 0L))
   runtime_now_set_for_test(500L)
-  let rep = Repeat::new()
+  let rep = @gamepad.Repeat::new()
   let out1 = rep.filter(None, g)
   debug_inspect(out1.map(filter_event_sig), content="Some((3, 0, 0, 589825))")
   // update state with repeat, then next repeat at +30ms

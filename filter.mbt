@@ -36,7 +36,7 @@ pub struct Jitter {
 
 ///|
 pub fn Jitter::new() -> Jitter {
-  { threshold: 0.01 }
+  { threshold: 0.01, }
 }
 
 ///|
@@ -86,7 +86,7 @@ fn apply_deadzone(
 }
 
 ///|
-fn deadzone_nonzero_axis_idx(axis : Axis) -> Int? {
+fn deadzone_nonzero_axis_idx(axis : Axis) -> Int32? {
   Some(
     match axis {
       DPadX => 0
@@ -407,7 +407,7 @@ pub struct Repeat {
 
 ///|
 pub fn Repeat::new() -> Repeat {
-  { after_ms: 500L, every_ms: 30L }
+  { after_ms: 500L, every_ms: 30L, }
 }
 
 ///|

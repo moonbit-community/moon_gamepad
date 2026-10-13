@@ -24,7 +24,7 @@ pub struct Uuid {
 
 ///|
 pub fn Uuid::nil() -> Uuid {
-  { simple: "00000000000000000000000000000000" }
+  { simple: "00000000000000000000000000000000", }
 }
 
 ///|
@@ -35,9 +35,9 @@ pub fn Uuid::simple(self : Uuid) -> String {
 ///|
 fn is_hex_char(c : Char) -> Bool {
   match c {
-    '0'..='9' => true
-    'a'..='f' => true
-    'A'..='F' => true
+    '0'..<='9' => true
+    'a'..<='f' => true
+    'A'..<='F' => true
     _ => false
   }
 }
@@ -92,5 +92,5 @@ pub fn Uuid::parse(s : String) -> Uuid raise UuidError {
   if buf.length() != 32 {
     raise InvalidGuid
   }
-  { simple: buf }
+  { simple: buf, }
 }

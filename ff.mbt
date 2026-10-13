@@ -37,11 +37,11 @@ pub struct Ticks {
 ///|
 pub fn Ticks::from_ms(ms : Int64) -> Ticks {
   if ms <= 0L {
-    { ms: 0L }
+    { ms: 0L, }
   } else {
     let tick = 50L
     let q = (ms + tick - 1L) / tick
-    { ms: q * tick }
+    { ms: q * tick, }
   }
 }
 
@@ -52,8 +52,8 @@ pub fn Ticks::as_ms(self : Ticks) -> Int64 {
 
 ///|
 pub(all) enum BaseEffectType {
-  Weak(Int)
-  Strong(Int)
+  Weak(Int32)
+  Strong(Int32)
 }
 
 ///|
@@ -174,19 +174,19 @@ pub fn DistanceModel::validate(
 
 ///|
 pub struct Envelope {
-  attack_length : Int
+  attack_length : Int32
   attack_level : Double
-  fade_length : Int
+  fade_length : Int32
   fade_level : Double
 }
 
 ///|
 pub fn Envelope::default() -> Envelope {
-  { attack_length: 0, attack_level: 1.0, fade_length: 0, fade_level: 1.0 }
+  { attack_length: 0, attack_level: 1.0, fade_length: 0, fade_level: 1.0, }
 }
 
 ///|
-pub fn Envelope::at(self : Envelope, ticks : Int, dur : Int) -> Double {
+pub fn Envelope::at(self : Envelope, ticks : Int32, dur : Int32) -> Double {
   if ticks < self.attack_length {
     self.attack_level +
     ticks.to_double() *
@@ -204,18 +204,18 @@ pub fn Envelope::at(self : Envelope, ticks : Int, dur : Int) -> Double {
 
 ///|
 pub struct Replay {
-  after : Int
-  play_for : Int
-  with_delay : Int
+  after : Int32
+  play_for : Int32
+  with_delay : Int32
 }
 
 ///|
 pub fn Replay::default() -> Replay {
-  { after: 0, play_for: 1, with_delay: 0 }
+  { after: 0, play_for: 1, with_delay: 0, }
 }
 
 ///|
-pub fn Replay::at(self : Replay, ticks : Int) -> Double {
+pub fn Replay::at(self : Replay, ticks : Int32) -> Double {
   if ticks >= self.play_for {
     0.0
   } else {
@@ -224,12 +224,12 @@ pub fn Replay::at(self : Replay, ticks : Int) -> Double {
 }
 
 ///|
-pub fn Replay::dur(self : Replay) -> Int {
+pub fn Replay::dur(self : Replay) -> Int32 {
   self.play_for + self.with_delay
 }
 
 ///|
-fn Replay::wrap(self : Replay, ticks : Int) -> Int? {
+fn Replay::wrap(self : Replay, ticks : Int32) -> Int32? {
   if ticks < self.after {
     None
   } else {
@@ -243,7 +243,7 @@ fn Replay::wrap(self : Replay, ticks : Int) -> Int? {
 }
 
 ///|
-fn clamp_u16(x : Double) -> Int {
+fn clamp_u16(x : Double) -> Int32 {
   if x <= 0.0 || x != x {
     0
   } else if x >= 65535.0 {
@@ -270,7 +270,7 @@ fn BaseEffectType::scaled(
 }
 
 ///|
-fn BaseEffect::magnitude_at(self : BaseEffect, ticks : Int) -> BaseEffectType {
+fn BaseEffect::magnitude_at(self : BaseEffect, ticks : Int32) -> BaseEffectType {
   match self.scheduling.wrap(ticks) {
     None => self.kind.scaled(0.0)
     Some(wrapped) => {
@@ -331,7 +331,7 @@ fn DistanceModel::attenuation(
 ///|
 pub struct Effect {
   gil : Gil
-  effect_token : Int
+  effect_token : Int32
   mut gamepads : Array[GamepadId]
   strong : Double
   weak : Double

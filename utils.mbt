@@ -13,7 +13,7 @@
 // limitations under the License.
 
 ///|
-pub fn ceil_div(a : UInt, b : UInt) -> UInt {
+pub fn ceil_div(a : UInt32, b : UInt32) -> UInt32 {
   if a == 0U {
     0U
   } else {

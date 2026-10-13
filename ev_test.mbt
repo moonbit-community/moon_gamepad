@@ -14,25 +14,25 @@
 
 ///|
 test "event drop" {
-  let id = GamepadId::new(0)
-  let ev = Event::new(id, Connected)
+  let id = @gamepad.GamepadId::new(0)
+  let ev = @gamepad.Event::new(id, Connected)
   inspect(ev.is_dropped(), content="false")
   inspect(ev.drop().is_dropped(), content="true")
 }
 
 ///|
 test "button categories" {
-  inspect(Button::South.is_action(), content="true")
-  inspect(Button::LeftTrigger2.is_trigger(), content="true")
-  inspect(Button::Start.is_menu(), content="true")
-  inspect(Button::LeftThumb.is_stick(), content="true")
-  inspect(Button::DPadLeft.is_dpad(), content="true")
-  inspect(Button::Unknown.is_action(), content="false")
+  inspect(@gamepad.Button::South.is_action(), content="true")
+  inspect(@gamepad.Button::LeftTrigger2.is_trigger(), content="true")
+  inspect(@gamepad.Button::Start.is_menu(), content="true")
+  inspect(@gamepad.Button::LeftThumb.is_stick(), content="true")
+  inspect(@gamepad.Button::DPadLeft.is_dpad(), content="true")
+  inspect(@gamepad.Button::Unknown.is_action(), content="false")
 }
 
 ///|
 test "axis second axis" {
-  fn axis_name(ax : Axis) -> String {
+  fn axis_name(ax : @gamepad.Axis) -> String {
     match ax {
       LeftStickX => "LeftStickX"
       LeftStickY => "LeftStickY"
@@ -46,7 +46,7 @@ test "axis second axis" {
     }
   }
 
-  fn axis_opt_name(ax : Axis?) -> String {
+  fn axis_opt_name(ax : @gamepad.Axis?) -> String {
     match ax {
       None => "None"
       Some(ax) => "Some(" + axis_name(ax) + ")"
@@ -54,38 +54,41 @@ test "axis second axis" {
   }
 
   inspect(
-    axis_opt_name(Axis::LeftStickX.second_axis()),
+    axis_opt_name(@gamepad.Axis::LeftStickX.second_axis()),
     content="Some(LeftStickY)",
   )
   inspect(
-    axis_opt_name(Axis::LeftStickY.second_axis()),
+    axis_opt_name(@gamepad.Axis::LeftStickY.second_axis()),
     content="Some(LeftStickX)",
   )
-  inspect(axis_opt_name(Axis::DPadX.second_axis()), content="Some(DPadY)")
-  inspect(axis_opt_name(Axis::Unknown.second_axis()), content="None")
+  inspect(
+    axis_opt_name(@gamepad.Axis::DPadX.second_axis()),
+    content="Some(DPadY)",
+  )
+  inspect(axis_opt_name(@gamepad.Axis::Unknown.second_axis()), content="None")
 }
 
 ///|
 test "ev helper branches parity" {
-  inspect(Axis::LeftStickX.is_stick(), content="true")
-  inspect(Axis::LeftZ.is_stick(), content="false")
+  inspect(@gamepad.Axis::LeftStickX.is_stick(), content="true")
+  inspect(@gamepad.Axis::LeftZ.is_stick(), content="false")
   debug_inspect(
-    Axis::RightStickX.second_axis().map(fn(ax) { ax.to_index() }),
+    @gamepad.Axis::RightStickX.second_axis().map(fn(ax) { ax.to_index() }),
     content="Some(4)",
   )
   debug_inspect(
-    Axis::RightStickY.second_axis().map(fn(ax) { ax.to_index() }),
+    @gamepad.Axis::RightStickY.second_axis().map(fn(ax) { ax.to_index() }),
     content="Some(3)",
   )
   debug_inspect(
-    Axis::DPadY.second_axis().map(fn(ax) { ax.to_index() }),
+    @gamepad.Axis::DPadY.second_axis().map(fn(ax) { ax.to_index() }),
     content="Some(6)",
   )
-  inspect(Button::South.is_trigger(), content="false")
-  inspect(Button::South.is_menu(), content="false")
-  inspect(Button::South.is_stick(), content="false")
-  inspect(Button::South.is_dpad(), content="false")
-  inspect(Button::C.to_index(), content="2")
-  inspect(Button::Z.to_index(), content="5")
-  inspect(AxisOrBtn::Axis(Unknown).is_button(), content="false")
+  inspect(@gamepad.Button::South.is_trigger(), content="false")
+  inspect(@gamepad.Button::South.is_menu(), content="false")
+  inspect(@gamepad.Button::South.is_stick(), content="false")
+  inspect(@gamepad.Button::South.is_dpad(), content="false")
+  inspect(@gamepad.Button::C.to_index(), content="2")
+  inspect(@gamepad.Button::Z.to_index(), content="5")
+  inspect(@gamepad.AxisOrBtn::Axis(Unknown).is_button(), content="false")
 }

@@ -67,13 +67,15 @@ test "quick start" {
 ```mbt check
 ///|
 test "mock button press" {
-  let gil = GilBuilder::new()
+  let gil = @gamepad.GilBuilder::new()
     .with_mock_gamepad_count(1)
     .with_default_filters(false)
     .build()
 
   let id = @gamepad.GamepadId(0)
-  gil.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
+  gil.insert_event(
+    @gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 0L),
+  )
 
   assert_true(gil.next_event() is Some(_))
 }

@@ -14,21 +14,21 @@
 
 ///|
 pub struct GamepadId {
-  value : Int
+  value : Int32
 }
 
 ///|
-pub fn GamepadId::GamepadId(value : Int) -> GamepadId {
+pub fn GamepadId::GamepadId(value : Int32) -> GamepadId {
   { value, }
 }
 
 ///|
-pub fn GamepadId::new(value : Int) -> GamepadId {
+pub fn GamepadId::new(value : Int32) -> GamepadId {
   { value, }
 }
 
 ///|
-pub fn GamepadId::value(self : GamepadId) -> Int {
+pub fn GamepadId::value(self : GamepadId) -> Int32 {
   self.value
 }
 
@@ -54,12 +54,12 @@ pub struct Event {
 
 ///|
 pub fn Event::new(id : GamepadId, event : EventType) -> Event {
-  { id, event, time: 0L }
+  { id, event, time: 0L, }
 }
 
 ///|
 pub fn Event::at(id : GamepadId, event : EventType, time : Int64) -> Event {
-  { id, event, time }
+  { id, event, time, }
 }
 
 ///|
@@ -79,7 +79,7 @@ pub fn Event::time(self : Event) -> Int64 {
 
 ///|
 pub fn Event::drop(self : Event) -> Event {
-  { id: self.id, event: Dropped, time: self.time }
+  { id: self.id, event: Dropped, time: self.time, }
 }
 
 ///|

@@ -50,17 +50,17 @@ pub struct Mapping {
   mappings : Array[(Code, AxisOrBtn)]
   mut name : String
   default : Bool
-  mut hats_mapped : Int
+  mut hats_mapped : Int32
 }
 
 ///|
 pub fn Mapping::new() -> Mapping {
-  { mappings: [], name: "", default: false, hats_mapped: 0 }
+  { mappings: [], name: "", default: false, hats_mapped: 0, }
 }
 
 ///|
 pub fn Mapping::new_default() -> Mapping {
-  { mappings: [], name: "", default: true, hats_mapped: 0 }
+  { mappings: [], name: "", default: true, hats_mapped: 0, }
 }
 
 ///|
@@ -111,7 +111,7 @@ pub fn Mapping::insert(self : Mapping, code : Code, el : AxisOrBtn) -> Unit {
 }
 
 ///|
-pub fn Mapping::set_hats_mapped(self : Mapping, hats : Int) -> Unit {
+pub fn Mapping::set_hats_mapped(self : Mapping, hats : Int32) -> Unit {
   self.hats_mapped = hats
 }
 
@@ -148,7 +148,7 @@ pub fn Mapping::is_default(self : Mapping) -> Bool {
 }
 
 ///|
-pub fn Mapping::hats_mapped(self : Mapping) -> Int {
+pub fn Mapping::hats_mapped(self : Mapping) -> Int32 {
   self.hats_mapped
 }
 
@@ -292,7 +292,7 @@ fn is_name_valid(name : String) -> Bool {
 }
 
 ///|
-fn index_of_code(list : Array[Code], code : Code) -> Int? {
+fn index_of_code(list : Array[Code], code : Code) -> Int32? {
   for i in 0..<list.length() {
     if list[i] == code {
       return Some(i)
@@ -552,7 +552,7 @@ pub fn Mapping::from_data(
       mappings,
     )
   }
-  ({ mappings, name, default: false, hats_mapped: 0 }, sdl_mappings)
+  ({ mappings, name, default: false, hats_mapped: 0, }, sdl_mappings)
 }
 
 ///|
@@ -565,11 +565,11 @@ const INCLUDED_MAPPINGS_FALLBACK : String = "030000005e0400008e02000002010000,Xb
 
 ///|
 pub fn MappingDb::new() -> MappingDb {
-  { mappings: [] }
+  { mappings: [], }
 }
 
 ///|
-fn index_of_substring(s : String, pat : String) -> Int? {
+fn index_of_substring(s : String, pat : String) -> Int32? {
   let n = s.length()
   let m = pat.length()
   if m == 0 {
@@ -594,7 +594,7 @@ fn index_of_substring(s : String, pat : String) -> Int? {
 }
 
 ///|
-fn find_first_comma(s : String) -> Int? {
+fn find_first_comma(s : String) -> Int32? {
   for i in 0..<s.length() {
     if s.code_unit_at(i).to_int() == ','.to_int() {
       return Some(i)
@@ -714,6 +714,6 @@ pub fn MappingDb::get(self : MappingDb, uuid : Uuid) -> String? {
 }
 
 ///|
-pub fn MappingDb::len(self : MappingDb) -> Int {
+pub fn MappingDb::len(self : MappingDb) -> Int32 {
   self.mappings.length()
 }

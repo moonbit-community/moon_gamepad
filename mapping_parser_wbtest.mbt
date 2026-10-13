@@ -13,7 +13,7 @@
 // limitations under the License.
 
 ///|
-fn non_empty_parser_errors(line : String) -> Int {
+fn non_empty_parser_errors(line : String) -> Int32 {
   let parser = Parser::new(line)
   let mut errors = 0
   while true {

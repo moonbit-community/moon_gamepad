@@ -14,18 +14,21 @@
 
 ///|
 test "Uuid::nil is 32 zeros" {
-  inspect(Uuid::nil().simple(), content="00000000000000000000000000000000")
+  inspect(
+    @gamepad.Uuid::nil().simple(),
+    content="00000000000000000000000000000000",
+  )
 }
 
 ///|
 test "Uuid::parse accepts hyphens and normalizes to lowercase" {
-  let u = Uuid::parse("A0B1C2D3-E4F5-6789-ABCD-EF0123456789")
+  let u = @gamepad.Uuid::parse("A0B1C2D3-E4F5-6789-ABCD-EF0123456789")
   inspect(u.simple(), content="a0b1c2d3e4f56789abcdef0123456789")
 }
 
 ///|
 test "Uuid::parse treats xinput as nil" {
-  let u = Uuid::parse("xinput")
+  let u = @gamepad.Uuid::parse("xinput")
   inspect(u.simple(), content="00000000000000000000000000000000")
 }
 
@@ -33,7 +36,7 @@ test "Uuid::parse treats xinput as nil" {
 test "Uuid::parse rejects invalid character" {
   let mut ok = true
   try {
-    let _ = Uuid::parse("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
+    let _ = @gamepad.Uuid::parse("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
   } catch {
     _ => ok = false
   }
@@ -44,7 +47,7 @@ test "Uuid::parse rejects invalid character" {
 test "Uuid::parse rejects invalid length" {
   let mut ok = true
   try {
-    let _ = Uuid::parse("a0b1")
+    let _ = @gamepad.Uuid::parse("a0b1")
   } catch {
     _ => ok = false
   }
@@ -55,7 +58,7 @@ test "Uuid::parse rejects invalid length" {
 test "Uuid::parse rejects malformed hyphen placement" {
   let mut ok = true
   try {
-    let _ = Uuid::parse("a0b1-c2d3e4f5-6789-abcd-ef0123456789")
+    let _ = @gamepad.Uuid::parse("a0b1-c2d3e4f5-6789-abcd-ef0123456789")
   } catch {
     _ => ok = false
   }

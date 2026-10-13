@@ -25,14 +25,14 @@ pub(all) enum NativeEventTag {
 ///|
 pub struct NativeEvent {
   tag : NativeEventTag
-  id : Int
+  id : Int32
   code : Code
   value : Double
   time_ms : Int64
 }
 
 ///|
-fn read_u32_le(b : Bytes, off : Int) -> Int {
+fn read_u32_le(b : Bytes, off : Int32) -> Int32 {
   let b0 = b[off + 0].to_int()
   let b1 = b[off + 1].to_int()
   let b2 = b[off + 2].to_int()
@@ -41,7 +41,7 @@ fn read_u32_le(b : Bytes, off : Int) -> Int {
 }
 
 ///|
-fn read_u64_le(b : Bytes, off : Int) -> UInt64 {
+fn read_u64_le(b : Bytes, off : Int32) -> UInt64 {
   let mut out : UInt64 = 0UL
   for i in 0..<8 {
     let v = b[off + i].to_uint64()
@@ -74,5 +74,5 @@ pub fn decode_native_event(b : Bytes) -> NativeEvent? {
     5 => ButtonChanged
     _ => return None
   }
-  Some({ tag, id, code, value, time_ms })
+  Some({ tag, id, code, value, time_ms, })
 }

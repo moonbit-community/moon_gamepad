@@ -14,31 +14,31 @@
 
 ///|
 test "axis_value documented case" {
-  let info = AxisInfo::new(0, 255, None)
-  inspect(axis_value(info, 127, LeftStickY), content="0")
+  let info = @gamepad.AxisInfo::new(0, 255, None)
+  inspect(@gamepad.axis_value(info, 127, LeftStickY), content="0")
 }
 
 ///|
 test "axis_value overflow behavior" {
   let minv = @moonbitlang/core/int.MIN_VALUE
   let maxv = @moonbitlang/core/int.MAX_VALUE
-  let info = AxisInfo::new(minv, maxv, None)
-  let axis = Axis::LeftStickY
-  inspect(axis_value(info, -1, axis), content="0")
-  inspect(axis_value(info, 0, axis), content="0")
-  inspect(axis_value(info, 1, axis), content="0")
-  inspect(axis_value(info, minv, axis), content="1")
-  inspect(axis_value(info, maxv, axis), content="-1")
+  let info = @gamepad.AxisInfo::new(minv, maxv, None)
+  let axis = @gamepad.Axis::LeftStickY
+  inspect(@gamepad.axis_value(info, -1, axis), content="0")
+  inspect(@gamepad.axis_value(info, 0, axis), content="0")
+  inspect(@gamepad.axis_value(info, 1, axis), content="0")
+  inspect(@gamepad.axis_value(info, minv, axis), content="1")
+  inspect(@gamepad.axis_value(info, maxv, axis), content="-1")
 }
 
 ///|
 test "btn_value overflow behavior" {
   let minv = @moonbitlang/core/int.MIN_VALUE
   let maxv = @moonbitlang/core/int.MAX_VALUE
-  let info = AxisInfo::new(minv, maxv, None)
-  inspect(btn_value(info, -1), content="0.5")
-  inspect(btn_value(info, 0), content="0.5")
-  inspect(btn_value(info, 1), content="0.5")
-  inspect(btn_value(info, minv), content="0")
-  inspect(btn_value(info, maxv), content="1")
+  let info = @gamepad.AxisInfo::new(minv, maxv, None)
+  inspect(@gamepad.btn_value(info, -1), content="0.5")
+  inspect(@gamepad.btn_value(info, 0), content="0.5")
+  inspect(@gamepad.btn_value(info, 1), content="0.5")
+  inspect(@gamepad.btn_value(info, minv), content="0")
+  inspect(@gamepad.btn_value(info, maxv), content="1")
 }

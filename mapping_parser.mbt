@@ -24,9 +24,9 @@ pub(all) enum Token {
   Uuid(Uuid)
   Platform(String)
   Name(String)
-  AxisMapping(Int, AxisOrBtn, AxisRange, AxisRange, Bool)
-  ButtonMapping(Int, AxisOrBtn, AxisRange)
-  HatMapping(Int, Int, AxisOrBtn, AxisRange)
+  AxisMapping(Int32, AxisOrBtn, AxisRange, AxisRange, Bool)
+  ButtonMapping(Int32, AxisOrBtn, AxisRange)
+  HatMapping(Int32, Int32, AxisOrBtn, AxisRange)
 }
 
 ///|
@@ -43,7 +43,7 @@ pub(all) enum ParserErrorKind {
 
 ///|
 suberror ParserError {
-  Error(ParserErrorKind, Int)
+  Error(ParserErrorKind, Int32)
 }
 
 ///|
@@ -54,7 +54,7 @@ pub fn ParserError::kind(self : ParserError) -> ParserErrorKind {
 }
 
 ///|
-pub fn ParserError::position(self : ParserError) -> Int {
+pub fn ParserError::position(self : ParserError) -> Int32 {
   match self {
     Error(_, pos) => pos
   }
@@ -71,17 +71,17 @@ priv enum State {
 ///|
 priv struct Parser {
   data : String
-  mut pos : Int
+  mut pos : Int32
   mut state : State
 }
 
 ///|
 fn Parser::new(mapping : String) -> Parser {
-  { data: mapping, pos: 0, state: Uuid }
+  { data: mapping, pos: 0, state: Uuid, }
 }
 
 ///|
-fn next_comma_or_end(data : String, pos : Int) -> Int {
+fn next_comma_or_end(data : String, pos : Int32) -> Int32 {
   let n = data.length()
   for i in pos..<n {
     if data.code_unit_at(i).to_int() == ','.to_int() {
@@ -92,7 +92,7 @@ fn next_comma_or_end(data : String, pos : Int) -> Int {
 }
 
 ///|
-fn find_char(data : String, pos : Int, end : Int, needle : Char) -> Int? {
+fn find_char(data : String, pos : Int32, end : Int32, needle : Char) -> Int32? {
   for i in pos..<end {
     if data.code_unit_at(i).to_int() == needle.to_int() {
       return Some(i)
@@ -102,18 +102,18 @@ fn find_char(data : String, pos : Int, end : Int, needle : Char) -> Int? {
 }
 
 ///|
-fn slice_to_string(data : String, start : Int, end : Int) -> String {
-  data.sub(start~, end~).to_owned()
+fn slice_to_string(data : String, start : Int32, end : Int32) -> String {
+  data.exact_view(start~, end~).to_owned()
 }
 
 ///|
-fn parse_u16_decimal(s : String, pos : Int) -> Int raise ParserError {
+fn parse_u16_decimal(s : String, pos : Int32) -> Int32 raise ParserError {
   if s.length() == 0 {
     raise Error(InvalidValue, pos)
   }
   let mut acc = 0
   for c in s {
-    if c is ('0'..='9') {
+    if c is ('0'..<='9') {
       acc = acc * 10 + (c.to_int() - '0'.to_int())
       if acc > 65535 {
         raise Error(InvalidValue, pos)
@@ -172,7 +172,7 @@ let axes : Array[AxisOrBtn] = [
 fn lookup_axis_or_btn(
   key : String,
   kind : ParserErrorKind,
-  pos : Int,
+  pos : Int32,
 ) -> AxisOrBtn raise ParserError {
   for i in 0..<axes_sdl.length() {
     if axes_sdl[i] == key {

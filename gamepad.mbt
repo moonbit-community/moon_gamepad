@@ -14,14 +14,14 @@
 
 ///|
 pub struct AxisInfo {
-  min : Int
-  max : Int
-  deadzone : Int?
+  min : Int32
+  max : Int32
+  deadzone : Int32?
 }
 
 ///|
-pub fn AxisInfo::new(min : Int, max : Int, deadzone : Int?) -> AxisInfo {
-  { min, max, deadzone }
+pub fn AxisInfo::new(min : Int32, max : Int32, deadzone : Int32?) -> AxisInfo {
+  { min, max, deadzone, }
 }
 
 ///|
@@ -33,7 +33,7 @@ fn is_y_axis_reversed() -> Bool {
 const INT_MAX_I64 : Int64 = 2147483647L
 
 ///|
-pub fn axis_value(info : AxisInfo, val : Int, axis : Axis) -> Double {
+pub fn axis_value(info : AxisInfo, val : Int32, axis : Axis) -> Double {
   let range_i64 = info.max.to_int64() - info.min.to_int64()
   let minf = Float::from_int(info.min)
   let onef = Float::from_int(1)
@@ -62,7 +62,7 @@ pub fn axis_value(info : AxisInfo, val : Int, axis : Axis) -> Double {
 }
 
 ///|
-pub fn btn_value(info : AxisInfo, val : Int) -> Double {
+pub fn btn_value(info : AxisInfo, val : Int32) -> Double {
   let minf = Float::from_int(info.min)
   let range = Float::from_int(info.max) - minf
   let mut v = Float::from_int(val) - minf

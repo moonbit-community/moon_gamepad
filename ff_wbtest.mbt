@@ -50,11 +50,11 @@ extern "C" fn ff_runtime_now_clear_for_test() -> Unit = "moon_gamepad_now_ms_cle
 
 ///|
 fn native_backend_null_for_test() -> NativeBackend {
-  { owner: backend_new_null_for_test() }
+  { owner: backend_new_null_for_test(), }
 }
 
 ///|
-fn new_ff_ready_mock(gamepad_count : Int) -> Gil {
+fn new_ff_ready_mock(gamepad_count : Int32) -> Gil {
   let g = Gil::new_mock(gamepad_count)
   for i in 0..<gamepad_count {
     g.gamepads_data[i].ff_supported = true
@@ -63,7 +63,7 @@ fn new_ff_ready_mock(gamepad_count : Int) -> Gil {
 }
 
 ///|
-fn new_ff_ready_with_null_backend(gamepad_count : Int) -> Gil {
+fn new_ff_ready_with_null_backend(gamepad_count : Int32) -> Gil {
   let data : Array[GamepadData] = []
   for _ in 0..<gamepad_count {
     let d = GamepadData::new()
@@ -201,7 +201,7 @@ test "finish returns FfNotSupported when gamepad has no ff capability" {
 }
 
 ///|
-fn to_duration_int(ms : Int64) -> Int {
+fn to_duration_int(ms : Int64) -> Int32 {
   if ms <= 0L {
     0
   } else if ms >= 0x7FFF_FFFFL {
@@ -252,7 +252,7 @@ test "envelope default stays at unity" {
 
 ///|
 test "replay matches upstream checkpoints" {
-  let replay = { after: 10, play_for: 50, with_delay: 20 }
+  let replay = { after: 10, play_for: 50, with_delay: 20, }
   inspect(approx(replay.at(0), 1.0, 0.000000001), content="true")
   inspect(approx(replay.at(9), 1.0, 0.000000001), content="true")
   inspect(approx(replay.at(10), 1.0, 0.000000001), content="true")
@@ -275,7 +275,7 @@ test "ticks from_ms quantizes to tick duration" {
 test "base effect scheduling wraps after+with_delay" {
   let eff : BaseEffect = {
     kind: Strong(1000),
-    scheduling: { after: 2, play_for: 2, with_delay: 1 },
+    scheduling: { after: 2, play_for: 2, with_delay: 1, },
     envelope: Envelope::default(),
   }
   inspect(

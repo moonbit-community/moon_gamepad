@@ -14,54 +14,62 @@
 
 ///|
 test "gil fifo + auto update_state" {
-  let gil = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
-  gil.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 10L))
-  gil.insert_event(Event::at(id, ButtonReleased(South, BTN_SOUTH), 11L))
+  let gil = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
+  gil.insert_event(
+    @gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 10L),
+  )
+  gil.insert_event(
+    @gamepad.Event::at(id, ButtonReleased(South, @gamepad.BTN_SOUTH), 11L),
+  )
   let ev1 = gil.next_event()
   inspect(ev1 is Some(_), content="true")
   debug_inspect(
-    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(@gamepad.BTN_SOUTH) }),
     content="Some(true)",
   )
   let c1 = match gil.state(id) {
     None => None
-    Some(s) => s.button_data(BTN_SOUTH).map(fn(d) { d.counter() })
+    Some(s) => s.button_data(@gamepad.BTN_SOUTH).map(fn(d) { d.counter() })
   }
   debug_inspect(c1, content="Some(0)")
   gil.inc()
   let ev2 = gil.next_event()
   inspect(ev2 is Some(_), content="true")
   debug_inspect(
-    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(@gamepad.BTN_SOUTH) }),
     content="Some(false)",
   )
   let c2 = match gil.state(id) {
     None => None
-    Some(s) => s.button_data(BTN_SOUTH).map(fn(d) { d.counter() })
+    Some(s) => s.button_data(@gamepad.BTN_SOUTH).map(fn(d) { d.counter() })
   }
   debug_inspect(c2, content="Some(1)")
 }
 
 ///|
 test "gil no auto update when disabled" {
-  let gil = Gil::new_mock(1, update_state=false)
-  let id = GamepadId::new(0)
-  gil.insert_event(Event::at(id, ButtonPressed(South, BTN_SOUTH), 10L))
+  let gil = @gamepad.Gil::new_mock(1, update_state=false)
+  let id = @gamepad.GamepadId::new(0)
+  gil.insert_event(
+    @gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 10L),
+  )
   let _ = gil.next_event()
   debug_inspect(
-    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(@gamepad.BTN_SOUTH) }),
     content="Some(false)",
   )
-  gil.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 10L))
+  gil.update(
+    @gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 10L),
+  )
   debug_inspect(
-    gil.state(id).map(fn(s) { s.is_pressed(BTN_SOUTH) }),
+    gil.state(id).map(fn(s) { s.is_pressed(@gamepad.BTN_SOUTH) }),
     content="Some(true)",
   )
 }
 
 ///|
-fn gilrs_event_sig(e : Event) -> (Int, Int, Double, Int) {
+fn gilrs_event_sig(e : @gamepad.Event) -> (Int32, Int32, Double, Int32) {
   match e.event() {
     AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
     ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
@@ -72,28 +80,41 @@ fn gilrs_event_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
-fn build_ok_gilrs(builder : GilBuilder) -> Gil {
-  let res : Result[Gil, GilError] = try builder.build() |> Ok catch {
+fn build_ok_gilrs(builder : @gamepad.GilBuilder) -> @gamepad.Gil {
+  let res : Result[@gamepad.Gil, @gamepad.GilError] = try
+    builder.build() |> Ok
+  catch {
     e => Err(e)
   }
   match res {
     Ok(g) => g
-    Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
+    Err(_) =>
+      @gamepad.Gil::new_mock(0, update_state=false, default_filters=false)
   }
 }
 
 ///|
 test "gil next_event applies default filters by default" {
-  let g = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
 
   // seed state so jitter can compare
-  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.5, AXIS_LSTICKX), 1L))
+  g.insert_event(
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.5, @gamepad.AXIS_LSTICKX),
+      1L,
+    ),
+  )
   let _ = g.next_event()
 
   // small delta should be dropped; next_event skips dropped events
   g.insert_event(
-    Event::at(id, AxisChanged(LeftStickX, 0.505, AXIS_LSTICKX), 2L),
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.505, @gamepad.AXIS_LSTICKX),
+      2L,
+    ),
   )
   inspect(g.next_event() is None, content="true")
 }
@@ -101,16 +122,26 @@ test "gil next_event applies default filters by default" {
 ///|
 test "gil builder can disable default filters" {
   let g = build_ok_gilrs(
-    GilBuilder::new()
+    @gamepad.GilBuilder::new()
     .with_mock_gamepad_count(1)
     .set_update_state(true)
     .with_default_filters(false),
   )
-  let id = GamepadId::new(0)
-  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.5, AXIS_LSTICKX), 1L))
+  let id = @gamepad.GamepadId::new(0)
+  g.insert_event(
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.5, @gamepad.AXIS_LSTICKX),
+      1L,
+    ),
+  )
   let _ = g.next_event()
   g.insert_event(
-    Event::at(id, AxisChanged(LeftStickX, 0.505, AXIS_LSTICKX), 2L),
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.505, @gamepad.AXIS_LSTICKX),
+      2L,
+    ),
   )
   debug_inspect(
     g.next_event().map(gilrs_event_sig),
@@ -120,9 +151,9 @@ test "gil builder can disable default filters" {
 
 ///|
 test "gil returns dropped when default filters are disabled" {
-  let g = Gil::new_mock(1, update_state=true, default_filters=false)
-  let id = GamepadId::new(0)
-  g.insert_event(Event::at(id, Dropped, 1L))
+  let g = @gamepad.Gil::new_mock(1, update_state=true, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  g.insert_event(@gamepad.Event::at(id, Dropped, 1L))
   let got = g
     .next_event()
     .map(fn(ev) {
@@ -136,14 +167,14 @@ test "gil returns dropped when default filters are disabled" {
 
 ///|
 test "gil update ignores connection events but next_event syncs connection" {
-  let g = Gil::new_mock(1, update_state=true, default_filters=false)
-  let id = GamepadId::new(0)
-  g.update(Event::at(id, Disconnected, 1L))
+  let g = @gamepad.Gil::new_mock(1, update_state=true, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  g.update(@gamepad.Event::at(id, Disconnected, 1L))
   debug_inspect(
     g.gamepad(id).map(fn(gp) { gp.is_connected() }),
     content="Some(true)",
   )
-  g.insert_event(Event::at(id, Disconnected, 2L))
+  g.insert_event(@gamepad.Event::at(id, Disconnected, 2L))
   ignore(g.next_event())
   debug_inspect(
     g.gamepad(id).map(fn(gp) { gp.is_connected() }),
@@ -153,12 +184,14 @@ test "gil update ignores connection events but next_event syncs connection" {
 
 ///|
 test "gil next_event runs axis_dpad_to_button in default pipeline" {
-  let g = Gil::new_mock(1, update_state=true)
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
+  let g = @gamepad.Gil::new_mock(1, update_state=true)
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
   m.set_hats_mapped(0b1111)
   g.set_mapping(id, m)
-  g.insert_event(Event::at(id, AxisChanged(DPadX, 1.0, AXIS_DPADX), 1L))
+  g.insert_event(
+    @gamepad.Event::at(id, AxisChanged(DPadX, 1.0, @gamepad.AXIS_DPADX), 1L),
+  )
   debug_inspect(
     g.next_event().map(gilrs_event_sig),
     content="Some((1, 18, 1, 589843))",
@@ -171,10 +204,10 @@ test "gil next_event runs axis_dpad_to_button in default pipeline" {
 
 ///|
 test "gil next_event_blocking timeout 0 behaves like next_event (mock)" {
-  let g = Gil::new_mock(1)
+  let g = @gamepad.Gil::new_mock(1)
   inspect(g.next_event_blocking(Some(0L)) is None, content="true")
-  let id = GamepadId::new(0)
-  g.insert_event(Event::at(id, Connected, 1L))
+  let id = @gamepad.GamepadId::new(0)
+  g.insert_event(@gamepad.Event::at(id, Connected, 1L))
   let got = g
     .next_event_blocking(Some(0L))
     .map(fn(ev) {
@@ -188,8 +221,8 @@ test "gil next_event_blocking timeout 0 behaves like next_event (mock)" {
 
 ///|
 test "gamepad power_info default is Unknown (mock)" {
-  let g = Gil::new_mock(1)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1)
+  let id = @gamepad.GamepadId::new(0)
   let p = g
     .gamepad(id)
     .map(fn(gp) {
@@ -203,20 +236,20 @@ test "gamepad power_info default is Unknown (mock)" {
 
 ///|
 test "gamepad is_ff_supported default is false (mock)" {
-  let g = Gil::new_mock(1)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1)
+  let id = @gamepad.GamepadId::new(0)
   let supported = g.gamepad(id).map(fn(gp) { gp.is_ff_supported() })
   debug_inspect(supported, content="Some(false)")
 }
 
 ///|
 test "gil keeps historical disconnected ids after reconnect-style sequence" {
-  let g = Gil::new_mock(2)
-  let id0 = GamepadId::new(0)
-  let id1 = GamepadId::new(1)
-  g.insert_event(Event::at(id0, Connected, 1L))
-  g.insert_event(Event::at(id0, Disconnected, 2L))
-  g.insert_event(Event::at(id1, Connected, 3L))
+  let g = @gamepad.Gil::new_mock(2)
+  let id0 = @gamepad.GamepadId::new(0)
+  let id1 = @gamepad.GamepadId::new(1)
+  g.insert_event(@gamepad.Event::at(id0, Connected, 1L))
+  g.insert_event(@gamepad.Event::at(id0, Disconnected, 2L))
+  g.insert_event(@gamepad.Event::at(id1, Connected, 3L))
   let t1 = g
     .next_event()
     .map(fn(ev) {

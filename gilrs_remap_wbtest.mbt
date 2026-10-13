@@ -13,7 +13,7 @@
 // limitations under the License.
 
 ///|
-fn ev_sig(e : Event) -> (Int, Int, Double, Int) {
+fn ev_sig(e : Event) -> (Int32, Int32, Double, Int32) {
   match e.event() {
     AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
     ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
@@ -46,11 +46,11 @@ extern "C" fn remap_backend_new_null_for_test() -> BackendOwner = "moon_gamepad_
 
 ///|
 fn remap_native_backend_null_for_test() -> NativeBackend {
-  { owner: remap_backend_new_null_for_test() }
+  { owner: remap_backend_new_null_for_test(), }
 }
 
 ///|
-fn remap_new_ff_ready_with_null_backend(gamepad_count : Int) -> Gil {
+fn remap_new_ff_ready_with_null_backend(gamepad_count : Int32) -> Gil {
   let data : Array[GamepadData] = []
   for _ in 0..<gamepad_count {
     let d = GamepadData::new()
@@ -562,7 +562,7 @@ test "mapping_source reports SdlMappings for parsed SDL mapping" {
 ///|
 test "mapping_source reports None for invalid gamepad handle" {
   let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let ghost : Gamepad = { gil: g, id: GamepadId::new(99) }
+  let ghost : Gamepad = { gil: g, id: GamepadId::new(99), }
   let source = ghost.mapping_source()
   let ok = match source {
     None => true

@@ -14,26 +14,35 @@
 
 ///|
 test "native_ev_codes: mac HID codes are page<<16|usage" {
-  inspect(BTN_SOUTH, content="589825")
-  inspect(BTN_EAST, content="589826")
-  inspect(AXIS_LSTICKX, content="65584")
-  inspect(AXIS_DPADY, content="65594")
-  inspect(AXIS_LT2, content="131269")
-  inspect(AXIS_RT2, content="131268")
+  inspect(@gamepad.BTN_SOUTH, content="589825")
+  inspect(@gamepad.BTN_EAST, content="589826")
+  inspect(@gamepad.AXIS_LSTICKX, content="65584")
+  inspect(@gamepad.AXIS_DPADY, content="65594")
+  inspect(@gamepad.AXIS_LT2, content="131269")
+  inspect(@gamepad.AXIS_RT2, content="131268")
 }
 
 ///|
 test "native_ev_codes: hid_page/hid_usage roundtrip" {
-  debug_inspect((hid_page(BTN_WEST), hid_usage(BTN_WEST)), content="(9, 4)")
   debug_inspect(
-    (hid_page(AXIS_LSTICKY), hid_usage(AXIS_LSTICKY)),
+    (
+      @gamepad.hid_page(@gamepad.BTN_WEST),
+      @gamepad.hid_usage(@gamepad.BTN_WEST),
+    ),
+    content="(9, 4)",
+  )
+  debug_inspect(
+    (
+      @gamepad.hid_page(@gamepad.AXIS_LSTICKY),
+      @gamepad.hid_usage(@gamepad.AXIS_LSTICKY),
+    ),
     content="(1, 49)",
   )
 }
 
 ///|
 test "native_ev_codes: trigger axes map to buttons" {
-  let ok = match axis_or_btn_from_code(AXIS_LT2) {
+  let ok = match @gamepad.axis_or_btn_from_code(@gamepad.AXIS_LT2) {
     Some(Btn(LeftTrigger2)) => true
     _ => false
   }
@@ -42,13 +51,13 @@ test "native_ev_codes: trigger axes map to buttons" {
 
 ///|
 test "native_ev_codes: unconfirmed macOS axes remain unmapped by default" {
-  let rx = hid_code(PAGE_GENERIC_DESKTOP, 0x33)
-  let ry = hid_code(PAGE_GENERIC_DESKTOP, 0x34)
-  let ok_rx = match axis_or_btn_from_code(rx) {
+  let rx = @gamepad.hid_code(@gamepad.PAGE_GENERIC_DESKTOP, 0x33)
+  let ry = @gamepad.hid_code(@gamepad.PAGE_GENERIC_DESKTOP, 0x34)
+  let ok_rx = match @gamepad.axis_or_btn_from_code(rx) {
     None => true
     _ => false
   }
-  let ok_ry = match axis_or_btn_from_code(ry) {
+  let ok_ry = match @gamepad.axis_or_btn_from_code(ry) {
     None => true
     _ => false
   }
@@ -57,29 +66,34 @@ test "native_ev_codes: unconfirmed macOS axes remain unmapped by default" {
 
 ///|
 test "native_ev_codes: unconfirmed constants use GenericDesktop usage 0" {
-  let zero_usage = hid_code(PAGE_GENERIC_DESKTOP, 0)
+  let zero_usage = @gamepad.hid_code(@gamepad.PAGE_GENERIC_DESKTOP, 0)
   inspect(zero_usage, content="65536")
   debug_inspect(
-    (AXIS_LEFTZ, AXIS_RIGHTZ, AXIS_LT, AXIS_RT),
+    (
+      @gamepad.AXIS_LEFTZ,
+      @gamepad.AXIS_RIGHTZ,
+      @gamepad.AXIS_LT,
+      @gamepad.AXIS_RT,
+    ),
     content="(65536, 65536, 65536, 65536)",
   )
 }
 
 ///|
 test "native_ev_codes: usage-0 constants collide to one default mapping" {
-  let hit_leftz = match axis_or_btn_from_code(AXIS_LEFTZ) {
+  let hit_leftz = match @gamepad.axis_or_btn_from_code(@gamepad.AXIS_LEFTZ) {
     Some(Axis(RightZ)) => true
     _ => false
   }
-  let hit_rightz = match axis_or_btn_from_code(AXIS_RIGHTZ) {
+  let hit_rightz = match @gamepad.axis_or_btn_from_code(@gamepad.AXIS_RIGHTZ) {
     Some(Axis(RightZ)) => true
     _ => false
   }
-  let hit_lt = match axis_or_btn_from_code(AXIS_LT) {
+  let hit_lt = match @gamepad.axis_or_btn_from_code(@gamepad.AXIS_LT) {
     Some(Axis(RightZ)) => true
     _ => false
   }
-  let hit_rt = match axis_or_btn_from_code(AXIS_RT) {
+  let hit_rt = match @gamepad.axis_or_btn_from_code(@gamepad.AXIS_RT) {
     Some(Axis(RightZ)) => true
     _ => false
   }

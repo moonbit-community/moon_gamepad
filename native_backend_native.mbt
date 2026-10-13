@@ -26,16 +26,16 @@ extern "C" fn backend_poll(owner : BackendOwner) -> Unit = "moon_gamepad_backend
 #borrow(owner)
 extern "C" fn backend_poll_timeout(
   owner : BackendOwner,
-  timeout_ms : Int,
+  timeout_ms : Int32,
 ) -> Unit = "moon_gamepad_backend_poll_timeout"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_gamepad_count(owner : BackendOwner) -> Int = "moon_gamepad_backend_gamepad_count"
+extern "C" fn backend_gamepad_count(owner : BackendOwner) -> Int32 = "moon_gamepad_backend_gamepad_count"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_last_gamepad_hint(owner : BackendOwner) -> Int = "moon_gamepad_backend_last_gamepad_hint"
+extern "C" fn backend_last_gamepad_hint(owner : BackendOwner) -> Int32 = "moon_gamepad_backend_last_gamepad_hint"
 
 ///|
 #borrow(owner)
@@ -52,57 +52,60 @@ extern "C" fn backend_sdl_platform_name() -> String = "moon_gamepad_sdl_platform
 
 ///|
 #borrow(owner)
-extern "C" fn backend_name(owner : BackendOwner, id : Int) -> String = "moon_gamepad_backend_name"
+extern "C" fn backend_name(owner : BackendOwner, id : Int32) -> String = "moon_gamepad_backend_name"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_uuid_simple(owner : BackendOwner, id : Int) -> String = "moon_gamepad_backend_uuid_simple"
+extern "C" fn backend_uuid_simple(owner : BackendOwner, id : Int32) -> String = "moon_gamepad_backend_uuid_simple"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_vendor_id(owner : BackendOwner, id : Int) -> Int = "moon_gamepad_backend_vendor_id"
+extern "C" fn backend_vendor_id(owner : BackendOwner, id : Int32) -> Int32 = "moon_gamepad_backend_vendor_id"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_product_id(owner : BackendOwner, id : Int) -> Int = "moon_gamepad_backend_product_id"
+extern "C" fn backend_product_id(owner : BackendOwner, id : Int32) -> Int32 = "moon_gamepad_backend_product_id"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_is_connected(owner : BackendOwner, id : Int) -> Int = "moon_gamepad_backend_is_connected"
+extern "C" fn backend_is_connected(owner : BackendOwner, id : Int32) -> Int32 = "moon_gamepad_backend_is_connected"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_is_ff_supported(owner : BackendOwner, id : Int) -> Int = "moon_gamepad_backend_is_ff_supported"
+extern "C" fn backend_is_ff_supported(
+  owner : BackendOwner,
+  id : Int32,
+) -> Int32 = "moon_gamepad_backend_is_ff_supported"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_power_info_bin(owner : BackendOwner, id : Int) -> Bytes = "moon_gamepad_backend_power_info_bin"
+extern "C" fn backend_power_info_bin(owner : BackendOwner, id : Int32) -> Bytes = "moon_gamepad_backend_power_info_bin"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_axes_bin(owner : BackendOwner, id : Int) -> Bytes = "moon_gamepad_backend_axes_bin"
+extern "C" fn backend_axes_bin(owner : BackendOwner, id : Int32) -> Bytes = "moon_gamepad_backend_axes_bin"
 
 ///|
 #borrow(owner)
-extern "C" fn backend_buttons_bin(owner : BackendOwner, id : Int) -> Bytes = "moon_gamepad_backend_buttons_bin"
+extern "C" fn backend_buttons_bin(owner : BackendOwner, id : Int32) -> Bytes = "moon_gamepad_backend_buttons_bin"
 
 ///|
 #borrow(owner)
 extern "C" fn backend_axis_info_bin(
   owner : BackendOwner,
-  id : Int,
-  code : Int,
+  id : Int32,
+  code : Int32,
 ) -> Bytes = "moon_gamepad_backend_axis_info_bin"
 
 ///|
 #borrow(owner)
 extern "C" fn backend_set_rumble(
   owner : BackendOwner,
-  id : Int,
+  id : Int32,
   strong : Double,
   weak : Double,
-  duration_ms : Int,
-) -> Int = "moon_gamepad_backend_set_rumble"
+  duration_ms : Int32,
+) -> Int32 = "moon_gamepad_backend_set_rumble"
 
 ///|
 pub struct NativeBackend {
@@ -111,7 +114,7 @@ pub struct NativeBackend {
 
 ///|
 pub fn NativeBackend::new() -> NativeBackend {
-  { owner: backend_new() }
+  { owner: backend_new(), }
 }
 
 ///|
@@ -122,18 +125,18 @@ pub fn NativeBackend::poll(self : NativeBackend) -> Unit {
 ///|
 pub fn NativeBackend::poll_timeout(
   self : NativeBackend,
-  timeout_ms : Int,
+  timeout_ms : Int32,
 ) -> Unit {
   backend_poll_timeout(self.owner, timeout_ms)
 }
 
 ///|
-pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int {
+pub fn NativeBackend::gamepad_count(self : NativeBackend) -> Int32 {
   backend_gamepad_count(self.owner)
 }
 
 ///|
-pub fn NativeBackend::last_gamepad_hint(self : NativeBackend) -> Int {
+pub fn NativeBackend::last_gamepad_hint(self : NativeBackend) -> Int32 {
   backend_last_gamepad_hint(self.owner)
 }
 
@@ -159,17 +162,17 @@ pub fn runtime_sdl_platform_name() -> String {
 }
 
 ///|
-pub fn NativeBackend::name(self : NativeBackend, id : Int) -> String {
+pub fn NativeBackend::name(self : NativeBackend, id : Int32) -> String {
   backend_name(self.owner, id)
 }
 
 ///|
-pub fn NativeBackend::uuid_simple(self : NativeBackend, id : Int) -> String {
+pub fn NativeBackend::uuid_simple(self : NativeBackend, id : Int32) -> String {
   backend_uuid_simple(self.owner, id)
 }
 
 ///|
-pub fn NativeBackend::vendor_id(self : NativeBackend, id : Int) -> Int? {
+pub fn NativeBackend::vendor_id(self : NativeBackend, id : Int32) -> Int32? {
   let v = backend_vendor_id(self.owner, id)
   if v < 0 {
     None
@@ -179,7 +182,7 @@ pub fn NativeBackend::vendor_id(self : NativeBackend, id : Int) -> Int? {
 }
 
 ///|
-pub fn NativeBackend::product_id(self : NativeBackend, id : Int) -> Int? {
+pub fn NativeBackend::product_id(self : NativeBackend, id : Int32) -> Int32? {
   let v = backend_product_id(self.owner, id)
   if v < 0 {
     None
@@ -189,17 +192,17 @@ pub fn NativeBackend::product_id(self : NativeBackend, id : Int) -> Int? {
 }
 
 ///|
-pub fn NativeBackend::is_connected(self : NativeBackend, id : Int) -> Bool {
+pub fn NativeBackend::is_connected(self : NativeBackend, id : Int32) -> Bool {
   backend_is_connected(self.owner, id) != 0
 }
 
 ///|
-pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int) -> Bool {
+pub fn NativeBackend::is_ff_supported(self : NativeBackend, id : Int32) -> Bool {
   backend_is_ff_supported(self.owner, id) != 0
 }
 
 ///|
-pub fn NativeBackend::power_info(self : NativeBackend, id : Int) -> PowerInfo {
+pub fn NativeBackend::power_info(self : NativeBackend, id : Int32) -> PowerInfo {
   let b = backend_power_info_bin(self.owner, id)
   if b.length() < 8 {
     return Unknown
@@ -216,7 +219,7 @@ pub fn NativeBackend::power_info(self : NativeBackend, id : Int) -> PowerInfo {
 }
 
 ///|
-fn read_i32_le(b : Bytes, off : Int) -> Int {
+fn read_i32_le(b : Bytes, off : Int32) -> Int32 {
   let b0 = b[off + 0].to_int()
   let b1 = b[off + 1].to_int()
   let b2 = b[off + 2].to_int()
@@ -225,8 +228,8 @@ fn read_i32_le(b : Bytes, off : Int) -> Int {
 }
 
 ///|
-fn decode_i32s(b : Bytes) -> Array[Int] {
-  let out : Array[Int] = []
+fn decode_i32s(b : Bytes) -> Array[Int32] {
+  let out : Array[Int32] = []
   if b.length() == 0 {
     return out
   }
@@ -238,20 +241,20 @@ fn decode_i32s(b : Bytes) -> Array[Int] {
 }
 
 ///|
-pub fn NativeBackend::axes(self : NativeBackend, id : Int) -> Array[Int] {
+pub fn NativeBackend::axes(self : NativeBackend, id : Int32) -> Array[Int32] {
   decode_i32s(backend_axes_bin(self.owner, id))
 }
 
 ///|
-pub fn NativeBackend::buttons(self : NativeBackend, id : Int) -> Array[Int] {
+pub fn NativeBackend::buttons(self : NativeBackend, id : Int32) -> Array[Int32] {
   decode_i32s(backend_buttons_bin(self.owner, id))
 }
 
 ///|
 pub fn NativeBackend::axis_info(
   self : NativeBackend,
-  id : Int,
-  code : Int,
+  id : Int32,
+  code : Int32,
 ) -> AxisInfo? {
   let b = backend_axis_info_bin(self.owner, id, code)
   if b.length() < 16 {
@@ -264,17 +267,17 @@ pub fn NativeBackend::axis_info(
   let minv = read_i32_le(b, 4)
   let maxv = read_i32_le(b, 8)
   let dz = read_i32_le(b, 12)
-  let deadzone : Int? = if dz < 0 { None } else { Some(dz) }
+  let deadzone : Int32? = if dz < 0 { None } else { Some(dz) }
   Some(AxisInfo::new(minv, maxv, deadzone))
 }
 
 ///|
 pub fn NativeBackend::set_rumble(
   self : NativeBackend,
-  id : Int,
+  id : Int32,
   strong : Double,
   weak : Double,
-  duration_ms : Int,
+  duration_ms : Int32,
 ) -> Bool {
   backend_set_rumble(self.owner, id, strong, weak, duration_ms) != 0
 }

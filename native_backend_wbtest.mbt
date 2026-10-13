@@ -14,10 +14,10 @@
 
 ///|
 extern "C" fn uuid_simple_from_ids_for_test(
-  bustype : Int,
-  vendor : Int,
-  product : Int,
-  version : Int,
+  bustype : Int32,
+  vendor : Int32,
+  product : Int32,
+  version : Int32,
 ) -> String = "moon_gamepad_uuid_simple_from_ids"
 
 ///|
@@ -28,13 +28,13 @@ test "uuid from ids matches gil SDL layout sample" {
 
 ///|
 extern "C" fn macos_hat_pack_for_test(
-  hat_v : Int,
-  hat_min : Int,
-  hat_max : Int,
-) -> Int = "moon_gamepad_macos_hat_pack_for_test"
+  hat_v : Int32,
+  hat_min : Int32,
+  hat_max : Int32,
+) -> Int32 = "moon_gamepad_macos_hat_pack_for_test"
 
 ///|
-fn unpack_hat(pack : Int) -> (Int, Int) {
+fn unpack_hat(pack : Int32) -> (Int32, Int32) {
   let x = (pack & 0x3) - 2
   let y = ((pack >> 2) & 0x3) - 2
   (x, y)

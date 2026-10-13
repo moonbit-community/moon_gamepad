@@ -14,28 +14,28 @@
 
 ///|
 // Native HID-style codes (macOS parity): Code = (page << 16) | usage.
-pub fn hid_code(page : Int, usage : Int) -> Code {
+pub fn hid_code(page : Int32, usage : Int32) -> Code {
   (page << 16) | usage
 }
 
 ///|
-pub fn hid_page(code : Code) -> Int {
+pub fn hid_page(code : Code) -> Int32 {
   (code >> 16) & 0xFFFF
 }
 
 ///|
-pub fn hid_usage(code : Code) -> Int {
+pub fn hid_usage(code : Code) -> Int32 {
   code & 0xFFFF
 }
 
 ///|
-pub const PAGE_GENERIC_DESKTOP : Int = 0x01
+pub const PAGE_GENERIC_DESKTOP : Int32 = 0x01
 
 ///|
-pub const PAGE_SIMULATION : Int = 0x02
+pub const PAGE_SIMULATION : Int32 = 0x02
 
 ///|
-pub const PAGE_BUTTON : Int = 0x09
+pub const PAGE_BUTTON : Int32 = 0x09
 
 ///|
 pub const AXIS_LSTICKX : Code = (PAGE_GENERIC_DESKTOP << 16) | 0x30

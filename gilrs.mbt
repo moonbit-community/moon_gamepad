@@ -36,8 +36,8 @@ pub struct GamepadData {
   mut mapping : Mapping
   mut name : String
   mut uuid : Uuid
-  mut vendor_id : Int?
-  mut product_id : Int?
+  mut vendor_id : Int32?
+  mut product_id : Int32?
   mut ff_supported : Bool
   mut listener_position : (Double, Double, Double)
   mut power_info : PowerInfo
@@ -74,28 +74,28 @@ const FF_TICK_DURATION_MS : Int64 = 50L
 
 ///|
 priv struct FfMagnitude {
-  strong : Int
-  weak : Int
+  strong : Int32
+  weak : Int32
 }
 
 ///|
 priv enum FfEffectState {
-  Playing(Int)
+  Playing(Int32)
   Stopped
 }
 
 ///|
 struct FfEffectSource {
-  token : Int
+  token : Int32
   base_effects : Array[BaseEffect]
-  mut devices : Array[Int]
+  mut devices : Array[Int32]
   mut repeat_mode : FfRepeat
   mut distance_model : DistanceModel
   mut position : (Double, Double, Double)
   mut gain : Double
   mut state : FfEffectState
-  strong : Int
-  weak : Int
+  strong : Int32
+  weak : Int32
 }
 
 ///|
@@ -106,25 +106,25 @@ pub struct Gil {
   mut axis_to_btn_pressed : Double
   mut axis_to_btn_released : Double
   events : Array[Event]
-  mut events_head : Int
+  mut events_head : Int32
   gamepads_data : Array[GamepadData]
   mappings : MappingDb
   mut now_ms : Int64
-  mut next_effect_token : Int
+  mut next_effect_token : Int32
   ff_tick_base_ms : Int64
-  mut ff_tick : Int
+  mut ff_tick : Int32
   mut ff_dirty : Bool
   ff_effects : Array[FfEffectSource]
   mut ff_events : Array[Event]
-  mut ff_events_head : Int
+  mut ff_events_head : Int32
   backend : NativeBackend?
 }
 
 ///|
 pub fn Gil::new_mock(
-  gamepad_count : Int,
-  update_state? : Bool = true,
-  default_filters? : Bool = true,
+  gamepad_count : Int32,
+  update_state~ : Bool = true,
+  default_filters~ : Bool = true,
 ) -> Gil {
   let data : Array[GamepadData] = []
   for _ in 0..<gamepad_count {
@@ -154,8 +154,8 @@ pub fn Gil::new_mock(
 
 ///|
 pub fn Gil::new_native(
-  update_state? : Bool = true,
-  default_filters? : Bool = true,
+  update_state~ : Bool = true,
+  default_filters~ : Bool = true,
 ) -> Gil {
   {
     counter: 0L,
@@ -228,7 +228,7 @@ pub fn Gil::time(self : Gil) -> Int64 {
 }
 
 ///|
-fn contains_id(ids : Array[Int], id : Int) -> Bool {
+fn contains_id(ids : Array[Int32], id : Int32) -> Bool {
   for x in ids {
     if x == id {
       return true
@@ -238,7 +238,7 @@ fn contains_id(ids : Array[Int], id : Int) -> Bool {
 }
 
 ///|
-fn Gil::new_effect_token(self : Gil) -> Int {
+fn Gil::new_effect_token(self : Gil) -> Int32 {
   let token = self.next_effect_token
   if token >= 0x7FFF_FFFF {
     self.next_effect_token = 1
@@ -249,7 +249,7 @@ fn Gil::new_effect_token(self : Gil) -> Int {
 }
 
 ///|
-fn u16_saturating_add(lhs : Int, rhs : Int) -> Int {
+fn u16_saturating_add(lhs : Int32, rhs : Int32) -> Int32 {
   let sum = lhs + rhs
   if sum >= 65535 {
     65535
@@ -261,7 +261,7 @@ fn u16_saturating_add(lhs : Int, rhs : Int) -> Int {
 }
 
 ///|
-fn u16_scale(magnitude : Int, factor : Double) -> Int {
+fn u16_scale(magnitude : Int32, factor : Double) -> Int32 {
   if factor <= 0.0 || Double::is_nan(factor) {
     return 0
   }
@@ -276,7 +276,7 @@ fn u16_scale(magnitude : Int, factor : Double) -> Int {
 }
 
 ///|
-fn u16_from_amp(amp : Double) -> Int {
+fn u16_from_amp(amp : Double) -> Int32 {
   if amp <= 0.0 || Double::is_nan(amp) {
     0
   } else if amp >= 1.0 {
@@ -287,12 +287,12 @@ fn u16_from_amp(amp : Double) -> Int {
 }
 
 ///|
-fn amp_from_u16(magnitude : Int) -> Double {
+fn amp_from_u16(magnitude : Int32) -> Double {
   clamp(magnitude.to_double() / 65535.0, 0.0, 1.0)
 }
 
 ///|
-fn Gil::ff_find_effect_idx(self : Gil, token : Int) -> Int? {
+fn Gil::ff_find_effect_idx(self : Gil, token : Int32) -> Int32? {
   for i in 0..<self.ff_effects.length() {
     if self.ff_effects[i].token == token {
       return Some(i)
@@ -302,7 +302,7 @@ fn Gil::ff_find_effect_idx(self : Gil, token : Int) -> Int? {
 }
 
 ///|
-fn ff_devices_contains(devices : Array[Int], id : Int) -> Bool {
+fn ff_devices_contains(devices : Array[Int32], id : Int32) -> Bool {
   for x in devices {
     if x == id {
       return true
@@ -312,7 +312,7 @@ fn ff_devices_contains(devices : Array[Int], id : Int) -> Bool {
 }
 
 ///|
-fn ff_repeat_max_ticks(repeat : FfRepeat) -> Int? {
+fn ff_repeat_max_ticks(repeat : FfRepeat) -> Int32? {
   match repeat {
     Infinitely => None
     For(ms) => {
@@ -341,7 +341,7 @@ fn Gil::ff_push_event(self : Gil, ev : Event) -> Unit {
 }
 
 ///|
-fn Gil::ff_now_tick(self : Gil, now_ms : Int64) -> Int {
+fn Gil::ff_now_tick(self : Gil, now_ms : Int64) -> Int32 {
   let elapsed = now_ms - self.ff_tick_base_ms
   if elapsed <= 0L {
     0
@@ -362,7 +362,7 @@ fn Gil::ff_has_active_effect(self : Gil) -> Bool {
 }
 
 ///|
-fn Gil::ff_next_tick_wait_ms(self : Gil, now_ms : Int64) -> Int {
+fn Gil::ff_next_tick_wait_ms(self : Gil, now_ms : Int64) -> Int32 {
   let tick = self.ff_now_tick(now_ms)
   let next_tick_at = self.ff_tick_base_ms +
     (tick.to_int64() + 1L) * FF_TICK_DURATION_MS
@@ -379,7 +379,7 @@ fn Gil::ff_next_tick_wait_ms(self : Gil, now_ms : Int64) -> Int {
 ///|
 fn Gil::ff_upsert_effect_from_handle(self : Gil, effect : Effect) -> Unit {
   let token = effect.effect_token
-  let devices : Array[Int] = []
+  let devices : Array[Int32] = []
   for gid in effect.gamepads {
     let id = gid.value()
     if id >= 0 && !contains_id(devices, id) {
@@ -427,13 +427,13 @@ fn Gil::ff_upsert_effect_from_handle(self : Gil, effect : Effect) -> Unit {
 ///|
 fn Gil::ff_set_effect_gamepads(
   self : Gil,
-  token : Int,
+  token : Int32,
   gamepads : Array[GamepadId],
 ) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
     Some(idx) => {
-      let devices : Array[Int] = []
+      let devices : Array[Int32] = []
       for gid in gamepads {
         let id = gid.value()
         if id >= 0 && !contains_id(devices, id) {
@@ -449,7 +449,7 @@ fn Gil::ff_set_effect_gamepads(
 ///|
 fn Gil::ff_set_effect_repeat(
   self : Gil,
-  token : Int,
+  token : Int32,
   repeat : FfRepeat,
 ) -> Unit {
   match self.ff_find_effect_idx(token) {
@@ -462,7 +462,7 @@ fn Gil::ff_set_effect_repeat(
 ///|
 fn Gil::ff_set_effect_distance_model(
   self : Gil,
-  token : Int,
+  token : Int32,
   model : DistanceModel,
 ) -> Unit {
   match self.ff_find_effect_idx(token) {
@@ -475,7 +475,7 @@ fn Gil::ff_set_effect_distance_model(
 ///|
 fn Gil::ff_set_effect_position(
   self : Gil,
-  token : Int,
+  token : Int32,
   position : (Double, Double, Double),
 ) -> Unit {
   match self.ff_find_effect_idx(token) {
@@ -486,7 +486,7 @@ fn Gil::ff_set_effect_position(
 }
 
 ///|
-fn Gil::ff_set_effect_gain(self : Gil, token : Int, gain : Double) -> Unit {
+fn Gil::ff_set_effect_gain(self : Gil, token : Int32, gain : Double) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
     Some(idx) => self.ff_effects[idx].gain = gain
@@ -495,7 +495,7 @@ fn Gil::ff_set_effect_gain(self : Gil, token : Int, gain : Double) -> Unit {
 }
 
 ///|
-fn Gil::ff_play_effect(self : Gil, token : Int, tick : Int) -> Unit {
+fn Gil::ff_play_effect(self : Gil, token : Int32, tick : Int32) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
     Some(idx) => self.ff_effects[idx].state = Playing(tick)
@@ -504,7 +504,7 @@ fn Gil::ff_play_effect(self : Gil, token : Int, tick : Int) -> Unit {
 }
 
 ///|
-fn Gil::ff_stop_effect(self : Gil, token : Int) -> Unit {
+fn Gil::ff_stop_effect(self : Gil, token : Int32) -> Unit {
   match self.ff_find_effect_idx(token) {
     None => ()
     Some(idx) => self.ff_effects[idx].state = Stopped
@@ -528,14 +528,14 @@ fn distance(
 ///|
 fn Gil::ff_combine_base_effects(
   self : Gil,
-  idx : Int,
-  tick : Int,
+  idx : Int32,
+  tick : Int32,
   actor_pos : (Double, Double, Double),
   now_ms : Int64,
 ) -> FfMagnitude {
   let mut rel_ticks = 0
   match self.ff_effects[idx].state {
-    Stopped => return { strong: 0, weak: 0 }
+    Stopped => return { strong: 0, weak: 0, }
     Playing(since_tick) => {
       rel_ticks = tick - since_tick
       if rel_ticks < 0 {
@@ -554,7 +554,7 @@ fn Gil::ff_combine_base_effects(
             Event::at(GamepadId::new(id), ForceFeedbackEffectCompleted, now_ms),
           )
         }
-        return { strong: 0, weak: 0 }
+        return { strong: 0, weak: 0, }
       }
   }
 
@@ -562,7 +562,7 @@ fn Gil::ff_combine_base_effects(
   let attenuation = self.ff_effects[idx].distance_model.attenuation(dist) *
     self.ff_effects[idx].gain
   if attenuation < 0.05 {
-    return { strong: 0, weak: 0 }
+    return { strong: 0, weak: 0, }
   }
 
   let mut strong = self.ff_effects[idx].strong
@@ -573,7 +573,10 @@ fn Gil::ff_combine_base_effects(
       Weak(magnitude) => weak = u16_saturating_add(weak, magnitude)
     }
   }
-  { strong: u16_scale(strong, attenuation), weak: u16_scale(weak, attenuation) }
+  {
+    strong: u16_scale(strong, attenuation),
+    weak: u16_scale(weak, attenuation),
+  }
 }
 
 ///|
@@ -635,7 +638,7 @@ fn Gil::apply_connection_event(self : Gil, ev : Event) -> Unit {
 }
 
 ///|
-fn Gil::ensure_gamepad_data(self : Gil, id : Int) -> Unit {
+fn Gil::ensure_gamepad_data(self : Gil, id : Int32) -> Unit {
   if id < 0 {
     return
   }
@@ -645,7 +648,7 @@ fn Gil::ensure_gamepad_data(self : Gil, id : Int) -> Unit {
 }
 
 ///|
-fn Gil::set_connected(self : Gil, id : Int, connected : Bool) -> Unit {
+fn Gil::set_connected(self : Gil, id : Int32, connected : Bool) -> Unit {
   self.ensure_gamepad_data(id)
   if id < 0 || id >= self.gamepads_data.length() {
     return
@@ -654,7 +657,7 @@ fn Gil::set_connected(self : Gil, id : Int, connected : Bool) -> Unit {
 }
 
 ///|
-fn Gil::apply_identity_mapping(self : Gil, id : Int) -> Unit {
+fn Gil::apply_identity_mapping(self : Gil, id : Int32) -> Unit {
   self.ensure_gamepad_data(id)
   if id < 0 || id >= self.gamepads_data.length() {
     return
@@ -690,7 +693,7 @@ fn find_axis_info(infos : Array[(Code, AxisInfo)], code : Code) -> AxisInfo? {
 ///|
 fn Gil::refresh_gamepad_data_on_connected(
   self : Gil,
-  id : Int,
+  id : Int32,
   existed_before : Bool,
 ) -> Unit {
   if id < 0 || id >= self.gamepads_data.length() {
@@ -924,7 +927,7 @@ pub fn Gil::poll(self : Gil) -> Unit {
 }
 
 ///|
-fn clamp_blocking_timeout(timeout_ms : Int64?) -> Int {
+fn clamp_blocking_timeout(timeout_ms : Int64?) -> Int32 {
   match timeout_ms {
     None => -1
     Some(ms) =>
@@ -939,7 +942,7 @@ fn clamp_blocking_timeout(timeout_ms : Int64?) -> Int {
 }
 
 ///|
-fn min_timeout(lhs : Int, rhs : Int) -> Int {
+fn min_timeout(lhs : Int32, rhs : Int32) -> Int32 {
   if lhs < 0 {
     rhs
   } else if rhs < 0 {
@@ -1137,7 +1140,7 @@ pub fn Gil::set_mapping_data(
   self : Gil,
   id : GamepadId,
   mapping_data : MappingData,
-  name? : String? = None,
+  name~ : String? = None,
 ) -> String raise MappingError {
   let i = id.value()
   if i < 0 || i >= self.gamepads_data.length() {
@@ -1166,7 +1169,7 @@ pub fn Gil::set_mapping_data_strict(
   self : Gil,
   id : GamepadId,
   mapping_data : MappingData,
-  name? : String? = None,
+  name~ : String? = None,
 ) -> String raise MappingError {
   if mapping_data.button(C) is Some(_) ||
     mapping_data.button(Z) is Some(_) ||
@@ -1225,7 +1228,7 @@ pub fn Gil::button_code(self : Gil, id : GamepadId, btn : Button) -> Code? {
 }
 
 ///|
-fn find_deadzone_idx(deadzones : Array[(Code, Double)], code : Code) -> Int? {
+fn find_deadzone_idx(deadzones : Array[(Code, Double)], code : Code) -> Int32? {
   for i in 0..<deadzones.length() {
     let (c, _) = deadzones[i]
     if c == code {
@@ -1296,7 +1299,7 @@ pub struct GilBuilder {
   mut axis_to_btn_released : Double
   mut env_mappings : Bool
   mut included_mappings : Bool
-  mut mock_gamepad_count : Int
+  mut mock_gamepad_count : Int32
   mut use_native_backend : Bool
   mapping_inputs : Array[String]
 }
@@ -1334,7 +1337,7 @@ pub fn GilBuilder::with_default_filters(
 ///|
 pub fn GilBuilder::with_mock_gamepad_count(
   self : GilBuilder,
-  n : Int,
+  n : Int32,
 ) -> GilBuilder {
   self.mock_gamepad_count = n
   self
@@ -1454,7 +1457,7 @@ pub fn Gil::gamepad(self : Gil, id : GamepadId) -> Gamepad? {
   if i < 0 || i >= self.gamepads_data.length() {
     None
   } else {
-    Some({ gil: self, id })
+    Some({ gil: self, id, })
   }
 }
 
@@ -1474,7 +1477,7 @@ pub fn Gil::gamepads(self : Gil) -> Array[(GamepadId, Gamepad)] {
       continue
     }
     let id = GamepadId::new(i)
-    out.push((id, { gil: self, id }))
+    out.push((id, { gil: self, id, }))
   }
   out
 }
@@ -1534,7 +1537,7 @@ pub fn Gamepad::uuid(self : Gamepad) -> Uuid {
 }
 
 ///|
-pub fn Gamepad::vendor_id(self : Gamepad) -> Int? {
+pub fn Gamepad::vendor_id(self : Gamepad) -> Int32? {
   let i = self.id.value()
   if i < 0 || i >= self.gil.gamepads_data.length() {
     None
@@ -1544,7 +1547,7 @@ pub fn Gamepad::vendor_id(self : Gamepad) -> Int? {
 }
 
 ///|
-pub fn Gamepad::product_id(self : Gamepad) -> Int? {
+pub fn Gamepad::product_id(self : Gamepad) -> Int32? {
   let i = self.id.value()
   if i < 0 || i >= self.gil.gamepads_data.length() {
     None

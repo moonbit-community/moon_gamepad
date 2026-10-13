@@ -23,39 +23,39 @@ extern "C" fn runtime_set_sdl_gamecontrollerconfig_for_test(s : String) -> Unit 
 extern "C" fn runtime_clear_sdl_gamecontrollerconfig_for_test() -> Unit = "moon_gamepad_clear_sdl_gamecontrollerconfig_for_test"
 
 ///|
-let buttons : Array[Code] = [
-  BTN_SOUTH,
-  BTN_EAST,
-  BTN_C,
-  BTN_NORTH,
-  BTN_WEST,
-  BTN_Z,
-  BTN_LT,
-  BTN_RT,
-  BTN_LT2,
-  BTN_RT2,
-  BTN_SELECT,
-  BTN_START,
-  BTN_MODE,
-  BTN_LTHUMB,
-  BTN_RTHUMB,
+let buttons : Array[@gamepad.Code] = [
+  @gamepad.BTN_SOUTH,
+  @gamepad.BTN_EAST,
+  @gamepad.BTN_C,
+  @gamepad.BTN_NORTH,
+  @gamepad.BTN_WEST,
+  @gamepad.BTN_Z,
+  @gamepad.BTN_LT,
+  @gamepad.BTN_RT,
+  @gamepad.BTN_LT2,
+  @gamepad.BTN_RT2,
+  @gamepad.BTN_SELECT,
+  @gamepad.BTN_START,
+  @gamepad.BTN_MODE,
+  @gamepad.BTN_LTHUMB,
+  @gamepad.BTN_RTHUMB,
 ]
 
 ///|
-let axes : Array[Code] = [
-  AXIS_LSTICKX,
-  AXIS_LSTICKY,
-  AXIS_RSTICKX,
-  AXIS_RSTICKY,
-  AXIS_LT2,
-  AXIS_RT2,
-  LEGACY_AXIS_LEFTZ,
-  LEGACY_AXIS_RIGHTZ,
+let axes : Array[@gamepad.Code] = [
+  @gamepad.AXIS_LSTICKX,
+  @gamepad.AXIS_LSTICKY,
+  @gamepad.AXIS_RSTICKX,
+  @gamepad.AXIS_RSTICKY,
+  @gamepad.AXIS_LT2,
+  @gamepad.AXIS_RT2,
+  @gamepad.LEGACY_AXIS_LEFTZ,
+  @gamepad.LEGACY_AXIS_RIGHTZ,
 ]
 
 ///|
-fn mapping_debug(m : Mapping) -> String {
-  fn axis_name(ax : Axis) -> String {
+fn mapping_debug(m : @gamepad.Mapping) -> String {
+  fn axis_name(ax : @gamepad.Axis) -> String {
     match ax {
       LeftStickX => "LeftStickX"
       LeftStickY => "LeftStickY"
@@ -69,7 +69,7 @@ fn mapping_debug(m : Mapping) -> String {
     }
   }
 
-  fn button_name(btn : Button) -> String {
+  fn button_name(btn : @gamepad.Button) -> String {
     match btn {
       South => "South"
       East => "East"
@@ -94,7 +94,7 @@ fn mapping_debug(m : Mapping) -> String {
     }
   }
 
-  fn el_name(el : AxisOrBtn) -> String {
+  fn el_name(el : @gamepad.AxisOrBtn) -> String {
     match el {
       Axis(ax) => "Axis:" + axis_name(ax)
       Btn(btn) => "Btn:" + button_name(btn)
@@ -103,7 +103,7 @@ fn mapping_debug(m : Mapping) -> String {
 
   let entries = m
     .entries()
-    .map(fn(pair : (Code, AxisOrBtn)) -> String {
+    .map(fn(pair : (@gamepad.Code, @gamepad.AxisOrBtn)) -> String {
       let (code, el) = pair
       "\{code}->\{el_name(el)}"
     })
@@ -112,8 +112,8 @@ fn mapping_debug(m : Mapping) -> String {
 
 ///|
 test "parse_sdl_mapping" {
-  let res : Result[Mapping, Error] = try
-    Mapping::parse_sdl_mapping(TEST_STR, buttons, axes) |> Ok
+  let res : Result[@gamepad.Mapping, Error] = try
+    @gamepad.Mapping::parse_sdl_mapping(TEST_STR, buttons, axes) |> Ok
   catch {
     e => Err(e)
   }
@@ -129,22 +129,22 @@ test "parse_sdl_mapping" {
 
 ///|
 test "parse_sdl_mapping preserves unmapped button indices" {
-  let uuid = Uuid::nil().simple()
+  let uuid = @gamepad.Uuid::nil().simple()
   let line = uuid + ",Test,a:b2,"
   // Include an extra unmapped button usage (usage=3) at index 2.
-  let buttons2 : Array[Code] = [
-    hid_code(PAGE_BUTTON, 1),
-    hid_code(PAGE_BUTTON, 2),
-    hid_code(PAGE_BUTTON, 3),
+  let buttons2 : Array[@gamepad.Code] = [
+    @gamepad.hid_code(@gamepad.PAGE_BUTTON, 1),
+    @gamepad.hid_code(@gamepad.PAGE_BUTTON, 2),
+    @gamepad.hid_code(@gamepad.PAGE_BUTTON, 3),
   ]
-  let res : Result[Mapping, Error] = try
-    Mapping::parse_sdl_mapping(line, buttons2, []) |> Ok
+  let res : Result[@gamepad.Mapping, Error] = try
+    @gamepad.Mapping::parse_sdl_mapping(line, buttons2, []) |> Ok
   catch {
     e => Err(e)
   }
   match res {
     Ok(m) => {
-      let code = hid_code(PAGE_BUTTON, 3)
+      let code = @gamepad.hid_code(@gamepad.PAGE_BUTTON, 3)
       let ok = match m.map(code) {
         Some(Btn(South)) => true
         _ => false
@@ -157,15 +157,15 @@ test "parse_sdl_mapping preserves unmapped button indices" {
 
 ///|
 test "from_data roundtrip + errors" {
-  let uuid = Uuid::nil()
+  let uuid = @gamepad.Uuid::nil()
   let name = "Best Gamepad"
-  let data = MappingData::new()
-  data.insert_axis(AXIS_LSTICKX, LeftStickX) |> ignore
-  data.insert_axis(AXIS_LSTICKY, LeftStickY) |> ignore
-  data.insert_axis(LEGACY_AXIS_LEFTZ, LeftZ) |> ignore
-  data.insert_axis(AXIS_RSTICKX, RightStickX) |> ignore
-  data.insert_axis(AXIS_RSTICKY, RightStickY) |> ignore
-  data.insert_axis(LEGACY_AXIS_RIGHTZ, RightZ) |> ignore
+  let data = @gamepad.MappingData::new()
+  data.insert_axis(@gamepad.AXIS_LSTICKX, LeftStickX) |> ignore
+  data.insert_axis(@gamepad.AXIS_LSTICKY, LeftStickY) |> ignore
+  data.insert_axis(@gamepad.LEGACY_AXIS_LEFTZ, LeftZ) |> ignore
+  data.insert_axis(@gamepad.AXIS_RSTICKX, RightStickX) |> ignore
+  data.insert_axis(@gamepad.AXIS_RSTICKY, RightStickY) |> ignore
+  data.insert_axis(@gamepad.LEGACY_AXIS_RIGHTZ, RightZ) |> ignore
   data.insert_btn(buttons[0], South) |> ignore
   data.insert_btn(buttons[1], East) |> ignore
   data.insert_btn(buttons[3], North) |> ignore
@@ -177,15 +177,15 @@ test "from_data roundtrip + errors" {
   data.insert_btn(buttons[9], RightThumb) |> ignore
   data.insert_btn(buttons[2], C) |> ignore
   data.insert_btn(buttons[10], Z) |> ignore
-  let ok_res : Result[(Mapping, String), Error] = try
-    Mapping::from_data(data, buttons, axes, name, uuid) |> Ok
+  let ok_res : Result[(@gamepad.Mapping, String), Error] = try
+    @gamepad.Mapping::from_data(data, buttons, axes, name, uuid) |> Ok
   catch {
     e => Err(e)
   }
   match ok_res {
     Ok((mappings, sdl)) => {
-      let parsed : Result[Mapping, Error] = try
-        Mapping::parse_sdl_mapping(sdl, buttons, axes) |> Ok
+      let parsed : Result[@gamepad.Mapping, Error] = try
+        @gamepad.Mapping::parse_sdl_mapping(sdl, buttons, axes) |> Ok
       catch {
         e => Err(e)
       }
@@ -198,7 +198,7 @@ test "from_data roundtrip + errors" {
     Err(_) => fail("from_data should not fail")
   }
   let bad_name : Result[Unit, Error] = try
-    Mapping::from_data(data, buttons, axes, "Inval,id name", uuid)
+    @gamepad.Mapping::from_data(data, buttons, axes, "Inval,id name", uuid)
     |> ignore
     |> Ok
   catch {
@@ -208,9 +208,9 @@ test "from_data roundtrip + errors" {
     bad_name,
     content="Err(<Milky2018/gamepad.MappingError.InvalidName: ...>)",
   )
-  data.insert_btn(BTN_DPAD_RIGHT, DPadRight) |> ignore
-  let invalid_code : Result[Unit, MappingError] = try
-    Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
+  data.insert_btn(@gamepad.BTN_DPAD_RIGHT, DPadRight) |> ignore
+  let invalid_code : Result[Unit, @gamepad.MappingError] = try
+    @gamepad.Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
   catch {
     e => Err(e)
   }
@@ -218,10 +218,10 @@ test "from_data roundtrip + errors" {
     Ok(_) => None
     Err(e) => e.invalid_code()
   }
-  inspect(invalid_code_payload == Some(BTN_DPAD_RIGHT), content="true")
+  inspect(invalid_code_payload == Some(@gamepad.BTN_DPAD_RIGHT), content="true")
   data.insert_btn(buttons[3], Unknown) |> ignore
   let unknown_el : Result[Unit, Error] = try
-    Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
+    @gamepad.Mapping::from_data(data, buttons, axes, name, uuid) |> ignore |> Ok
   catch {
     e => Err(e)
   }
@@ -235,9 +235,9 @@ test "from_data roundtrip + errors" {
 test "mapping_db insert/get" {
   let mappings = "\nShould be ignored\nThis also should,be ignored\n\n" +
     TEST_STR
-  let db = MappingDb::new()
+  let db = @gamepad.MappingDb::new()
   db.insert(mappings)
-  let uuid = Uuid::parse("03000000260900008888000000010001")
+  let uuid = @gamepad.Uuid::parse("03000000260900008888000000010001")
   debug_inspect(
     db.get(uuid),
     content=(
@@ -248,46 +248,48 @@ test "mapping_db insert/get" {
 
 ///|
 test "mapping_db insert works after preloading included mappings" {
-  let db = MappingDb::new()
+  let db = @gamepad.MappingDb::new()
   db.add_included_mappings()
-  let platform = runtime_sdl_platform_name()
+  let platform = @gamepad.runtime_sdl_platform_name()
   let mapping = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,AfterInclude,a:b0,platform:" +
     platform +
     ","
   db.insert(mapping)
   inspect(
-    db.get(Uuid::parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")) == Some(mapping),
+    db.get(@gamepad.Uuid::parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")) ==
+    Some(mapping),
     content="true",
   )
 }
 
 ///|
 test "mapping_db insert accepts CRLF-separated mappings" {
-  let db = MappingDb::new()
-  let platform = runtime_sdl_platform_name()
+  let db = @gamepad.MappingDb::new()
+  let platform = @gamepad.runtime_sdl_platform_name()
   let line = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,CRLF Pad,a:b0,platform:" +
     platform +
     ","
   db.insert(line + "\r\n")
   inspect(
-    db.get(Uuid::parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")) == Some(line),
+    db.get(@gamepad.Uuid::parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")) ==
+    Some(line),
     content="true",
   )
 }
 
 ///|
 test "mapping_db insert accepts UUID-only line" {
-  let db = MappingDb::new()
+  let db = @gamepad.MappingDb::new()
   let line = "cccccccccccccccccccccccccccccccc"
   db.insert(line)
-  inspect(db.get(Uuid::parse(line)) == Some(line), content="true")
+  inspect(db.get(@gamepad.Uuid::parse(line)) == Some(line), content="true")
 }
 
 ///|
 test "parse_sdl_mapping hat unknown direction" {
   let map_str = "03000000341a00003608000000010000,Test,platform:Linux,dpup:h0.16,"
-  let res : Result[Mapping, Error] = try
-    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  let res : Result[@gamepad.Mapping, Error] = try
+    @gamepad.Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
   catch {
     e => Err(e)
   }
@@ -304,8 +306,8 @@ test "parse_sdl_mapping hat unknown direction" {
 ///|
 test "parse_sdl_mapping rejects out-of-range u16 numbers" {
   let map_str = "03000000341a00003608000000010000,Test,platform:Linux,a:h70000.1,"
-  let res : Result[Mapping, Error] = try
-    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  let res : Result[@gamepad.Mapping, Error] = try
+    @gamepad.Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
   catch {
     e => Err(e)
   }
@@ -315,8 +317,8 @@ test "parse_sdl_mapping rejects out-of-range u16 numbers" {
 ///|
 test "parse_sdl_mapping accepts xinput pseudo-guid" {
   let map_str = "xinput,Test,a:b0,"
-  let res : Result[Mapping, Error] = try
-    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  let res : Result[@gamepad.Mapping, Error] = try
+    @gamepad.Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
   catch {
     e => Err(e)
   }
@@ -326,8 +328,8 @@ test "parse_sdl_mapping accepts xinput pseudo-guid" {
 ///|
 test "parse_sdl_mapping invalid guid maps to InvalidGuid" {
   let map_str = "not-a-guid,Test,platform:Linux,a:b0,"
-  let res : Result[Mapping, Error] = try
-    Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
+  let res : Result[@gamepad.Mapping, Error] = try
+    @gamepad.Mapping::parse_sdl_mapping(map_str, buttons, axes) |> Ok
   catch {
     e => Err(e)
   }
@@ -341,14 +343,14 @@ test "parse_sdl_mapping invalid guid maps to InvalidGuid" {
 
 ///|
 test "mapping_db insert respects platform tag" {
-  let db = MappingDb::new()
-  let platform = runtime_sdl_platform_name()
+  let db = @gamepad.MappingDb::new()
+  let platform = @gamepad.runtime_sdl_platform_name()
   let other = if platform == "Mac OS X" { "Linux" } else { "Mac OS X" }
   let uuid = "22222222222222222222222222222222"
   let non_match = uuid + ",Wrong,a:b0,platform:" + other + ","
   let yes_match = uuid + ",Right,a:b0,platform:" + platform + ","
   db.insert(non_match + "\n" + yes_match)
-  inspect(db.get(Uuid::parse(uuid)) == Some(yes_match), content="true")
+  inspect(db.get(@gamepad.Uuid::parse(uuid)) == Some(yes_match), content="true")
 }
 
 ///|
@@ -356,10 +358,10 @@ test "mapping_db add_env_mappings reads SDL_GAMECONTROLLERCONFIG" {
   runtime_set_sdl_gamecontrollerconfig_for_test(
     "33333333333333333333333333333333,Env Mapping,a:b0,",
   )
-  let db = MappingDb::new()
+  let db = @gamepad.MappingDb::new()
   db.add_env_mappings()
   inspect(
-    db.get(Uuid::parse("33333333333333333333333333333333")) is Some(_),
+    db.get(@gamepad.Uuid::parse("33333333333333333333333333333333")) is Some(_),
     content="true",
   )
   runtime_clear_sdl_gamecontrollerconfig_for_test()
@@ -367,30 +369,34 @@ test "mapping_db add_env_mappings reads SDL_GAMECONTROLLERCONFIG" {
 
 ///|
 test "mapping_db add_included_mappings loads bundled mapping" {
-  let db = MappingDb::new()
+  let db = @gamepad.MappingDb::new()
   db.add_included_mappings()
-  let platform = runtime_sdl_platform_name()
+  let platform = @gamepad.runtime_sdl_platform_name()
   if platform == "Mac OS X" {
     inspect(db.len() >= 200, content="true")
     inspect(
-      db.get(Uuid::parse("03000000c82d00001930000000000000")) is Some(_),
+      db.get(@gamepad.Uuid::parse("03000000c82d00001930000000000000"))
+      is Some(_),
       content="true",
     )
   } else if platform == "Linux" {
     inspect(db.len() >= 500, content="true")
     inspect(
-      db.get(Uuid::parse("03000000c82d00001930000011010000")) is Some(_),
+      db.get(@gamepad.Uuid::parse("03000000c82d00001930000011010000"))
+      is Some(_),
       content="true",
     )
   } else if platform == "Windows" {
     inspect(db.len() >= 500, content="true")
     inspect(
-      db.get(Uuid::parse("03000000300f00000a01000000000000")) is Some(_),
+      db.get(@gamepad.Uuid::parse("03000000300f00000a01000000000000"))
+      is Some(_),
       content="true",
     )
   } else {
     inspect(
-      db.get(Uuid::parse("030000005e0400008e02000002010000")) is Some(_),
+      db.get(@gamepad.Uuid::parse("030000005e0400008e02000002010000"))
+      is Some(_),
       content="true",
     )
   }

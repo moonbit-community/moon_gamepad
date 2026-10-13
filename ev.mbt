@@ -13,7 +13,7 @@
 // limitations under the License.
 
 ///|
-pub type Code = Int
+pub type Code = Int32
 
 ///|
 pub(all) enum Axis {
@@ -50,7 +50,7 @@ pub fn Axis::second_axis(self : Axis) -> Axis? {
 }
 
 ///|
-pub fn Axis::to_index(self : Axis) -> Int {
+pub fn Axis::to_index(self : Axis) -> Int32 {
   match self {
     LeftStickX => 0
     LeftStickY => 1
@@ -65,7 +65,7 @@ pub fn Axis::to_index(self : Axis) -> Int {
 }
 
 ///|
-pub const AXIS_COUNT : Int = 9
+pub const AXIS_COUNT : Int32 = 9
 
 ///|
 pub(all) enum Button {
@@ -132,7 +132,7 @@ pub fn Button::is_dpad(self : Button) -> Bool {
 }
 
 ///|
-pub fn Button::to_index(self : Button) -> Int {
+pub fn Button::to_index(self : Button) -> Int32 {
   match self {
     South => 0
     East => 1
@@ -158,7 +158,7 @@ pub fn Button::to_index(self : Button) -> Int {
 }
 
 ///|
-pub const BUTTON_COUNT : Int = 20
+pub const BUTTON_COUNT : Int32 = 20
 
 ///|
 pub(all) enum AxisOrBtn {

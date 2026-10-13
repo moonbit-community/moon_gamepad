@@ -19,9 +19,9 @@ pub enum PowerInfo {
   /// Device doesn't have battery.
   Wired
   /// Device is running on the battery (0..=100).
-  Discharging(Int)
+  Discharging(Int32)
   /// Battery is charging (0..=100).
-  Charging(Int)
+  Charging(Int32)
   /// Battery is charged.
   Charged
 }

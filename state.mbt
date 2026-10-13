@@ -72,7 +72,7 @@ pub struct AxisData {
 
 ///|
 fn AxisData::new(value : Double, counter : Int64, time : Int64) -> AxisData {
-  { last_event_ts: time, last_event_c: counter, value }
+  { last_event_ts: time, last_event_c: counter, value, }
 }
 
 ///|
@@ -98,7 +98,7 @@ pub struct GamepadState {
 
 ///|
 pub fn GamepadState::new() -> GamepadState {
-  { buttons: [], axes: [] }
+  { buttons: [], axes: [], }
 }
 
 ///|
@@ -116,7 +116,7 @@ pub fn GamepadState::axes_entries(
 }
 
 ///|
-fn find_idx_button(buttons : Array[(Code, ButtonData)], code : Code) -> Int? {
+fn find_idx_button(buttons : Array[(Code, ButtonData)], code : Code) -> Int32? {
   for i in 0..<buttons.length() {
     let (c, _) = buttons[i]
     if c == code {
@@ -127,7 +127,7 @@ fn find_idx_button(buttons : Array[(Code, ButtonData)], code : Code) -> Int? {
 }
 
 ///|
-fn find_idx_axis(axes : Array[(Code, AxisData)], code : Code) -> Int? {
+fn find_idx_axis(axes : Array[(Code, AxisData)], code : Code) -> Int32? {
   for i in 0..<axes.length() {
     let (c, _) = axes[i]
     if c == code {

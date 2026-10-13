@@ -13,7 +13,7 @@
 // limitations under the License.
 
 ///|
-fn core_event_sig(e : Event) -> (Int, Int, Double, Int) {
+fn core_event_sig(e : @gamepad.Event) -> (Int32, Int32, Double, Int32) {
   match e.event() {
     AxisChanged(axis, val, code) => (0, axis.to_index(), val, code)
     ButtonPressed(btn, code) => (1, btn.to_index(), 1.0, code)
@@ -25,32 +25,51 @@ fn core_event_sig(e : Event) -> (Int, Int, Double, Int) {
 }
 
 ///|
-fn build_ok_core(builder : GilBuilder) -> Gil {
-  let res : Result[Gil, GilError] = try builder.build() |> Ok catch {
+fn build_ok_core(builder : @gamepad.GilBuilder) -> @gamepad.Gil {
+  let res : Result[@gamepad.Gil, @gamepad.GilError] = try
+    builder.build() |> Ok
+  catch {
     e => Err(e)
   }
   match res {
     Ok(g) => g
-    Err(_) => Gil::new_mock(0, update_state=false, default_filters=false)
+    Err(_) =>
+      @gamepad.Gil::new_mock(0, update_state=false, default_filters=false)
   }
 }
 
 ///|
 test "gil next_event default filters skip dropped" {
-  let g = Gil::new_mock(1, update_state=true, default_filters=true)
-  let id = GamepadId::new(0)
-  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.5, AXIS_LSTICKX), 1L))
+  let g = @gamepad.Gil::new_mock(1, update_state=true, default_filters=true)
+  let id = @gamepad.GamepadId::new(0)
   g.insert_event(
-    Event::at(id, AxisChanged(LeftStickX, 0.505, AXIS_LSTICKX), 2L),
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.5, @gamepad.AXIS_LSTICKX),
+      1L,
+    ),
   )
-  g.insert_event(Event::at(id, AxisChanged(LeftStickX, 0.7, AXIS_LSTICKX), 3L))
+  g.insert_event(
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.505, @gamepad.AXIS_LSTICKX),
+      2L,
+    ),
+  )
+  g.insert_event(
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.7, @gamepad.AXIS_LSTICKX),
+      3L,
+    ),
+  )
   let ev1 = g.next_event()
   debug_inspect(ev1.map(core_event_sig), content="Some((0, 0, 0.5, 65584))")
   let ev2 = g.next_event()
   // The small-delta event is dropped by Jitter and skipped.
   debug_inspect(ev2.map(core_event_sig), content="Some((0, 0, 0.7, 65584))")
   debug_inspect(
-    g.state(id).map(fn(s) { s.value(AXIS_LSTICKX) }),
+    g.state(id).map(fn(s) { s.value(@gamepad.AXIS_LSTICKX) }),
     content="Some(0.7)",
   )
   inspect(g.next_event() is None, content="true")
@@ -58,7 +77,7 @@ test "gil next_event default filters skip dropped" {
 
 ///|
 test "builder build_mock wires flags" {
-  let b = GilBuilder::new()
+  let b = @gamepad.GilBuilder::new()
     .with_default_filters(true)
     .set_update_state(false)
     .with_mock_gamepad_count(1)
@@ -69,8 +88,8 @@ test "builder build_mock wires flags" {
 
 ///|
 test "builder rejects invalid axis_to_btn thresholds" {
-  let bad : Result[Gil, GilError] = try
-    GilBuilder::new().set_axis_to_btn(0.4, 0.5).build() |> Ok
+  let bad : Result[@gamepad.Gil, @gamepad.GilError] = try
+    @gamepad.GilBuilder::new().set_axis_to_btn(0.4, 0.5).build() |> Ok
   catch {
     e => Err(e)
   }
@@ -84,24 +103,30 @@ test "builder rejects invalid axis_to_btn thresholds" {
 ///|
 test "gamepad handle delegates mapping/state" {
   let g = build_ok_core(
-    GilBuilder::new()
+    @gamepad.GilBuilder::new()
     .with_default_filters(false)
     .set_update_state(false)
     .with_mock_gamepad_count(1),
   )
-  let id = GamepadId::new(0)
-  let m = Mapping::new()
-  m.insert(BTN_SOUTH, Btn(South))
-  m.insert(AXIS_LSTICKX, Axis(LeftStickX))
+  let id = @gamepad.GamepadId::new(0)
+  let m = @gamepad.Mapping::new()
+  m.insert(@gamepad.BTN_SOUTH, Btn(South))
+  m.insert(@gamepad.AXIS_LSTICKX, Axis(LeftStickX))
   g.set_mapping(id, m)
   let gp = g.gamepad(id).unwrap()
-  let ok = match gp.axis_or_btn_name(BTN_SOUTH) {
+  let ok = match gp.axis_or_btn_name(@gamepad.BTN_SOUTH) {
     Some(Btn(South)) => true
     _ => false
   }
   inspect(ok, content="true")
-  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
-  g.update(Event::at(id, AxisChanged(LeftStickX, 0.25, AXIS_LSTICKX), 1L))
+  g.update(@gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 0L))
+  g.update(
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.25, @gamepad.AXIS_LSTICKX),
+      1L,
+    ),
+  )
   let gp2 = g.gamepad(id).unwrap()
   inspect(gp2.is_pressed(South), content="true")
   inspect(gp2.value(LeftStickX), content="0.25")
@@ -117,14 +142,14 @@ test "gamepad handle delegates mapping/state" {
 
 ///|
 test "gamepad name/map_name/os_name semantics" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
   let gp0 = g.gamepad(id).unwrap()
   let os_name = gp0.os_name()
   debug_inspect(gp0.map_name(), content="Some(\"\")")
   inspect(gp0.name() == os_name, content="true")
 
-  let data = MappingData::new()
+  let data = @gamepad.MappingData::new()
   ignore(g.set_mapping_data(id, data, name=Some("Mapped Pad")))
   let gp1 = g.gamepad(id).unwrap()
   debug_inspect(gp1.map_name(), content="Some(\"Mapped Pad\")")
@@ -134,10 +159,16 @@ test "gamepad name/map_name/os_name semantics" {
 
 ///|
 test "gamepad semantic accessors follow gil mapping rules" {
-  let g = Gil::new_mock(1, update_state=false, default_filters=false)
-  let id = GamepadId::new(0)
-  g.update(Event::at(id, ButtonPressed(South, BTN_SOUTH), 0L))
-  g.update(Event::at(id, AxisChanged(LeftStickX, 0.42, AXIS_LSTICKX), 1L))
+  let g = @gamepad.Gil::new_mock(1, update_state=false, default_filters=false)
+  let id = @gamepad.GamepadId::new(0)
+  g.update(@gamepad.Event::at(id, ButtonPressed(South, @gamepad.BTN_SOUTH), 0L))
+  g.update(
+    @gamepad.Event::at(
+      id,
+      AxisChanged(LeftStickX, 0.42, @gamepad.AXIS_LSTICKX),
+      1L,
+    ),
+  )
   let gp = g.gamepad(id).unwrap()
   inspect(gp.is_pressed(South), content="true")
   inspect(gp.value(LeftStickX), content="0")
